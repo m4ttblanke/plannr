@@ -1,0 +1,101 @@
+####################################
+# macOS
+####################################
+.DS_Store
+.AppleDouble
+.LSOverride
+
+####################################
+# Xcode
+####################################
+xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
+*.xcworkspace/xcuserdata/
+.swiftpm/
+Package.resolved
+timeline.xctimeline
+playground.xcworkspace
+*.gcno
+*.gcda
+*.profraw
+
+####################################
+# CocoaPods
+####################################
+Pods/
+
+####################################
+# Fastlane
+####################################
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+
+####################################
+# Python
+####################################
+__pycache__/
+*.py[cod]
+*.so
+.Python
+dist/
+*.egg-info/
+*.egg
+MANIFEST
+
+####################################
+# Virtual environments
+####################################
+venv/
+.venv/
+ENV/
+env/
+
+####################################
+# Testing
+####################################
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+.tox/
+.nox/
+
+####################################
+# Environment / secrets — never commit
+####################################
+.env
+.envrc
+
+####################################
+# Database files — never commit
+####################################
+*.db
+*.sqlite
+*.sqlite3
+
+####################################
+# Logs & temp
+####################################
+*.log
+*.swp
+*.tmp
+
+####################################
+# Claude Code local settings
+####################################
+.claude/settings.local.json
+
+####################################
+# JetBrains
+####################################
+.idea/
+
+####################################
+# Ruff
+####################################
+.ruff_cache/
