@@ -2,26 +2,25 @@ from fastapi import FastAPI, File, UploadFile, Query, Body
 from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 import google.generativeai as genai
 from PyPDF2 import PdfReader
-import os
 import time
 import secrets
 import hashlib
 import base64
 import csv
 import io
+import json
 from io import BytesIO
 from datetime import date as date_type
 from icalendar import Calendar as ICalendar, Event as ICalEvent
-from dotenv import load_dotenv
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
-from database.db_manager import init_db, fetch_user_creds, update_creds
-import json
 from pydantic import BaseModel
 from typing import List, Optional
 from pdf2image import convert_from_bytes
 import pytesseract
+from config import settings
+from repositories.user_repository import initialize, get_google_credentials, upsert_google_credentials
 
 
 class CalendarEvent(BaseModel):
@@ -52,20 +51,9 @@ class CalendarClassSyncRequest(BaseModel):
     background_color: Optional[str] = None  # Hex color for calendar background (e.g., "#FF5733")
     foreground_color: Optional[str] = None  # Hex color for text (e.g., "#FFFFFF")
 
-# Load environment variables from .env file
-load_dotenv()
-
-# Configure Gemini API
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if not GEMINI_API_KEY:
-    raise ValueError("GEMINI_API_KEY environment variable not set. Please add it to your .env file.")
-
-genai.configure(api_key=GEMINI_API_KEY)
-
-# Google OAuth Configuration
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
-GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
-GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/auth/callback")
+# Configure Gemini API if key is available
+if settings.gemini_api_key:
+    genai.configure(api_key=settings.gemini_api_key)
 
 SCOPES = [
     'https://www.googleapis.com/auth/calendar',
@@ -89,7 +77,7 @@ def _cleanup_expired_states():
 
 
 # Initialize database on startup
-init_db()
+initialize()
 
 app = FastAPI(
     title='Plannr API',
@@ -98,25 +86,37 @@ app = FastAPI(
 
 
 def get_oauth_flow():
-    """Create OAuth flow with client config"""
+    """Create OAuth flow from settings."""
     client_config = {
         "web": {
-            "client_id": GOOGLE_CLIENT_ID,
-            "client_secret": GOOGLE_CLIENT_SECRET,
+            "client_id": settings.google_client_id,
+            "client_secret": settings.google_client_secret,
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
             "token_uri": "https://oauth2.googleapis.com/token",
-            "redirect_uris": [GOOGLE_REDIRECT_URI]
+            "redirect_uris": [settings.google_redirect_uri],
         }
     }
     flow = Flow.from_client_config(client_config, scopes=SCOPES)
-    flow.redirect_uri = GOOGLE_REDIRECT_URI
+    flow.redirect_uri = settings.google_redirect_uri
     return flow
+
+
+def _build_credentials(creds_data: dict) -> Credentials:
+    """Reconstruct a Google Credentials object from a stored credentials dict."""
+    return Credentials(
+        token=creds_data.get("token"),
+        refresh_token=creds_data.get("refresh_token"),
+        token_uri=creds_data.get("token_uri"),
+        client_id=creds_data.get("client_id"),
+        client_secret=creds_data.get("client_secret"),
+        scopes=creds_data.get("scopes"),
+    )
 
 
 @app.get('/auth/google', tags=['OAuth'])
 async def google_auth():
     """Start OAuth flow - redirects to Google sign-in"""
-    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+    if not settings.google_client_id or not settings.google_client_secret:
         return JSONResponse(
             status_code=500,
             content={"error": "Google OAuth credentials not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env"}
@@ -180,9 +180,7 @@ async def auth_callback(code: str = Query(...), state: str = Query(None), redire
             'scopes': credentials.scopes
         }
 
-        # Ensure user exists and update credentials
-        fetch_user_creds(email)  # This creates user if not exists
-        update_creds(email, creds_data)
+        upsert_google_credentials(email, creds_data)
 
         # Redirect to iOS app with custom URL scheme
         from urllib.parse import quote
@@ -482,27 +480,14 @@ Return a **single JSON object** in this exact format:
 async def add_to_calendar(email: str = Query(...), request: CalendarSyncRequest = Body(...)):
     """Add parsed syllabus events to user's Google Calendar"""
     try:
-        # Get user credentials from database
-        creds_json = fetch_user_creds(email)
-        if not creds_json:
+        creds_data = get_google_credentials(email)
+        if not creds_data:
             return JSONResponse(
                 status_code=401,
                 content={"error": "User not authenticated. Please sign in with Google first."}
             )
 
-        # Parse stored credentials
-        creds_data = json.loads(creds_json)
-        credentials = Credentials(
-            token=creds_data.get('token'),
-            refresh_token=creds_data.get('refresh_token'),
-            token_uri=creds_data.get('token_uri'),
-            client_id=creds_data.get('client_id'),
-            client_secret=creds_data.get('client_secret'),
-            scopes=creds_data.get('scopes')
-        )
-
-        # Build Calendar service
-        service = build('calendar', 'v3', credentials=credentials)
+        service = build('calendar', 'v3', credentials=_build_credentials(creds_data))
 
         created_events = []
         for event in request.events:
@@ -619,20 +604,11 @@ async def sync_class_calendar(email: str = Query(...), request: CalendarClassSyn
     Returns the google_calendar_id and per-event mappings {local_id, google_event_id}.
     """
     try:
-        creds_json = fetch_user_creds(email)
-        if not creds_json:
+        creds_data = get_google_credentials(email)
+        if not creds_data:
             return JSONResponse(status_code=401, content={"error": "User not authenticated."})
 
-        creds_data = json.loads(creds_json)
-        credentials = Credentials(
-            token=creds_data.get('token'),
-            refresh_token=creds_data.get('refresh_token'),
-            token_uri=creds_data.get('token_uri'),
-            client_id=creds_data.get('client_id'),
-            client_secret=creds_data.get('client_secret'),
-            scopes=creds_data.get('scopes')
-        )
-        service = build('calendar', 'v3', credentials=credentials)
+        service = build('calendar', 'v3', credentials=_build_credentials(creds_data))
 
         # ── Step 1: get or create the secondary calendar ──────────────────────
         cal_id = None
@@ -722,20 +698,11 @@ async def sync_class_calendar(email: str = Query(...), request: CalendarClassSyn
 async def delete_class_calendar(email: str = Query(...), google_calendar_id: str = Query(...)):
     """Delete a secondary Google Calendar by its ID."""
     try:
-        creds_json = fetch_user_creds(email)
-        if not creds_json:
+        creds_data = get_google_credentials(email)
+        if not creds_data:
             return JSONResponse(status_code=401, content={"error": "User not authenticated."})
 
-        creds_data = json.loads(creds_json)
-        credentials = Credentials(
-            token=creds_data.get('token'),
-            refresh_token=creds_data.get('refresh_token'),
-            token_uri=creds_data.get('token_uri'),
-            client_id=creds_data.get('client_id'),
-            client_secret=creds_data.get('client_secret'),
-            scopes=creds_data.get('scopes')
-        )
-        service = build('calendar', 'v3', credentials=credentials)
+        service = build('calendar', 'v3', credentials=_build_credentials(creds_data))
         service.calendars().delete(calendarId=google_calendar_id).execute()
         return JSONResponse(status_code=200, content={"message": "Calendar deleted."})
 
@@ -757,8 +724,7 @@ async def export_events(
             content={"error": "format must be 'ics' or 'csv'"}
         )
 
-    creds_json = fetch_user_creds(email)
-    if not creds_json:
+    if not get_google_credentials(email):
         return JSONResponse(
             status_code=401,
             content={"error": "User not authenticated. Please sign in with Google first."}

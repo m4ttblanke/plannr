@@ -1,6 +1,5 @@
 """Tests for POST /export endpoint (.ics and .csv export)."""
 
-import json
 from unittest.mock import patch
 
 import pytest
@@ -23,7 +22,7 @@ SAMPLE_EVENTS = [
     }
 ]
 
-FAKE_CREDS = json.dumps({"token": "fake-token", "refresh_token": "fake-refresh"})
+FAKE_CREDS = {"token": "fake-token", "refresh_token": "fake-refresh"}
 
 
 @pytest.fixture
@@ -33,7 +32,7 @@ def client():
 
 def test_export_ics_valid(client):
     """Valid request with authenticated user returns a text/calendar response containing VEVENTs."""
-    with patch("app.fetch_user_creds", return_value=FAKE_CREDS):
+    with patch("app.get_google_credentials", return_value=FAKE_CREDS):
         resp = client.post(
             "/export",
             params={"email": "student@example.com", "format": "ics"},
@@ -51,7 +50,7 @@ def test_export_ics_valid(client):
 
 def test_export_csv_valid(client):
     """Valid request with authenticated user returns a text/csv response with correct columns."""
-    with patch("app.fetch_user_creds", return_value=FAKE_CREDS):
+    with patch("app.get_google_credentials", return_value=FAKE_CREDS):
         resp = client.post(
             "/export",
             params={"email": "student@example.com", "format": "csv"},
@@ -70,7 +69,7 @@ def test_export_csv_valid(client):
 
 def test_export_invalid_format(client):
     """Unsupported format parameter returns 400."""
-    with patch("app.fetch_user_creds", return_value=FAKE_CREDS):
+    with patch("app.get_google_credentials", return_value=FAKE_CREDS):
         resp = client.post(
             "/export",
             params={"email": "student@example.com", "format": "pdf"},
@@ -82,7 +81,7 @@ def test_export_invalid_format(client):
 
 def test_export_unauthenticated(client):
     """Email with no stored credentials returns 401."""
-    with patch("app.fetch_user_creds", return_value=None):
+    with patch("app.get_google_credentials", return_value=None):
         resp = client.post(
             "/export",
             params={"email": "unknown@example.com", "format": "ics"},
@@ -94,7 +93,7 @@ def test_export_unauthenticated(client):
 
 def test_export_empty_events(client):
     """Authenticated user with an empty events list returns 400."""
-    with patch("app.fetch_user_creds", return_value=FAKE_CREDS):
+    with patch("app.get_google_credentials", return_value=FAKE_CREDS):
         resp = client.post(
             "/export",
             params={"email": "student@example.com", "format": "ics"},
