@@ -1,21 +1,64 @@
-import json
-from database.db_manager import fetch_user_creds, update_creds, init_db as _init_db
+from contextlib import contextmanager
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+from db import SessionLocal, engine
+from models import User, GoogleCredentials
+
+
+@contextmanager
+def _session():
+    db: Session = SessionLocal()
+    try:
+        yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
 
 
 def initialize() -> None:
-    """Initialize the database. Called once at application startup."""
-    _init_db()
+    """Verify database connectivity at startup."""
+    with engine.connect() as conn:
+        conn.execute(text("SELECT 1"))
+    print("Database connection verified.")
 
 
 def get_google_credentials(email: str) -> dict | None:
     """Return the stored Google OAuth credentials for the given email, or None."""
-    raw = fetch_user_creds(email)
-    if raw is None:
-        return None
-    return json.loads(raw)
+    with _session() as db:
+        user = db.query(User).filter(User.email == email).first()
+        if not user or not user.credentials:
+            return None
+        cred = user.credentials
+        return {
+            "token": cred.access_token,
+            "refresh_token": cred.refresh_token,
+            "token_uri": cred.token_uri,
+            "scopes": cred.scopes,
+        }
 
 
 def upsert_google_credentials(email: str, creds: dict) -> None:
     """Create the user if needed, then store their Google OAuth credentials."""
-    fetch_user_creds(email)  # creates user row if this is a new email
-    update_creds(email, creds)
+    with _session() as db:
+        user = db.query(User).filter(User.email == email).first()
+        if not user:
+            user = User(email=email)
+            db.add(user)
+            db.flush()  # populate user.id before inserting credentials
+
+        if user.credentials:
+            user.credentials.access_token = creds.get("token")
+            user.credentials.refresh_token = creds["refresh_token"]
+            user.credentials.token_uri = creds["token_uri"]
+            user.credentials.scopes = creds.get("scopes")
+        else:
+            db.add(GoogleCredentials(
+                user_id=user.id,
+                access_token=creds.get("token"),
+                refresh_token=creds["refresh_token"],
+                token_uri=creds["token_uri"],
+                scopes=creds.get("scopes"),
+            ))

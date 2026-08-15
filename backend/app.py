@@ -107,8 +107,8 @@ def _build_credentials(creds_data: dict) -> Credentials:
         token=creds_data.get("token"),
         refresh_token=creds_data.get("refresh_token"),
         token_uri=creds_data.get("token_uri"),
-        client_id=creds_data.get("client_id"),
-        client_secret=creds_data.get("client_secret"),
+        client_id=settings.google_client_id,
+        client_secret=settings.google_client_secret,
         scopes=creds_data.get("scopes"),
     )
 
@@ -170,14 +170,12 @@ async def auth_callback(code: str = Query(...), state: str = Query(None), redire
         email = user_info.get('email')
         name = user_info.get('name', '')
 
-        # Store credentials in database
+        # Store credentials — client_id/secret come from settings, not storage
         creds_data = {
             'token': credentials.token,
             'refresh_token': credentials.refresh_token,
             'token_uri': credentials.token_uri,
-            'client_id': credentials.client_id,
-            'client_secret': credentials.client_secret,
-            'scopes': credentials.scopes
+            'scopes': list(credentials.scopes or []),
         }
 
         upsert_google_credentials(email, creds_data)
