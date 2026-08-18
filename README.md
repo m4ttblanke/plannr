@@ -55,6 +55,20 @@ brew install tesseract poppler
 sudo apt-get install tesseract-ocr poppler-utils -y
 ```
 
+## Deployment
+
+The production backend is deployed on [Render](https://render.com) and is accessible at:
+
+```
+https://plannr-api.onrender.com
+```
+
+Deployment is automated — every push to `main` triggers a redeploy via `render.yaml`. The `alembic upgrade head` migration runs automatically on each deploy before the server starts.
+
+The production database is a Render-managed PostgreSQL instance. The `render.yaml` at the repo root defines both the web service and the database.
+
+> **Note:** The Render free tier spins down after 15 minutes of inactivity. The first request after a period of inactivity may take up to 30 seconds while the service wakes up.
+
 ## Local Development Setup
 
 ### 1. Clone the repo
@@ -115,7 +129,15 @@ The API will be available at `http://localhost:8000`. Interactive docs at `http:
 open ../Plannr/Plannr.xcodeproj
 ```
 
-The backend URL is configured in `Plannr/Plannr/Config.swift`. It defaults to `http://localhost:8000/` for local development. Change it there when pointing at a production server.
+The backend URL is configured in `Plannr/Plannr/Config.swift`. Change it there to switch between local dev and production:
+
+```swift
+// Local dev
+let BACKEND_URL = "http://localhost:8000/"
+
+// Production
+let BACKEND_URL = "https://plannr-api.onrender.com/"
+```
 
 Press `Cmd+R` to build and run on a simulator or device.
 
