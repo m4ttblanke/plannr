@@ -1,6 +1,7 @@
 from fastapi import FastAPI, File, UploadFile, Query, Body
 from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
-import google.generativeai as genai
+from google import genai
+from google.genai import types as genai_types
 from PyPDF2 import PdfReader
 import time
 import secrets
@@ -51,9 +52,8 @@ class CalendarClassSyncRequest(BaseModel):
     background_color: Optional[str] = None  # Hex color for calendar background (e.g., "#FF5733")
     foreground_color: Optional[str] = None  # Hex color for text (e.g., "#FFFFFF")
 
-# Configure Gemini API if key is available
-if settings.gemini_api_key:
-    genai.configure(api_key=settings.gemini_api_key)
+# Gemini client — None if key not configured
+_gemini_client = genai.Client(api_key=settings.gemini_api_key) if settings.gemini_api_key else None
 
 SCOPES = [
     'https://www.googleapis.com/auth/calendar',
@@ -295,21 +295,10 @@ def extract_text_via_ocr(pdf_bytes: bytes) -> str:
 
 async def parse_with_gemini(syllabus_text: str) -> dict:
     """Use Gemini to extract calendar events from syllabus text"""
+    if not _gemini_client:
+        print("Gemini API key not configured.")
+        return {"events": []}
     try:
-        # Configure generation settings for more deterministic output
-        generation_config = genai.types.GenerationConfig(
-            temperature=0.1,  # Lower temperature for more consistent output
-            top_p=0.8,       # Nucleus sampling
-            top_k=40,        # Top-k sampling  
-            max_output_tokens=4096,  # Limit response length
-            response_mime_type="application/json"  # Force JSON output
-        )
-        
-        model = genai.GenerativeModel(
-            'gemini-2.5-flash',
-            generation_config=generation_config
-        )
-        
         prompt = f"""
         You are an AI assistant that parses university course syllabi into a structured list of **graded deliverables**. The user has provided the full syllabus text. Your job is to accurately extract **what is due**, **when it is due**, and **how it should be labeled**, using careful temporal and contextual reasoning.
 
@@ -440,7 +429,17 @@ Return a **single JSON object** in this exact format:
         {syllabus_text}
         """
         
-        response = model.generate_content(prompt)
+        response = _gemini_client.models.generate_content(
+            model='gemini-3.7-flash',
+            contents=prompt,
+            config=genai_types.GenerateContentConfig(
+                temperature=0.1,
+                top_p=0.8,
+                top_k=40,
+                max_output_tokens=4096,
+                response_mime_type='application/json',
+            ),
+        )
         
         # Parse the response (Gemini should return JSON)
         import json
