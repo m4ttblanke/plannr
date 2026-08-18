@@ -7,4 +7,4 @@
 //  Production: https://your-domain.com/
 //
 
-let BACKEND_URL = "http://localhost:8000/"
+let BACKEND_URL = "https://plannr-api.onrender.com/"
