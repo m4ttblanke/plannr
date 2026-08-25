@@ -33,6 +33,7 @@ https://github.com/ucsb-cs148-w26/pj07-syllabus-to-cal-2pm
 - **Google OAuth 2.0** — authentication and Calendar API access
 - **Google Calendar API** — creating and syncing calendar events
 - **Google Gemini** — AI-powered syllabus parsing
+- **Stripe** — one-time payment gating access to the TestFlight demo
 
 ## Prerequisites
 
@@ -108,6 +109,9 @@ Edit `backend/.env` and fill in your values:
 | `GOOGLE_REDIRECT_URI` | Must match a URI registered in Google Cloud Console. Use `http://localhost:8000/auth/callback` for local dev. |
 | `GEMINI_API_KEY` | Gemini API key from AI Studio |
 | `DATABASE_URL` | PostgreSQL connection string — e.g. `postgresql://your_macos_username@localhost:5432/plannr` |
+| `STRIPE_SECRET_KEY` | Optional. Restricted key (`rk_...`) with "Checkout Sessions: Read" permission, from [dashboard.stripe.com/apikeys](https://dashboard.stripe.com/apikeys). Only needed to test the TestFlight payment flow. |
+| `STRIPE_WEBHOOK_SECRET` | Optional. Signing secret (`whsec_...`) for the `/stripe/webhook` endpoint. |
+| `TESTFLIGHT_LINK` | Optional. Public TestFlight join link from App Store Connect, revealed to customers after payment. |
 
 ### 5. Run database migrations
 
@@ -150,6 +154,27 @@ Press `Cmd+R` to build and run on a simulator or device.
 5. **Sync** — Tapping Sync creates a dedicated secondary Google Calendar for the class (named after it, colored to match) and pushes all accepted events as all-day events.
 6. **Re-sync** — If you edit or delete events later, or upload a new syllabus, the app reconciles changes and pushes only the diff to Google Calendar.
 
+## TestFlight Access (Stripe)
+
+The landing page (`docs/index.html`) has a "Get TestFlight Access" button that links to a Stripe Payment Link for a one-time payment. Two backend routes handle it:
+
+- `GET /testflight/success` — the Payment Link's redirect target. Verifies the Checkout Session server-side and reveals the public TestFlight join link (`TESTFLIGHT_LINK`) only once payment is confirmed. This is UX only — customers aren't guaranteed to land here (they may close the tab after paying).
+- `POST /stripe/webhook` — the source of truth for fulfillment. Verifies the event signature and handles `checkout.session.completed` / `checkout.session.async_payment_succeeded` (gated on `payment_status != 'unpaid'`).
+
+Both the Payment Link and the webhook endpoint (Dashboard → Webhooks → pointed at `https://plannr-api.onrender.com/stripe/webhook`) are configured directly in the Stripe Dashboard — there's no code path that creates them.
+
+### Testing without real money
+
+Use Stripe's test mode (toggle in the Dashboard) — it's fully isolated from live mode and requires a separate test-mode product, Payment Link, and restricted key (`rk_test_...`).
+
+```bash
+brew install stripe/stripe-cli/stripe
+stripe login
+stripe listen --forward-to localhost:8000/stripe/webhook   # prints a temporary whsec_... — put it in .env as STRIPE_WEBHOOK_SECRET
+```
+
+Point your test Payment Link's redirect at `http://localhost:8000/testflight/success?session_id={CHECKOUT_SESSION_ID}` (keep the literal `{CHECKOUT_SESSION_ID}` placeholder — Stripe substitutes it), run the backend locally with the test-mode `STRIPE_SECRET_KEY`, then pay with card `4242 4242 4242 4242` (any future expiry/CVC/ZIP). No real charge occurs.
+
 ## Project Structure
 
 ```
@@ -173,6 +198,11 @@ plannr/
 │   ├── .env.example
 │   └── tests/
 └── docs/
+    ├── index.html           Landing page
+    ├── style.css
+    ├── privacy.html
+    ├── terms.html
+    ├── PlannrDemo.mp4
     ├── MANUAL.md
     ├── PRIVACY_POLICY.md
     └── TERMS_OF_SERVICE.md
