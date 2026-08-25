@@ -426,13 +426,20 @@ struct CalendarEvent: Codable, Identifiable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
-        title = try container.decode(String.self, forKey: .title)
-        date = try container.decode(String.self, forKey: .date)
-        type = try container.decode(String.self, forKey: .type)
-        description = try container.decode(String.self, forKey: .description)
+        title = try container.decodeIfPresent(String.self, forKey: .title) ?? "Untitled"
+        date = try container.decodeIfPresent(String.self, forKey: .date) ?? ""
+        type = try container.decodeIfPresent(String.self, forKey: .type) ?? "other"
+        description = try container.decodeIfPresent(String.self, forKey: .description) ?? ""
         colorHex = try container.decodeIfPresent(String.self, forKey: .colorHex) ?? "007AFF"
         status = try container.decodeIfPresent(EventStatus.self, forKey: .status) ?? .pending
-        isSyllabus = try container.decodeIfPresent(Bool.self, forKey: .isSyllabus) ?? true
+        // isSyllabus is occasionally emitted by the LLM as a string ("true"/"True") rather
+        // than a JSON boolean, so fall back to parsing a string before defaulting.
+        if let boolValue = try? container.decodeIfPresent(Bool.self, forKey: .isSyllabus) {
+            isSyllabus = boolValue ?? true
+        } else {
+            let stringValue = try container.decodeIfPresent(String.self, forKey: .isSyllabus)
+            isSyllabus = stringValue.map { $0.lowercased() == "true" } ?? true
+        }
         isEdited = try container.decodeIfPresent(Bool.self, forKey: .isEdited) ?? false
         isTaskCompleted = try container.decodeIfPresent(Bool.self, forKey: .isTaskCompleted) ?? false
         googleEventId = try container.decodeIfPresent(String.self, forKey: .googleEventId)

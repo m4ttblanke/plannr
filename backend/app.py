@@ -35,6 +35,19 @@ class CalendarSyncRequest(BaseModel):
     events: List[CalendarEvent]
 
 
+class GeminiSyllabusEvent(BaseModel):
+    title: str
+    date: str
+    type: str
+    description: str
+    Class: str = "Unknown"
+    isSyllabus: bool = True
+
+
+class GeminiSyllabusResult(BaseModel):
+    events: List[GeminiSyllabusEvent]
+
+
 class SyncEventRequest(BaseModel):
     local_id: str
     title: str
@@ -420,7 +433,7 @@ Return a **single JSON object** in this exact format:
                     "type": "homework/exam/quiz/lab/other",
                     "description": "brief description",
                     "Class": "The name of the class the user is taking here",
-                    "isSyllabus": "True if syllabus false if not"
+                    "isSyllabus": true
                 }}
             ]
         }}
@@ -438,6 +451,7 @@ Return a **single JSON object** in this exact format:
                 top_k=40,
                 max_output_tokens=4096,
                 response_mime_type='application/json',
+                response_schema=GeminiSyllabusResult,
             ),
         )
         
