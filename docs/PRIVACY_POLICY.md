@@ -1,6 +1,6 @@
 # Privacy Policy for Plannr
 
-*Last updated: January 28, 2025*
+*Last updated: August 25, 2026*
 
 ## 1. Introduction
 
@@ -38,11 +38,20 @@ Your data is handled in accordance with [Google's Privacy Policy](https://polici
 - The iOS app stores only your name and email locally on your device.
 - We do not use analytics services or third-party tracking tools.
 
-## 6. Data Retention
+## 6. Data Protection & Security
+
+We take the following measures to protect your data, including sensitive data such as your Google OAuth credentials:
+
+- **Encryption in Transit:** All communication between the Plannr app, our backend server, and Google's APIs (OAuth, Calendar, Gemini) is encrypted using HTTPS/TLS.
+- **Encryption at Rest:** Our database is hosted on Render, which encrypts data at rest at the infrastructure level.
+- **Access Controls:** Our database is not publicly accessible and can only be reached by our backend service. OAuth access and refresh tokens are used exclusively server-side to make authorized calls to the Google Calendar API on your behalf and are never exposed in the app itself or in application logs.
+- **Data Minimization:** We collect and retain only the data necessary to provide the syllabus-to-calendar service, as described in Section 2. We do not use analytics or third-party tracking tools.
+
+## 7. Data Retention
 
 Your data is retained for as long as your account exists. Syllabus content is processed in memory and is not stored persistently after events have been extracted.
 
-## 7. Requesting Data Deletion
+## 8. Requesting Data Deletion
 
 You may request complete deletion of your account and all associated data at any time by contacting us at **plannr.ucsb@gmail.com**. Upon receiving your request, we will:
 
@@ -51,14 +60,18 @@ You may request complete deletion of your account and all associated data at any
 
 Please note that events already synced to your Google Calendar will remain in your calendar unless you delete them manually, as they belong to your Google account.
 
-## 8. Revoking Access
+## 9. Revoking Access
 
 You can revoke Plannr's access to your Google account at any time by visiting your [Google Account Permissions](https://myaccount.google.com/permissions) page and removing Plannr.
 
-## 9. Children's Privacy
+## 10. Children's Privacy
 
 Plannr is intended for university students and is not directed at children under 13. We do not knowingly collect data from children under 13.
 
-## 10. Changes to This Policy
+## 11. Limited Use Compliance Statement
+
+Plannr's use and transfer to any other app of information received from Google APIs will adhere to the [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy), including the Limited Use requirements.
+
+## 12. Changes to This Policy
 
 We may update this privacy policy from time to time. Any changes will be reflected by the "Last updated" date at the top of this page.
