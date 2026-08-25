@@ -1,5 +1,6 @@
-from fastapi import FastAPI, File, UploadFile, Query, Body
-from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
+from fastapi import FastAPI, File, UploadFile, Query, Body, Request
+from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse, HTMLResponse
+import stripe
 from google import genai
 from google.genai import types as genai_types
 from PyPDF2 import PdfReader
@@ -67,6 +68,8 @@ class CalendarClassSyncRequest(BaseModel):
 
 # Gemini client — None if key not configured
 _gemini_client = genai.Client(api_key=settings.gemini_api_key) if settings.gemini_api_key else None
+
+_stripe_client = stripe.StripeClient(settings.stripe_secret_key) if settings.stripe_secret_key else None
 
 SCOPES = [
     'https://www.googleapis.com/auth/calendar',
@@ -797,3 +800,117 @@ def _build_csv_response(events: List[CalendarEvent]) -> StreamingResponse:
         media_type='text/csv',
         headers={'Content-Disposition': 'attachment; filename="events.csv"'}
     )
+
+
+_TESTFLIGHT_PAGE = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>{title}</title>
+<style>
+  body {{
+    margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: #07111d; color: #f5f7fa; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    text-align: center; padding: 24px; box-sizing: border-box;
+  }}
+  .card {{ max-width: 420px; }}
+  h1 {{ font-size: 1.5rem; margin-bottom: 12px; }}
+  p {{ color: #9aa5b1; line-height: 1.6; margin-bottom: 28px; }}
+  a.btn {{
+    display: inline-block; padding: 13px 26px; border-radius: 10px; font-weight: 600;
+    text-decoration: none; background: #4f8cff; color: #07111d;
+  }}
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>{heading}</h1>
+    <p>{message}</p>
+    {action}
+  </div>
+</body>
+</html>"""
+
+
+@app.get('/testflight/success', tags=['TestFlight'], response_class=HTMLResponse)
+async def testflight_success(session_id: str = Query(...)):
+    """Verify a completed Stripe Checkout session and reveal the TestFlight link."""
+    if not _stripe_client:
+        return HTMLResponse(
+            _TESTFLIGHT_PAGE.format(
+                title="Not configured", heading="Not configured yet",
+                message="Stripe isn't set up on this server. Contact support.", action=""
+            ),
+            status_code=500
+        )
+
+    try:
+        session = _stripe_client.v1.checkout.sessions.retrieve(session_id)
+    except Exception:
+        return HTMLResponse(
+            _TESTFLIGHT_PAGE.format(
+                title="Invalid session", heading="We couldn't verify that",
+                message="This link looks invalid or expired. If you were just charged, contact support.", action=""
+            ),
+            status_code=400
+        )
+
+    if session.payment_status != 'paid':
+        return HTMLResponse(
+            _TESTFLIGHT_PAGE.format(
+                title="Payment incomplete", heading="Payment not completed",
+                message="We couldn't confirm your payment. If you believe this is an error, contact support.", action=""
+            ),
+            status_code=402
+        )
+
+    if not settings.testflight_link:
+        return HTMLResponse(
+            _TESTFLIGHT_PAGE.format(
+                title="Almost there", heading="Payment confirmed!",
+                message="We're still finishing TestFlight setup — check back shortly or contact support for your access link.",
+                action=""
+            ),
+            status_code=200
+        )
+
+    return HTMLResponse(
+        _TESTFLIGHT_PAGE.format(
+            title="You're in", heading="You're in!",
+            message="Thanks for your purchase. Tap below to join the Plannr TestFlight beta.",
+            action=f'<a class="btn" href="{settings.testflight_link}">Join TestFlight</a>'
+        )
+    )
+
+
+@app.post('/stripe/webhook', tags=['TestFlight'])
+async def stripe_webhook(request: Request):
+    """Source of truth for TestFlight access grants — the success page is UX only.
+
+    Customers aren't guaranteed to land on the success page (e.g. they close the tab
+    after paying), so fulfillment must be driven from this event handler, not the redirect.
+    """
+    if not settings.stripe_webhook_secret:
+        return JSONResponse(status_code=500, content={"error": "Webhook not configured"})
+
+    payload = await request.body()
+    sig_header = request.headers.get('stripe-signature', '')
+    try:
+        event = stripe.Webhook.construct_event(payload, sig_header, settings.stripe_webhook_secret)
+    except (ValueError, stripe.SignatureVerificationError):
+        return JSONResponse(status_code=400, content={"error": "Invalid signature"})
+
+    event_type = event['type']
+    session = event['data']['object'].to_dict()
+
+    if event_type in ('checkout.session.completed', 'checkout.session.async_payment_succeeded'):
+        if session.get('payment_status') != 'unpaid':
+            email = (session.get('customer_details') or {}).get('email')
+            print(f"=== TESTFLIGHT PAYMENT CONFIRMED === session={session.get('id')} email={email}")
+            # Extension point: email the TestFlight link here as a durability backstop
+            # for customers who never land on /testflight/success.
+    elif event_type == 'checkout.session.async_payment_failed':
+        print(f"=== TESTFLIGHT PAYMENT FAILED === session={session.get('id')}")
+
+    return JSONResponse(status_code=200, content={"received": True})
