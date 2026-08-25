@@ -37,9 +37,10 @@
     </ul>
 
     <h2>3. How We Use Your Data</h2>
+    <p>Google user data obtained through Plannr is used only to provide and improve Plannr's user-facing functionality, including authentication and Google Calendar synchronization, as described below:</p>
     <ul>
       <li><strong>Authentication:</strong> Your Google account information is used to identify you and maintain your session.</li>
-      <li><strong>Syllabus Parsing:</strong> Uploaded PDF content is sent to Google's Gemini API to extract structured calendar event data. We do not retain the raw PDF content after processing.</li>
+      <li><strong>Syllabus Parsing:</strong> Uploaded PDF content is sent to Google's Gemini API solely to extract structured calendar event data (assignment, exam, and quiz dates). We do not retain the raw PDF content after processing. Your Google Calendar data and Google OAuth credentials are never sent to the Gemini API.</li>
       <li><strong>Calendar Syncing:</strong> Your OAuth credentials are used to create events in your Google Calendar on your behalf.</li>
       <li><strong>Account Management:</strong> Your email address serves as your unique account identifier in our system.</li>
     </ul>
@@ -51,7 +52,7 @@
       <li><strong>Google Calendar API</strong> — for creating calendar events</li>
       <li><strong>Google Gemini API</strong> — for analyzing syllabus content and extracting dates</li>
     </ul>
-    <p>Your data is handled in accordance with <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's Privacy Policy</a>. We do not sell, share, or distribute your data to any other third parties.</p>
+    <p>Your data is handled in accordance with <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's Privacy Policy</a>. Plannr does not sell Google user data. We do not share, transfer, or disclose your data to any third party except as necessary to provide the functionality described in this policy.</p>
 
     <h2>5. Data Storage</h2>
     <ul>
@@ -70,7 +71,7 @@
     </ul>
 
     <h2>7. Data Retention</h2>
-    <p>Your data is retained for as long as your account exists. Syllabus content is processed in memory and is not stored persistently after events have been extracted.</p>
+    <p>Account information, Google OAuth credentials, and Plannr-generated calendar event metadata are retained while your account exists or until you request deletion (see Section 8). Uploaded syllabus content is not persistently stored after processing.</p>
 
     <h2>8. Requesting Data Deletion</h2>
     <p>You may request complete deletion of your account and all associated data at any time by contacting us at <a href="mailto:plannr.ucsb@gmail.com">plannr.ucsb@gmail.com</a>. Upon receiving your request, we will:</p>
@@ -87,7 +88,7 @@
     <p>Plannr is intended for university students and is not directed at children under 13. We do not knowingly collect data from children under 13.</p>
 
     <h2>11. Limited Use Compliance Statement</h2>
-    <p>Plannr's use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
+    <p>Plannr's use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API Services User Data Policy</a>, including the Limited Use requirements. Plannr does not use information obtained from Google Workspace APIs to develop, improve, or train generalized or non-personalized artificial intelligence or machine learning models.</p>
 
     <h2>12. Changes to This Policy</h2>
     <p>We may update this privacy policy from time to time. Any changes will be reflected by the "Last updated" date at the top of this page.</p>
