@@ -1,6 +1,6 @@
 # Privacy Policy for Plannr
 
-*Last updated: August 25, 2026*
+*Last updated: August 30, 2026*
 
 ## 1. Introduction
 
@@ -38,7 +38,7 @@ Your data is handled in accordance with [Google's Privacy Policy](https://polici
 
 - Account information and OAuth credentials are stored on our backend server in a local database.
 - The iOS app stores only your name and email locally on your device.
-- We do not use analytics services or third-party tracking tools.
+- The Plannr app itself does not use analytics services or third-party tracking tools. Our marketing website uses Cloudflare Web Analytics, a privacy-focused, cookie-free service that measures aggregate site traffic and conversions without tracking individual visitors or collecting personal data.
 
 ## 6. Data Protection & Security
 
@@ -47,7 +47,7 @@ We take the following measures to protect your data, including sensitive data su
 - **Encryption in Transit:** All communication between the Plannr app, our backend server, and Google's APIs (OAuth, Calendar, Gemini) is encrypted using HTTPS/TLS.
 - **Encryption at Rest:** Our database is hosted on Render, which encrypts data at rest at the infrastructure level.
 - **Access Controls:** Our database is not publicly accessible and can only be reached by our backend service. OAuth access and refresh tokens are used exclusively server-side to make authorized calls to the Google Calendar API on your behalf and are never exposed in the app itself or in application logs.
-- **Data Minimization:** We collect and retain only the data necessary to provide the syllabus-to-calendar service, as described in Section 2. We do not use analytics or third-party tracking tools.
+- **Data Minimization:** We collect and retain only the data necessary to provide the syllabus-to-calendar service, as described in Section 2. The app itself does not use analytics or third-party tracking tools (see Section 5 regarding our marketing website).
 
 ## 7. Data Retention
 

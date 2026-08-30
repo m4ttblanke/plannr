@@ -802,12 +802,18 @@ def _build_csv_response(events: List[CalendarEvent]) -> StreamingResponse:
     )
 
 
+_CLOUDFLARE_BEACON = (
+    "<script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' "
+    "data-cf-beacon='{\"token\": \"56b37c71bdaf4f969a3b2ad12a8bd943\"}'></script>"
+)
+
 _TESTFLIGHT_PAGE = """<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>{title}</title>
+{analytics}
 <style>
   body {{
     margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
@@ -840,7 +846,7 @@ async def testflight_success(session_id: str = Query(...)):
         return HTMLResponse(
             _TESTFLIGHT_PAGE.format(
                 title="Not configured", heading="Not configured yet",
-                message="Stripe isn't set up on this server. Contact support.", action=""
+                message="Stripe isn't set up on this server. Contact support.", action="", analytics=""
             ),
             status_code=500
         )
@@ -851,7 +857,8 @@ async def testflight_success(session_id: str = Query(...)):
         return HTMLResponse(
             _TESTFLIGHT_PAGE.format(
                 title="Invalid session", heading="We couldn't verify that",
-                message="This link looks invalid or expired. If you were just charged, contact support.", action=""
+                message="This link looks invalid or expired. If you were just charged, contact support.", action="",
+                analytics=""
             ),
             status_code=400
         )
@@ -860,7 +867,8 @@ async def testflight_success(session_id: str = Query(...)):
         return HTMLResponse(
             _TESTFLIGHT_PAGE.format(
                 title="Payment incomplete", heading="Payment not completed",
-                message="We couldn't confirm your payment. If you believe this is an error, contact support.", action=""
+                message="We couldn't confirm your payment. If you believe this is an error, contact support.", action="",
+                analytics=""
             ),
             status_code=402
         )
@@ -870,7 +878,7 @@ async def testflight_success(session_id: str = Query(...)):
             _TESTFLIGHT_PAGE.format(
                 title="Almost there", heading="Payment confirmed!",
                 message="We're still finishing TestFlight setup — check back shortly or contact support for your access link.",
-                action=""
+                action="", analytics=""
             ),
             status_code=200
         )
@@ -879,7 +887,8 @@ async def testflight_success(session_id: str = Query(...)):
         _TESTFLIGHT_PAGE.format(
             title="You're in", heading="You're in!",
             message="Thanks for your purchase. Tap below to join the Plannr TestFlight beta.",
-            action=f'<a class="btn" href="{settings.testflight_link}">Join TestFlight</a>'
+            action=f'<a class="btn" href="{settings.testflight_link}">Join TestFlight</a>',
+            analytics=_CLOUDFLARE_BEACON
         )
     )
 
