@@ -40,6 +40,14 @@ def get_google_credentials(email: str) -> dict | None:
         }
 
 
+def delete_user(email: str) -> None:
+    """Delete the user record for the given email, cascading to their stored credentials."""
+    with _session() as db:
+        user = db.query(User).filter(User.email == email).first()
+        if user:
+            db.delete(user)
+
+
 def upsert_google_credentials(email: str, creds: dict) -> None:
     """Create the user if needed, then store their Google OAuth credentials."""
     with _session() as db:

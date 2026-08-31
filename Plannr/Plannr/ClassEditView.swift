@@ -33,6 +33,7 @@ private struct SyncedEventEntry: Decodable {
 struct ClassEditView: View {
     @EnvironmentObject var classManager: ClassManager
     @EnvironmentObject var authManager: AuthManager
+    @EnvironmentObject var settingsManager: SettingsManager
     @Environment(\.dismiss) private var dismiss
 
     // Local mutable copy of the class
@@ -118,6 +119,7 @@ struct ClassEditView: View {
             )
             .environmentObject(classManager)
             .environmentObject(authManager)
+            .environmentObject(settingsManager)
         }
         .alert("Sync Failed", isPresented: $showSyncError) {
             Button("OK", role: .cancel) {}
@@ -394,6 +396,7 @@ struct ClassEditView: View {
         editableClass.events[idx] = mutated
         editableClass.hasUnsyncedChanges = true
         persistClass()
+        autoSyncIfEnabled()
     }
 
     private func toggleDeleteEvent(_ event: CalendarEvent) {
@@ -401,6 +404,15 @@ struct ClassEditView: View {
         editableClass.events[idx].isDeletedLocally.toggle()
         editableClass.hasUnsyncedChanges = editableClass.events.contains { $0.isEdited || $0.isDeletedLocally }
         persistClass()
+        autoSyncIfEnabled()
+    }
+
+    /// If auto-sync is on (and the class has synced before), push changes immediately
+    /// instead of waiting for a manual "Re-sync" tap.
+    private func autoSyncIfEnabled() {
+        guard settingsManager.autoSyncEnabled, !authManager.isGuest, !isSyncing,
+              editableClass.googleCalendarId != nil else { return }
+        Task { await resyncChanges() }
     }
     
     private func persistClass() {
@@ -457,13 +469,15 @@ struct ClassEditView: View {
             let events: [SyncEventBody] // Empty array for color-only sync
             let backgroundColor: String?
             let foregroundColor: String?
+            let reminderMinutes: Int?
 
             enum CodingKeys: String, CodingKey {
                 case className = "class_name"
                 case googleCalendarId = "google_calendar_id"
                 case events
-                case backgroundColor = "background_color" 
+                case backgroundColor = "background_color"
                 case foregroundColor = "foreground_color"
+                case reminderMinutes = "reminder_minutes"
             }
         }
 
@@ -472,7 +486,8 @@ struct ClassEditView: View {
             googleCalendarId: editableClass.googleCalendarId,
             events: [], // No event changes, just color
             backgroundColor: editableClass.colorHex.hasPrefix("#") ? editableClass.colorHex : "#\(editableClass.colorHex)",
-            foregroundColor: "#FFFFFF"
+            foregroundColor: "#FFFFFF",
+            reminderMinutes: settingsManager.reminderMinutes
         )
 
         var request = URLRequest(url: url)
@@ -523,6 +538,7 @@ struct ClassEditView: View {
             let events: [SyncEventBody]
             let backgroundColor: String?
             let foregroundColor: String?
+            let reminderMinutes: Int?
 
             enum CodingKeys: String, CodingKey {
                 case className = "class_name"
@@ -530,6 +546,7 @@ struct ClassEditView: View {
                 case events
                 case backgroundColor = "background_color"
                 case foregroundColor = "foreground_color"
+                case reminderMinutes = "reminder_minutes"
             }
         }
 
@@ -559,7 +576,8 @@ struct ClassEditView: View {
             googleCalendarId: editableClass.googleCalendarId,
             events: eventsToSync,
             backgroundColor: editableClass.colorHex.hasPrefix("#") ? editableClass.colorHex : "#\(editableClass.colorHex)",
-            foregroundColor: "#FFFFFF"  // White text for better contrast
+            foregroundColor: "#FFFFFF",  // White text for better contrast
+            reminderMinutes: settingsManager.reminderMinutes
         )
 
         var request = URLRequest(url: url)
@@ -761,5 +779,6 @@ struct ClassEventRow: View {
         ))
         .environmentObject(ClassManager())
         .environmentObject(AuthManager())
+        .environmentObject(SettingsManager.shared)
     }
 }

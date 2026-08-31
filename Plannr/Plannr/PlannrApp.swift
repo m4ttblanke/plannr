@@ -32,6 +32,7 @@ struct PlannrApp: App {
 
         var email: String?
         var name: String?
+        var picture: String?
 
         for item in components.queryItems ?? [] {
             if item.name == "email" {
@@ -40,10 +41,13 @@ struct PlannrApp: App {
             if item.name == "name" {
                 name = item.value
             }
+            if item.name == "picture" {
+                picture = item.value
+            }
         }
 
         if let email = email {
-            authManager.completeAuthentication(email: email, name: name)
+            authManager.completeAuthentication(email: email, name: name, picture: picture)
         }
     }
 }

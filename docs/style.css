@@ -35,12 +35,22 @@ nav {
 }
 
 .nav-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   font-size: 1rem;
   font-weight: 800;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text);
   text-decoration: none;
+}
+
+.nav-logo-mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  display: block;
 }
 
 .nav-links {
@@ -246,6 +256,19 @@ footer p {
 }
 
 .footer-links a:hover { color: var(--text); }
+
+.footer-social {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.footer-social svg {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+  display: block;
+}
 
 /* ── Policy pages ────────────────────────────── */
 

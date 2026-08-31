@@ -61,6 +61,12 @@ class ClassManager: ObservableObject {
         }
     }
     
+    /// Wipe all locally stored classes (used when a user deletes their account).
+    func clearAllData() {
+        classes = []
+        UserDefaults.standard.removeObject(forKey: userDefaultsKey)
+    }
+
     private func saveClasses() {
         guard !isGuest else { return }
         if let encoded = try? JSONEncoder().encode(classes) {

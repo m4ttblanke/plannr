@@ -15,6 +15,7 @@ struct SyllabusUploadView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var classManager: ClassManager
     @EnvironmentObject var authManager: AuthManager
+    @EnvironmentObject var settingsManager: SettingsManager
 
     let className: String
     let classSchedule: String
@@ -125,9 +126,16 @@ struct SyllabusUploadView: View {
                 
                 // Loading indicator
                 if isUploading {
-                    ProgressView("Processing...")
-                        .tint(.pink)
-                        .foregroundColor(.white)
+                    VStack(spacing: 6) {
+                        ProgressView("Processing...")
+                            .tint(.pink)
+                            .foregroundColor(.white)
+                        Text("This can take up to a minute, especially if Plannr hasn't been used recently.")
+                            .font(.caption2)
+                            .foregroundColor(.gray)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 32)
+                    }
                 }
                 
                 // Error message
@@ -210,6 +218,7 @@ struct SyllabusUploadView: View {
                 )
                 .environmentObject(classManager)
                 .environmentObject(authManager)
+                .environmentObject(settingsManager)
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -360,7 +369,10 @@ struct SyllabusUploadView: View {
                 
                 var request = URLRequest(url: URL(string: "\(BACKEND_URL)syllabus")!)
                 request.httpMethod = "POST"
-                
+                // Generous timeout: the backend may need to wake from a cold start (~30s
+                // on Render's free tier), then run OCR and a Gemini call on top of that.
+                request.timeoutInterval = 100
+
                 let boundary = UUID().uuidString
                 request.setValue(
                     "multipart/form-data; boundary=\(boundary)",
@@ -408,9 +420,14 @@ struct SyllabusUploadView: View {
                             self.navigateToPreview = true
                         }
                     } else {
-                        let errorMessage =
-                            String(data: responseData, encoding: .utf8) ?? "Unknown error"
-                        
+                        let errorMessage: String
+                        if let errBody = try? JSONDecoder().decode([String: String].self, from: responseData),
+                           let msg = errBody["error"] {
+                            errorMessage = msg
+                        } else {
+                            errorMessage = String(data: responseData, encoding: .utf8) ?? "Unknown error"
+                        }
+
                         DispatchQueue.main.async {
                             self.uploadError = "Upload failed: \(errorMessage)"
                             self.isUploading = false
@@ -419,7 +436,11 @@ struct SyllabusUploadView: View {
                 }
             } catch {
                 DispatchQueue.main.async {
-                    self.uploadError = "Error uploading PDF: \(error.localizedDescription)"
+                    if let urlError = error as? URLError, urlError.code == .timedOut {
+                        self.uploadError = "This is taking longer than expected — the server may be waking up from being idle. Please try again in a moment."
+                    } else {
+                        self.uploadError = "Error uploading PDF: \(error.localizedDescription)"
+                    }
                     self.isUploading = false
                 }
             }
@@ -626,5 +647,6 @@ struct TextEntryView: View {
         )
         .environmentObject(ClassManager())
         .environmentObject(AuthManager())
+        .environmentObject(SettingsManager.shared)
     }
 }

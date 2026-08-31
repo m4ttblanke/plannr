@@ -11,7 +11,8 @@ struct CalendarPreviewView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var classManager: ClassManager
     @EnvironmentObject var authManager: AuthManager
-    
+    @EnvironmentObject var settingsManager: SettingsManager
+
     let className: String
     let classSchedule: String
     let classColor: Color
@@ -364,6 +365,7 @@ struct CalendarPreviewView: View {
             let events: [SyncEventBody]
             let backgroundColor: String?
             let foregroundColor: String?
+            let reminderMinutes: Int?
 
             enum CodingKeys: String, CodingKey {
                 case className = "class_name"
@@ -371,6 +373,7 @@ struct CalendarPreviewView: View {
                 case events
                 case backgroundColor = "background_color"
                 case foregroundColor = "foreground_color"
+                case reminderMinutes = "reminder_minutes"
             }
         }
 
@@ -393,7 +396,8 @@ struct CalendarPreviewView: View {
             googleCalendarId: nil,
             events: eventBodies,
             backgroundColor: (existingClass?.colorHex.hasPrefix("#") == true) ? existingClass?.colorHex : "#\(existingClass?.colorHex ?? "007AFF")",
-            foregroundColor: "#FFFFFF"
+            foregroundColor: "#FFFFFF",
+            reminderMinutes: settingsManager.reminderMinutes
         )
 
         var syncRequest = URLRequest(url: syncURL)
@@ -1076,5 +1080,6 @@ struct ActivityViewController: UIViewControllerRepresentable {
         )
         .environmentObject(ClassManager())
         .environmentObject(AuthManager())
+        .environmentObject(SettingsManager.shared)
     }
 }

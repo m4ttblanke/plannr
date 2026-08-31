@@ -317,18 +317,18 @@ struct WeeklyDashboardView: View {
        return VStack(alignment: .leading, spacing: 8) {
            // Weekend status based on early next week workload
            if earlyNextWeekEvents.isEmpty {
-               Text("🎉 Free Weekend Ahead!")
+               Text("Free Weekend Ahead!")
                    .font(.subheadline)
                    .foregroundColor(.green)
            } else if earlyNextWeekEvents.count == 1 {
-               Text("📖 Light Weekend")
+               Text("Light Weekend")
                    .font(.subheadline)
                    .foregroundColor(.orange)
                Text("1 assignment due early next week")
                    .font(.caption)
                    .foregroundColor(.orange.opacity(0.8))
            } else {
-               Text("📚 Busy Weekend")
+               Text("Busy Weekend")
                    .font(.subheadline)
                    .foregroundColor(.red)
                Text("\(earlyNextWeekEvents.count) assignments due early next week")

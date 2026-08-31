@@ -6,7 +6,7 @@ services:
     plan: free
     rootDir: backend
     buildCommand: pip install -r requirements.txt
-    startCommand: alembic upgrade head && uvicorn app:app --host 0.0.0.0 --port $PORT
+    startCommand: alembic upgrade head && uvicorn app:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'
     envVars:
       - key: GOOGLE_CLIENT_ID
         sync: false

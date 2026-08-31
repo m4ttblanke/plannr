@@ -34,6 +34,8 @@ https://github.com/ucsb-cs148-w26/pj07-syllabus-to-cal-2pm
 - **Google Calendar API** — creating and syncing calendar events
 - **Google Gemini** — AI-powered syllabus parsing
 - **Stripe** — one-time payment gating access to the TestFlight demo
+- **slowapi** — per-IP rate limiting on all backend endpoints
+- **Cloudflare Web Analytics** — privacy-focused traffic/conversion tracking on the marketing site (no cookies, no user tracking)
 
 ## Prerequisites
 
@@ -200,8 +202,10 @@ plannr/
 └── docs/
     ├── index.html           Landing page
     ├── style.css
+    ├── ticker.js
     ├── privacy.html
     ├── terms.html
+    ├── favicon.ico / favicon-16.png / favicon-32.png / apple-touch-icon.png
     ├── PlannrDemo.mp4
     ├── MANUAL.md
     ├── PRIVACY_POLICY.md

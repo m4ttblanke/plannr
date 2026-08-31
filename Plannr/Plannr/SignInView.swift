@@ -173,6 +173,7 @@ struct SignInView: View {
 
         var email: String?
         var name: String?
+        var picture: String?
 
         for item in queryItems {
             if item.name == "email" {
@@ -181,6 +182,9 @@ struct SignInView: View {
             if item.name == "name" {
                 name = item.value
             }
+            if item.name == "picture" {
+                picture = item.value
+            }
             if item.name == "error" {
                 authError = item.value ?? "Authentication failed"
                 return
@@ -188,7 +192,7 @@ struct SignInView: View {
         }
 
         if let email = email {
-            authManager.completeAuthentication(email: email, name: name)
+            authManager.completeAuthentication(email: email, name: name, picture: picture)
             DispatchQueue.main.async {
                 self.showPDFUpload = true
             }

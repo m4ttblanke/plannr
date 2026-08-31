@@ -21,8 +21,12 @@ from pydantic import BaseModel
 from typing import List, Optional
 from pdf2image import convert_from_bytes
 import pytesseract
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from config import settings
-from repositories.user_repository import initialize, get_google_credentials, upsert_google_credentials
+from repositories.user_repository import initialize, get_google_credentials, upsert_google_credentials, delete_user
 
 
 class CalendarEvent(BaseModel):
@@ -65,6 +69,7 @@ class CalendarClassSyncRequest(BaseModel):
     events: List[SyncEventRequest]
     background_color: Optional[str] = None  # Hex color for calendar background (e.g., "#FF5733")
     foreground_color: Optional[str] = None  # Hex color for text (e.g., "#FFFFFF")
+    reminder_minutes: Optional[int] = None  # Minutes before an event to remind; None = Google's default reminders
 
 # Gemini client — None if key not configured
 _gemini_client = genai.Client(api_key=settings.gemini_api_key) if settings.gemini_api_key else None
@@ -100,6 +105,14 @@ app = FastAPI(
     description='Upload your syllabus, the API parses it and uploads the relevant time slots to your Google Calendar'
 )
 
+# Per-IP rate limiting. Requires uvicorn to be run with --proxy-headers so
+# request.client.host reflects the real client IP behind Render's proxy
+# rather than the proxy's own address (see render.yaml).
+limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+
 
 def get_oauth_flow():
     """Create OAuth flow from settings."""
@@ -130,7 +143,8 @@ def _build_credentials(creds_data: dict) -> Credentials:
 
 
 @app.get('/auth/google', tags=['OAuth'])
-async def google_auth():
+@limiter.limit("10/minute")
+async def google_auth(request: Request):
     """Start OAuth flow - redirects to Google sign-in"""
     if not settings.google_client_id or not settings.google_client_secret:
         return JSONResponse(
@@ -160,7 +174,8 @@ async def google_auth():
 
 
 @app.get('/auth/callback', tags=['OAuth'])
-async def auth_callback(code: str = Query(...), state: str = Query(None), redirect_to_app: bool = Query(True)):
+@limiter.limit("10/minute")
+async def auth_callback(request: Request, code: str = Query(...), state: str = Query(None), redirect_to_app: bool = Query(True)):
     """Handle OAuth callback from Google"""
     try:
         # Validate the OAuth state parameter to prevent CSRF attacks
@@ -185,6 +200,7 @@ async def auth_callback(code: str = Query(...), state: str = Query(None), redire
         user_info = user_info_service.userinfo().get().execute()
         email = user_info.get('email')
         name = user_info.get('name', '')
+        picture = user_info.get('picture', '')
 
         # Store credentials — client_id/secret come from settings, not storage
         creds_data = {
@@ -198,7 +214,7 @@ async def auth_callback(code: str = Query(...), state: str = Query(None), redire
 
         # Redirect to iOS app with custom URL scheme
         from urllib.parse import quote
-        app_callback_url = f"plannr://auth/callback?email={quote(email)}&name={quote(name)}"
+        app_callback_url = f"plannr://auth/callback?email={quote(email)}&name={quote(name)}&picture={quote(picture)}"
         return RedirectResponse(url=app_callback_url)
 
     except Exception as e:
@@ -213,13 +229,44 @@ async def auth_callback(code: str = Query(...), state: str = Query(None), redire
 
 
 @app.post('/google-oauth-login', tags=['OAuth'])
-async def google_oauth_login():
+@limiter.limit("10/minute")
+async def google_oauth_login(request: Request):
     """Legacy endpoint - use /auth/google instead"""
     return RedirectResponse(url='/auth/google')
 
 
+@app.get('/me', tags=['OAuth'])
+@limiter.limit("30/minute")
+async def get_me(request: Request, email: str = Query(...)):
+    """Re-fetch current Google profile info (name, picture) for an already-linked
+    account. Lets the app backfill/refresh the profile photo for sessions that
+    predate this field, without requiring a full sign-out/sign-in."""
+    creds_data = get_google_credentials(email)
+    if not creds_data:
+        return JSONResponse(status_code=401, content={"error": "User not authenticated."})
+    try:
+        user_info_service = build('oauth2', 'v2', credentials=_build_credentials(creds_data))
+        user_info = user_info_service.userinfo().get().execute()
+        return JSONResponse(status_code=200, content={
+            "email": user_info.get('email', email),
+            "name": user_info.get('name', ''),
+            "picture": user_info.get('picture', ''),
+        })
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"error": f"Failed to fetch profile: {e}"})
+
+
+@app.delete('/account', tags=['OAuth'])
+@limiter.limit("5/minute")
+async def delete_account(request: Request, email: str = Query(...)):
+    """Delete a user's account record and stored Google OAuth credentials."""
+    delete_user(email)
+    return JSONResponse(status_code=200, content={"message": "Account deleted."})
+
+
 @app.post('/syllabus', tags=['Plannr'])
-async def parse_syllabus(file: UploadFile = File(...)):
+@limiter.limit("10/minute")
+async def parse_syllabus(request: Request, file: UploadFile = File(...)):
     try:
         print(f"\n=== NEW UPLOAD ===")
         print(f"Filename: {file.filename}")
@@ -309,13 +356,19 @@ def extract_text_via_ocr(pdf_bytes: bytes) -> str:
         print(f"OCR failed: {e}")
         return ""
 
+class SyllabusParsingError(Exception):
+    """Raised when Gemini fails to produce a usable response — kept distinct from
+    a legitimate zero-events result so callers don't silently show "no events found"
+    for what was actually an API or parsing failure."""
+    pass
+
+
 async def parse_with_gemini(syllabus_text: str) -> dict:
     """Use Gemini to extract calendar events from syllabus text"""
     if not _gemini_client:
-        print("Gemini API key not configured.")
-        return {"events": []}
-    try:
-        prompt = f"""
+        raise SyllabusParsingError("Gemini API key not configured on the server.")
+
+    prompt = f"""
         You are an AI assistant that parses university course syllabi into a structured list of **graded deliverables**. The user has provided the full syllabus text. Your job is to accurately extract **what is due**, **when it is due**, and **how it should be labeled**, using careful temporal and contextual reasoning.
 
 Your primary objective is **correct due-date inference**, even when dates are implicit, relative, or described indirectly.
@@ -445,6 +498,7 @@ Return a **single JSON object** in this exact format:
         {syllabus_text}
         """
         
+    try:
         response = _gemini_client.models.generate_content(
             model='gemini-3.7-flash',
             contents=prompt,
@@ -452,46 +506,59 @@ Return a **single JSON object** in this exact format:
                 temperature=0.1,
                 top_p=0.8,
                 top_k=40,
-                max_output_tokens=4096,
+                max_output_tokens=8192,
                 response_mime_type='application/json',
                 response_schema=GeminiSyllabusResult,
             ),
         )
-        
-        # Parse the response (Gemini should return JSON)
-        import json
-        # Try to extract JSON from the response
-        response_text = response.text
-        
-        print("\n=== GEMINI RAW RESPONSE ===")
-        print(response_text)
-        
-        # Look for JSON in the response
-        start_idx = response_text.find('{')
-        end_idx = response_text.rfind('}') + 1
-        if start_idx != -1 and end_idx > start_idx:
-            json_str = response_text[start_idx:end_idx]
-            print("\n=== EXTRACTED JSON STRING ===")
-            print(json_str)
-            
-            parsed = json.loads(json_str)
-            print("\n=== PARSED JSON ===")
-            print(parsed)
-            return parsed
-        else:
-            print("\n=== NO JSON FOUND IN RESPONSE ===")
-            return {"events": []}
-            
     except Exception as e:
         print(f"\n=== ERROR CALLING GEMINI ===")
         print(f"Error: {e}")
         import traceback
         traceback.print_exc()
-        return {"events": []}
+        raise SyllabusParsingError(f"Gemini API call failed: {e}") from e
+
+    response_text = response.text
+    print("\n=== GEMINI RAW RESPONSE ===")
+    print(response_text)
+
+    # Look for JSON in the response
+    start_idx = response_text.find('{')
+    end_idx = response_text.rfind('}') + 1
+    if start_idx == -1 or end_idx <= start_idx:
+        print("\n=== NO JSON FOUND IN RESPONSE ===")
+        raise SyllabusParsingError("Gemini did not return a parseable response. Please try again.")
+
+    json_str = response_text[start_idx:end_idx]
+    print("\n=== EXTRACTED JSON STRING ===")
+    print(json_str)
+
+    try:
+        parsed = json.loads(json_str)
+    except json.JSONDecodeError as e:
+        # Most often caused by the response getting cut off at max_output_tokens
+        # before the JSON finished — check finish_reason to give a specific message.
+        finish_reason = None
+        try:
+            finish_reason = response.candidates[0].finish_reason
+        except Exception:
+            pass
+        print(f"\n=== JSON DECODE FAILED (finish_reason={finish_reason}) ===")
+        if finish_reason and 'MAX_TOKENS' in str(finish_reason):
+            raise SyllabusParsingError(
+                "This syllabus has too many events for Plannr to parse in one pass. "
+                "Try splitting it into smaller uploads."
+            ) from e
+        raise SyllabusParsingError("Gemini's response was malformed. Please try again.") from e
+
+    print("\n=== PARSED JSON ===")
+    print(parsed)
+    return parsed
 
 
 @app.post('/calendar', tags=['Syllabus to Calendar'])
-async def add_to_calendar(email: str = Query(...), request: CalendarSyncRequest = Body(...)):
+@limiter.limit("20/minute")
+async def add_to_calendar(request: Request, email: str = Query(...), body: CalendarSyncRequest = Body(...)):
     """Add parsed syllabus events to user's Google Calendar"""
     try:
         creds_data = get_google_credentials(email)
@@ -504,7 +571,7 @@ async def add_to_calendar(email: str = Query(...), request: CalendarSyncRequest 
         service = build('calendar', 'v3', credentials=_build_credentials(creds_data))
 
         created_events = []
-        for event in request.events:
+        for event in body.events:
             # Create calendar event
             calendar_event = {
                 'summary': event.title,
@@ -595,17 +662,24 @@ def _set_calendar_colors(service, calendar_id: str, background_color: Optional[s
         pass
 
 
-def _build_google_event_body(event: SyncEventRequest) -> dict:
-    return {
+def _build_google_event_body(event: SyncEventRequest, reminder_minutes: Optional[int] = None) -> dict:
+    body = {
         'summary': event.title,
         'description': event.description or '',
         'start': {'date': event.date},
         'end': {'date': event.date},
     }
+    if reminder_minutes is not None:
+        body['reminders'] = {
+            'useDefault': False,
+            'overrides': [{'method': 'popup', 'minutes': reminder_minutes}],
+        }
+    return body
 
 
 @app.post('/calendar/sync', tags=['Syllabus to Calendar'])
-async def sync_class_calendar(email: str = Query(...), request: CalendarClassSyncRequest = Body(...)):
+@limiter.limit("20/minute")
+async def sync_class_calendar(request: Request, email: str = Query(...), body: CalendarClassSyncRequest = Body(...)):
     """
     Idempotent sync of a class's events to a dedicated secondary Google Calendar.
 
@@ -626,23 +700,23 @@ async def sync_class_calendar(email: str = Query(...), request: CalendarClassSyn
 
         # ── Step 1: get or create the secondary calendar ──────────────────────
         cal_id = None
-        if request.google_calendar_id:
+        if body.google_calendar_id:
             try:
-                service.calendars().get(calendarId=request.google_calendar_id).execute()
-                cal_id = request.google_calendar_id
+                service.calendars().get(calendarId=body.google_calendar_id).execute()
+                cal_id = body.google_calendar_id
                 # Update colors for existing calendar if provided
-                if request.background_color or request.foreground_color:
-                    _set_calendar_colors(service, cal_id, request.background_color, request.foreground_color)
+                if body.background_color or body.foreground_color:
+                    _set_calendar_colors(service, cal_id, body.background_color, body.foreground_color)
             except Exception:
                 # Calendar was deleted externally — fall through to find-or-create
                 pass
         if not cal_id:
-            cal_id = _find_or_create_calendar(service, request.class_name, request.background_color, request.foreground_color)
+            cal_id = _find_or_create_calendar(service, body.class_name, body.background_color, body.foreground_color)
 
         # ── Step 2: incremental sync ──────────────────────────────────────────
         synced_events = []
         try:
-            for event in request.events:
+            for event in body.events:
                 if event.is_deleted:
                     if event.google_event_id:
                         try:
@@ -657,14 +731,14 @@ async def sync_class_calendar(email: str = Query(...), request: CalendarClassSyn
                     updated = service.events().update(
                         calendarId=cal_id,
                         eventId=event.google_event_id,
-                        body=_build_google_event_body(event)
+                        body=_build_google_event_body(event, body.reminder_minutes)
                     ).execute()
                     synced_events.append({"local_id": event.local_id, "google_event_id": updated['id']})
                 else:
                     # Insert new event
                     created = service.events().insert(
                         calendarId=cal_id,
-                        body=_build_google_event_body(event)
+                        body=_build_google_event_body(event, body.reminder_minutes)
                     ).execute()
                     synced_events.append({"local_id": event.local_id, "google_event_id": created['id']})
 
@@ -687,12 +761,12 @@ async def sync_class_calendar(email: str = Query(...), request: CalendarClassSyn
                     break
 
             synced_events = []
-            for event in request.events:
+            for event in body.events:
                 if event.is_deleted:
                     continue
                 created = service.events().insert(
                     calendarId=cal_id,
-                    body=_build_google_event_body(event)
+                    body=_build_google_event_body(event, body.reminder_minutes)
                 ).execute()
                 synced_events.append({"local_id": event.local_id, "google_event_id": created['id']})
 
@@ -709,7 +783,8 @@ async def sync_class_calendar(email: str = Query(...), request: CalendarClassSyn
 
 
 @app.delete('/calendar', tags=['Syllabus to Calendar'])
-async def delete_class_calendar(email: str = Query(...), google_calendar_id: str = Query(...)):
+@limiter.limit("10/minute")
+async def delete_class_calendar(request: Request, email: str = Query(...), google_calendar_id: str = Query(...)):
     """Delete a secondary Google Calendar by its ID."""
     try:
         creds_data = get_google_credentials(email)
@@ -726,10 +801,12 @@ async def delete_class_calendar(email: str = Query(...), google_calendar_id: str
 
 
 @app.post('/export', tags=['Export'])
+@limiter.limit("20/minute")
 async def export_events(
+    request: Request,
     email: str = Query(...),
     format: str = Query(...),
-    request: CalendarSyncRequest = Body(...)
+    body: CalendarSyncRequest = Body(...)
 ):
     """Export parsed syllabus events as a downloadable .ics or .csv file."""
     if format.lower() not in ['ics', 'csv']:
@@ -744,7 +821,7 @@ async def export_events(
             content={"error": "User not authenticated. Please sign in with Google first."}
         )
 
-    if not request.events:
+    if not body.events:
         return JSONResponse(
             status_code=400,
             content={"error": "No events provided"}
@@ -752,9 +829,9 @@ async def export_events(
 
     try:
         if format.lower() == 'ics':
-            return _build_ics_response(request.events)
+            return _build_ics_response(body.events)
         else:
-            return _build_csv_response(request.events)
+            return _build_csv_response(body.events)
     except Exception as e:
         print(f"Export error: {e}")
         import traceback
@@ -840,7 +917,8 @@ _TESTFLIGHT_PAGE = """<!DOCTYPE html>
 
 
 @app.get('/testflight/success', tags=['TestFlight'], response_class=HTMLResponse)
-async def testflight_success(session_id: str = Query(...)):
+@limiter.limit("10/minute")
+async def testflight_success(request: Request, session_id: str = Query(...)):
     """Verify a completed Stripe Checkout session and reveal the TestFlight link."""
     if not _stripe_client:
         return HTMLResponse(
@@ -894,11 +972,16 @@ async def testflight_success(session_id: str = Query(...)):
 
 
 @app.post('/stripe/webhook', tags=['TestFlight'])
+@limiter.exempt
 async def stripe_webhook(request: Request):
     """Source of truth for TestFlight access grants — the success page is UX only.
 
     Customers aren't guaranteed to land on the success page (e.g. they close the tab
     after paying), so fulfillment must be driven from this event handler, not the redirect.
+
+    Exempt from IP rate limiting: Stripe sends webhook events from a shared pool of IPs
+    across all its customers, so per-IP limits here could throttle unrelated Stripe
+    traffic. The signature check above already rejects anything not actually from Stripe.
     """
     if not settings.stripe_webhook_secret:
         return JSONResponse(status_code=500, content={"error": "Webhook not configured"})
