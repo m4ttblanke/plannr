@@ -242,6 +242,12 @@ footer p {
   color: var(--muted);
 }
 
+.footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
 .footer-links {
   display: flex;
   gap: 28px;
@@ -257,15 +263,19 @@ footer p {
 
 .footer-links a:hover { color: var(--text); }
 
-.footer-social {
+.social-link {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  justify-content: center;
+  color: var(--muted);
+  transition: color 0.15s;
 }
 
-.footer-social svg {
-  width: 15px;
-  height: 15px;
+.social-link:hover { color: var(--text); }
+
+.social-link svg {
+  width: 16px;
+  height: 16px;
   fill: currentColor;
   display: block;
 }
