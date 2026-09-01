@@ -221,16 +221,47 @@ class AuthManager: ObservableObject {
 
     // MARK: - Account deletion
 
-    /// Delete the account on the backend, then wipe all local state. No-op (besides local wipe) for guests.
+    /// Delete the account on the backend, then wipe all local state.
+    ///
+    /// For a signed-in user, local state is wiped **only if the backend confirms
+    /// the deletion** — otherwise the stored Google credentials would be left on
+    /// the server while the app looks signed out. Guests have nothing
+    /// server-side, so they always succeed. Returns false (with `errorMessage`
+    /// set) if the backend call failed; the caller should surface that and keep
+    /// the account intact.
     func deleteAccount() async -> Bool {
         await MainActor.run { isDeletingAccount = true }
 
-        if !isGuest, let email = userEmail,
-           let encodedEmail = email.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-           let url = URL(string: "\(BACKEND_URL)account?email=\(encodedEmail)") {
+        if !isGuest {
+            guard let email = userEmail,
+                  let encodedEmail = email.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+                  let url = URL(string: "\(BACKEND_URL)account?email=\(encodedEmail)") else {
+                await MainActor.run {
+                    self.errorMessage = "Couldn't delete your account. Please try again."
+                    self.isDeletingAccount = false
+                }
+                return false
+            }
+
             var request = URLRequest(url: url)
             request.httpMethod = "DELETE"
-            _ = try? await URLSession.shared.data(for: request)
+
+            do {
+                let (_, response) = try await URLSession.shared.data(for: request)
+                guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+                    await MainActor.run {
+                        self.errorMessage = "Account deletion failed on the server. Your data was not deleted — please try again."
+                        self.isDeletingAccount = false
+                    }
+                    return false
+                }
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = "Couldn't reach the server to delete your account. Check your connection and try again."
+                    self.isDeletingAccount = false
+                }
+                return false
+            }
         }
 
         clearLocalProfilePhoto()

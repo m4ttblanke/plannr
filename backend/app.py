@@ -320,8 +320,20 @@ async def get_me(request: Request, email: str = Query(...)):
 @app.delete('/account', tags=['OAuth'])
 @limiter.limit("5/minute")
 async def delete_account(request: Request, email: str = Query(...)):
-    """Delete a user's account record and stored Google OAuth credentials."""
-    delete_user(email)
+    """Delete a user's account record and stored Google OAuth credentials.
+
+    Returns 200 only when the deletion actually committed (or the user did not
+    exist — `delete_user` is a no-op in that case). A DB failure returns 500 so
+    the client does not wipe local state while server-side data still exists.
+    """
+    try:
+        delete_user(email)
+    except Exception:
+        logger.exception("Account deletion failed for %s", _mask_email(email))
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Could not delete your account right now. Please try again."}
+        )
     return JSONResponse(status_code=200, content={"message": "Account deleted."})
 
 

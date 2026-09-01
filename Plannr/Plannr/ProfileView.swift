@@ -70,6 +70,7 @@ struct ProfileView: View {
 
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var showDeleteConfirm = false
+    @State private var showDeleteFailedAlert = false
     @State private var showNotificationDeniedAlert = false
 
     var body: some View {
@@ -97,6 +98,11 @@ struct ProfileView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text("Enable notifications for Plannr in the Settings app to get deadline reminders.")
+        }
+        .alert("Couldn't Delete Account", isPresented: $showDeleteFailedAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(authManager.errorMessage ?? "Something went wrong. Your account was not deleted — please try again.")
         }
     }
 
@@ -327,11 +333,14 @@ struct ProfileView: View {
         ) {
             Button("Delete Account", role: .destructive) {
                 Task {
-                    _ = await authManager.deleteAccount()
-                    classManager.clearAllData()
-                    settingsManager.resetToDefaults()
-                    NotificationManager.shared.cancelAll()
-                    dismiss()
+                    if await authManager.deleteAccount() {
+                        classManager.clearAllData()
+                        settingsManager.resetToDefaults()
+                        NotificationManager.shared.cancelAll()
+                        dismiss()
+                    } else {
+                        showDeleteFailedAlert = true
+                    }
                 }
             }
             Button("Cancel", role: .cancel) {}
