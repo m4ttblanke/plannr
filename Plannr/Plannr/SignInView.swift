@@ -152,53 +152,20 @@ struct SignInView: View {
                 return
             }
 
-            // The callback URL will be plannr://auth/callback?email=...&name=...
-            // But our backend returns JSON, so we need to fetch the result
+            // ASWebAuthenticationSession hands us the plannr://auth/callback?...
+            // redirect directly; AuthManager owns parsing it (success + error).
             if let callbackURL = callbackURL {
-                handleCallback(url: callbackURL)
+                if authManager.handleCallback(url: callbackURL) {
+                    showPDFUpload = true
+                } else {
+                    authError = authManager.errorMessage ?? "Sign-in failed. Please try again."
+                }
             }
         }
 
         session.presentationContextProvider = WebAuthContextProvider.shared
         session.prefersEphemeralWebBrowserSession = false
         session.start()
-    }
-
-    private func handleCallback(url: URL) {
-        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-              let queryItems = components.queryItems else {
-            authError = "Invalid callback URL"
-            return
-        }
-
-        var email: String?
-        var name: String?
-        var picture: String?
-
-        for item in queryItems {
-            if item.name == "email" {
-                email = item.value
-            }
-            if item.name == "name" {
-                name = item.value
-            }
-            if item.name == "picture" {
-                picture = item.value
-            }
-            if item.name == "error" {
-                authError = item.value ?? "Authentication failed"
-                return
-            }
-        }
-
-        if let email = email {
-            authManager.completeAuthentication(email: email, name: name, picture: picture)
-            DispatchQueue.main.async {
-                self.showPDFUpload = true
-            }
-        } else {
-            authError = "Could not get email from authentication"
-        }
     }
 }
 

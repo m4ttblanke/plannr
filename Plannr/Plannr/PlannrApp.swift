@@ -16,38 +16,11 @@ struct PlannrApp: App {
             SignInView()
                 .environmentObject(authManager)
                 .onOpenURL { url in
-                    handleIncomingURL(url)
+                    // ASWebAuthenticationSession normally intercepts the plannr://
+                    // redirect itself; this path covers the app being cold-opened
+                    // from the callback URL. Both routes share one parser.
+                    authManager.handleCallback(url: url)
                 }
-        }
-    }
-
-    private func handleIncomingURL(_ url: URL) {
-        // Handle plannr://auth/callback?email=...&name=...
-        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-              components.scheme == "plannr",
-              components.host == "auth",
-              components.path == "/callback" else {
-            return
-        }
-
-        var email: String?
-        var name: String?
-        var picture: String?
-
-        for item in components.queryItems ?? [] {
-            if item.name == "email" {
-                email = item.value
-            }
-            if item.name == "name" {
-                name = item.value
-            }
-            if item.name == "picture" {
-                picture = item.value
-            }
-        }
-
-        if let email = email {
-            authManager.completeAuthentication(email: email, name: name, picture: picture)
         }
     }
 }

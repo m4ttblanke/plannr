@@ -425,10 +425,11 @@ struct CalendarPreviewView: View {
             }
 
             do {
-                let (data, response) = try await URLSession.shared.data(for: syncRequest)
+                let (data, http) = try await authManager.send(syncRequest)
                 await MainActor.run {
                     isSyncing = false
-                    if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200,
+                    if http.statusCode == 401 { return }  // session-expired sign-out already triggered
+                    if http.statusCode == 200,
                        let syncResp = try? JSONDecoder().decode(CalendarSyncResponse.self, from: data) {
                         syncMessage = "Successfully synced \(acceptedEvents.count) events!"
                         syncSuccess = true

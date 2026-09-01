@@ -20,6 +20,7 @@ from datetime import date as date_type
 from icalendar import Calendar as ICalendar, Event as ICalEvent
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
+from google.auth.exceptions import RefreshError
 from googleapiclient.discovery import build
 from pydantic import BaseModel
 from typing import List, Optional
@@ -307,6 +308,10 @@ async def get_me(request: Request, email: str = Query(...)):
             "email": user_info.get('email', email),
             "name": user_info.get('name', ''),
             "picture": user_info.get('picture', ''),
+        })
+    except RefreshError:
+        return JSONResponse(status_code=401, content={
+            "error": "Google access was revoked or expired. Please sign in again."
         })
     except Exception as e:
         return JSONResponse(status_code=400, content={"error": f"Failed to fetch profile: {e}"})
@@ -759,9 +764,12 @@ async def sync_class_calendar(request: Request, email: str = Query(...), body: C
                     ).execute()
                     synced_events.append({"local_id": event.local_id, "google_event_id": created['id']})
 
+        except RefreshError:
+            raise  # dead token — no point attempting a full rebuild; handled below
         except Exception as incremental_err:
             # ── Fallback: rebuild the entire calendar ─────────────────────────
-            print(f"Incremental sync failed ({incremental_err}), falling back to full rebuild.")
+            logger.warning("Incremental sync failed (%s); falling back to full rebuild",
+                           incremental_err)
             # Delete all events in the calendar
             page_token = None
             while True:
@@ -792,10 +800,12 @@ async def sync_class_calendar(request: Request, email: str = Query(...), body: C
             "synced_events": synced_events
         })
 
+    except RefreshError:
+        return JSONResponse(status_code=401, content={
+            "error": "Google access was revoked or expired. Please sign in again."
+        })
     except Exception as e:
-        print(f"Calendar sync error: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.exception("Calendar sync failed")
         return JSONResponse(status_code=400, content={"error": f"Sync failed: {str(e)}"})
 
 
@@ -812,8 +822,12 @@ async def delete_class_calendar(request: Request, email: str = Query(...), googl
         service.calendars().delete(calendarId=google_calendar_id).execute()
         return JSONResponse(status_code=200, content={"message": "Calendar deleted."})
 
+    except RefreshError:
+        return JSONResponse(status_code=401, content={
+            "error": "Google access was revoked or expired. Please sign in again."
+        })
     except Exception as e:
-        print(f"Calendar delete error: {e}")
+        logger.exception("Calendar delete failed")
         return JSONResponse(status_code=400, content={"error": f"Failed to delete calendar: {str(e)}"})
 
 

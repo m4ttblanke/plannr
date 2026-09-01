@@ -496,8 +496,9 @@ struct ClassEditView: View {
 
         do {
             request.httpBody = try JSONEncoder().encode(body)
-            let (_, _) = try await URLSession.shared.data(for: request)
-            // Silent update - no need to show success/error for color changes
+            // Routed through `send` so a revoked token still triggers sign-out,
+            // even though the color sync itself reports nothing to the user.
+            _ = try await authManager.send(request)
         } catch {
             // Silent failure for color sync
         }
@@ -596,10 +597,11 @@ struct ClassEditView: View {
         }
 
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, http) = try await authManager.send(request)
             await MainActor.run {
                 isSyncing = false
-                if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200,
+                if http.statusCode == 401 { return }  // session-expired sign-out already triggered
+                if http.statusCode == 200,
                    let syncResponse = try? JSONDecoder().decode(ClassSyncResponse.self, from: data) {
                     applySync(response: syncResponse)
                 } else if let errBody = try? JSONDecoder().decode([String: String].self, from: data),

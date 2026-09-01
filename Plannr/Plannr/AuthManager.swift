@@ -49,8 +49,11 @@ class AuthManager: ObservableObject {
         }
 
         Task {
-            guard let (data, response) = try? await URLSession.shared.data(from: url),
-                  let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200,
+            // Routed through `send` so a 401 (revoked/expired Google credentials)
+            // triggers the global session-expired sign-out. This runs on every
+            // launch, so it's the main place that condition gets caught.
+            guard let (data, http) = try? await self.send(URLRequest(url: url)),
+                  http.statusCode == 200,
                   let me = try? JSONDecoder().decode(MeResponse.self, from: data) else { return }
 
             await MainActor.run {
@@ -66,48 +69,78 @@ class AuthManager: ObservableObject {
         }
     }
 
+    /// Called when the backend reports the Google session is no longer valid
+    /// (refresh token revoked or expired). Clears the session and surfaces a
+    /// message so the UI drops back to the sign-in screen.
+    func handleSessionExpired() {
+        DispatchQueue.main.async {
+            guard self.isAuthenticated, !self.isGuest else { return }
+            self.signOut()
+            self.errorMessage = "Your Google session expired. Please sign in again."
+        }
+    }
+
+    /// Single choke point for authenticated backend requests. Any 401 response —
+    /// from any endpoint — triggers the global session-expired sign-out. Callers
+    /// still handle their own non-401 status codes, and should bail out early
+    /// (without showing their own error UI) when `http.statusCode == 401`.
+    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        if http.statusCode == 401 {
+            handleSessionExpired()
+        }
+        return (data, http)
+    }
+
     /// Returns the Google OAuth URL from the backend
     func getGoogleAuthURL() -> URL? {
         return URL(string: "\(BACKEND_URL)auth/google")
     }
 
-    /// Handle the OAuth callback URL
-    func handleCallback(url: URL) {
-        // Parse the custom URL callback (e.g. plannr://auth/callback?email=...&name=...)
-        // The backend includes the email and name as URL query parameters after successful auth
-        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
-            return
+    /// Parse an OAuth callback URL (plannr://auth/callback?...). Handles both the
+    /// success payload (email/name/picture) and the backend's error payload
+    /// (error=...). Returns true only when authentication completed.
+    ///
+    /// This is the single entry point for the callback — used both by
+    /// ASWebAuthenticationSession's completion handler and by `.onOpenURL`, both
+    /// of which are delivered on the main thread, so state is set synchronously.
+    @discardableResult
+    func handleCallback(url: URL) -> Bool {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              components.host == "auth", components.path == "/callback" else {
+            return false
         }
 
-        // Check if this is our auth callback
-        if components.host == "auth" && components.path == "/callback" {
-            // Extract parameters from the URL
-            if let queryItems = components.queryItems {
-                for item in queryItems {
-                    if item.name == "email", let value = item.value {
-                        self.userEmail = value
-                    }
-                    if item.name == "name", let value = item.value {
-                        self.userName = value
-                    }
-                    if item.name == "picture", let value = item.value, !value.isEmpty {
-                        self.userPhotoURL = value
-                    }
-                }
-            }
+        var email: String?
+        var name: String?
+        var picture: String?
 
-            if userEmail != nil {
-                // Save to UserDefaults
-                UserDefaults.standard.set(userEmail, forKey: "userEmail")
-                UserDefaults.standard.set(userName, forKey: "userName")
-                UserDefaults.standard.set(userPhotoURL, forKey: "userPhotoURL")
-
-                DispatchQueue.main.async {
-                    self.isAuthenticated = true
-                    self.isLoading = false
-                }
+        for item in components.queryItems ?? [] {
+            switch item.name {
+            case "error":
+                let message = item.value ?? ""
+                errorMessage = message.isEmpty ? "Sign-in failed. Please try again." : message
+                isLoading = false
+                return false
+            case "email":   email = item.value
+            case "name":    name = item.value
+            case "picture": picture = item.value
+            default:        break
             }
         }
+
+        guard let email = email, !email.isEmpty else {
+            errorMessage = "Could not get your email from Google. Please try again."
+            isLoading = false
+            return false
+        }
+
+        errorMessage = nil
+        completeAuthentication(email: email, name: name, picture: picture)
+        return true
     }
 
     /// Called when OAuth completes successfully via web
