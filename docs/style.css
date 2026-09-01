@@ -269,9 +269,9 @@ nav .nav-links {
 
 .phone-mockup {
   position: relative;
-  width: 270px;
+  width: 340px;
   aspect-ratio: 1206 / 2622;
-  border-radius: 46px;
+  border-radius: 54px;
   background: linear-gradient(160deg, #5a6270 0%, #2b303a 55%, #16181d 100%);
   padding: 9px;
   box-shadow:
@@ -282,14 +282,14 @@ nav .nav-links {
   flex-shrink: 0;
 }
 
-.phone-mockup--hero { width: 300px; }
-.phone-mockup--small { width: 240px; }
+.phone-mockup--hero { width: 380px; }
+.phone-mockup--small { width: 320px; }
 
 .phone-screen {
   position: relative;
   width: 100%;
   height: 100%;
-  border-radius: 38px;
+  border-radius: 44px;
   overflow: hidden;
   background: #05070c;
   display: flex;
@@ -645,6 +645,7 @@ footer p {
   }
 
   .showcase-copy { text-align: center; max-width: 420px; }
+  .phone-mockup--small { width: 340px; }
 }
 
 @media (max-width: 768px) {
@@ -656,7 +657,8 @@ footer p {
 
   .hero { padding: 128px 24px 0; }
   .hero-device-wrap { margin-top: 48px; }
-  .phone-mockup--hero { width: 240px; }
+  .phone-mockup--hero,
+  .phone-mockup--small { width: min(300px, 82vw); }
 
   .showcase { padding: 96px 24px 24px; gap: 96px; }
   .disclosure-section { padding: 80px 24px; }
