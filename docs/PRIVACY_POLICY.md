@@ -55,7 +55,7 @@ Account information, Google OAuth credentials, and Plannr-generated calendar eve
 
 ## 8. Requesting Data Deletion
 
-You may request complete deletion of your account and all associated data at any time by contacting us at **plannr.ucsb@gmail.com**. Upon receiving your request, we will:
+You may request complete deletion of your account and all associated data at any time by contacting us at **mattheweblanke@gmail.com**. Upon receiving your request, we will:
 
 - Delete your account record and stored OAuth credentials from our database
 - Remove any calendar or syllabus data associated with your account

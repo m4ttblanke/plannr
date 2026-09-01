@@ -946,7 +946,7 @@ async def testflight_success(request: Request, session_id: str = Query(...)):
         return HTMLResponse(
             _TESTFLIGHT_PAGE.format(
                 title="Not configured", heading="Not configured yet",
-                message="Stripe isn't set up on this server. Contact support.", action="", analytics=""
+                message="Stripe isn't set up on this server. Email mattheweblanke@gmail.com for help.", action="", analytics=""
             ),
             status_code=500
         )
@@ -957,7 +957,7 @@ async def testflight_success(request: Request, session_id: str = Query(...)):
         return HTMLResponse(
             _TESTFLIGHT_PAGE.format(
                 title="Invalid session", heading="We couldn't verify that",
-                message="This link looks invalid or expired. If you were just charged, contact support.", action="",
+                message="This link looks invalid or expired. If you were just charged, email mattheweblanke@gmail.com.", action="",
                 analytics=""
             ),
             status_code=400
@@ -967,7 +967,7 @@ async def testflight_success(request: Request, session_id: str = Query(...)):
         return HTMLResponse(
             _TESTFLIGHT_PAGE.format(
                 title="Payment incomplete", heading="Payment not completed",
-                message="We couldn't confirm your payment. If you believe this is an error, contact support.", action="",
+                message="We couldn't confirm your payment. If you believe this is an error, email mattheweblanke@gmail.com.", action="",
                 analytics=""
             ),
             status_code=402
@@ -977,7 +977,7 @@ async def testflight_success(request: Request, session_id: str = Query(...)):
         return HTMLResponse(
             _TESTFLIGHT_PAGE.format(
                 title="Almost there", heading="Payment confirmed!",
-                message="We're still finishing TestFlight setup — check back shortly or contact support for your access link.",
+                message="We're still finishing TestFlight setup — check back shortly, or email mattheweblanke@gmail.com for your access link.",
                 action="", analytics=""
             ),
             status_code=200

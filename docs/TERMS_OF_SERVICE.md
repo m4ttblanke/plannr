@@ -79,4 +79,4 @@ We may update these Terms of Service from time to time. Any changes will be refl
 
 ## 9. Contact Us
 
-If you have questions about these Terms of Service, contact us at **plannr.ucsb@gmail.com**.
+If you have questions about these Terms of Service, contact us at **mattheweblanke@gmail.com**.
