@@ -38,7 +38,9 @@ struct UnifiedCalendarView: View {
 
     var allEvents: [UnifiedEvent] {
         classManager.classes.flatMap { cls in
-            cls.events.map { UnifiedEvent(event: $0, classColor: cls.color, className: cls.name) }
+            cls.events
+                .filter { !$0.isDeletedLocally }
+                .map { UnifiedEvent(event: $0, classColor: cls.color, className: cls.name) }
         }
     }
 

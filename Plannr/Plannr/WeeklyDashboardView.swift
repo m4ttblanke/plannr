@@ -407,7 +407,7 @@ struct WeeklyDashboardView: View {
    }
   
    private var allEvents: [CalendarEvent] {
-       classManager.classes.flatMap { $0.events }
+       classManager.classes.flatMap { $0.events }.filter { !$0.isDeletedLocally }
    }
   
    private var filteredEventsThisWeek: [CalendarEvent] {
@@ -521,11 +521,15 @@ struct WeeklyDashboardView: View {
    }
   
    private func toggleEventCompletion(_ event: CalendarEvent) {
-       // Find the class and event to update
-       for classIndex in classManager.classes.indices {
-           if let eventIndex = classManager.classes[classIndex].events.firstIndex(where: { $0.id == event.id }) {
-               classManager.classes[classIndex].events[eventIndex].isTaskCompleted.toggle()
-               classManager.classes[classIndex].hasUnsyncedChanges = true
+       // Persist via ClassManager.updateClass — mutating the @Published array in
+       // place updates the UI but is never written to disk, so completion state
+       // was being lost on relaunch. Task completion is a local-only flag, so it
+       // does not mark the class as needing a Google re-sync.
+       for index in classManager.classes.indices {
+           if let eventIndex = classManager.classes[index].events.firstIndex(where: { $0.id == event.id }) {
+               var updatedClass = classManager.classes[index]
+               updatedClass.events[eventIndex].isTaskCompleted.toggle()
+               classManager.updateClass(updatedClass)
                return
            }
        }
