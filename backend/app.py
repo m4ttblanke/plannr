@@ -3,7 +3,9 @@ from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse,
 import stripe
 from google import genai
 from google.genai import types as genai_types
+from google.genai import errors as genai_errors
 from PyPDF2 import PdfReader
+import asyncio
 import time
 import secrets
 import hashlib
@@ -363,6 +365,13 @@ class SyllabusParsingError(Exception):
     pass
 
 
+# Gemini status codes worth retrying — both are transient capacity issues on
+# Google's end (503 UNAVAILABLE, 429 RESOURCE_EXHAUSTED) that typically clear
+# up within seconds, unlike a 400/401/etc which will just fail the same way again.
+GEMINI_RETRYABLE_CODES = {503, 429}
+GEMINI_MAX_ATTEMPTS = 3
+
+
 async def parse_with_gemini(syllabus_text: str) -> dict:
     """Use Gemini to extract calendar events from syllabus text"""
     if not _gemini_client:
@@ -498,25 +507,38 @@ Return a **single JSON object** in this exact format:
         {syllabus_text}
         """
         
-    try:
-        response = _gemini_client.models.generate_content(
-            model='gemini-3.7-flash',
-            contents=prompt,
-            config=genai_types.GenerateContentConfig(
-                temperature=0.1,
-                top_p=0.8,
-                top_k=40,
-                max_output_tokens=8192,
-                response_mime_type='application/json',
-                response_schema=GeminiSyllabusResult,
-            ),
-        )
-    except Exception as e:
-        print(f"\n=== ERROR CALLING GEMINI ===")
-        print(f"Error: {e}")
-        import traceback
-        traceback.print_exc()
-        raise SyllabusParsingError(f"Gemini API call failed: {e}") from e
+    response = None
+    for attempt in range(1, GEMINI_MAX_ATTEMPTS + 1):
+        try:
+            response = _gemini_client.models.generate_content(
+                model='gemini-3.7-flash',
+                contents=prompt,
+                config=genai_types.GenerateContentConfig(
+                    temperature=0.1,
+                    top_p=0.8,
+                    top_k=40,
+                    max_output_tokens=8192,
+                    response_mime_type='application/json',
+                    response_schema=GeminiSyllabusResult,
+                ),
+            )
+            break
+        except genai_errors.APIError as e:
+            is_retryable = e.code in GEMINI_RETRYABLE_CODES
+            if not is_retryable or attempt == GEMINI_MAX_ATTEMPTS:
+                print(f"\n=== ERROR CALLING GEMINI (attempt {attempt}/{GEMINI_MAX_ATTEMPTS}) ===")
+                print(f"Error: {e}")
+                raise SyllabusParsingError(f"Gemini API call failed: {e}") from e
+            wait_seconds = 2 ** (attempt - 1)  # 1s, 2s, 4s
+            print(f"\n=== GEMINI {e.code} {e.status} — retrying in {wait_seconds}s "
+                  f"(attempt {attempt}/{GEMINI_MAX_ATTEMPTS}) ===")
+            await asyncio.sleep(wait_seconds)
+        except Exception as e:
+            print(f"\n=== ERROR CALLING GEMINI ===")
+            print(f"Error: {e}")
+            import traceback
+            traceback.print_exc()
+            raise SyllabusParsingError(f"Gemini API call failed: {e}") from e
 
     response_text = response.text
     print("\n=== GEMINI RAW RESPONSE ===")
