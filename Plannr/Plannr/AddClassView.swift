@@ -20,51 +20,50 @@ struct AddClassView: View {
             ZStack {
                 Color.black.ignoresSafeArea()
 
-                VStack(spacing: 24) {
-                    Text("Add New Class")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
+                VStack(spacing: 0) {
+                    ScrollView {
+                        VStack(spacing: 24) {
+                            Text("Add New Class")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.white)
+
+                            VStack(spacing: 20) {
+                                // Class Name
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Class Name")
+                                        .font(.headline)
+                                        .foregroundColor(.white)
+                                    TextField("e.g., Advanced Calculus", text: $className)
+                                        .padding()
+                                        .background(Color.gray.opacity(0.2))
+                                        .foregroundColor(.white)
+                                        .cornerRadius(8)
+                                }
+
+                                // Schedule (optional)
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Schedule (Optional)")
+                                        .font(.headline)
+                                        .foregroundColor(.white)
+                                    ClassSchedulePicker(schedule: $classSchedule)
+                                }
+
+                                // Color picker
+                                HStack {
+                                    Text("Class Color")
+                                        .font(.headline)
+                                        .foregroundColor(.white)
+                                    Spacer()
+                                    ColorPicker("", selection: $selectedColor)
+                                        .labelsHidden()
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
                         .padding(.top, 20)
-
-                    VStack(spacing: 20) {
-                        // Class Name
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Class Name")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                            TextField("e.g., Advanced Calculus", text: $className)
-                                .padding()
-                                .background(Color.gray.opacity(0.2))
-                                .foregroundColor(.white)
-                                .cornerRadius(8)
-                        }
-
-                        // Schedule (optional)
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Schedule (Optional)")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                            TextField("e.g., MWF 10:00 AM", text: $classSchedule)
-                                .padding()
-                                .background(Color.gray.opacity(0.2))
-                                .foregroundColor(.white)
-                                .cornerRadius(8)
-                        }
-
-                        // Color picker
-                        HStack {
-                            Text("Class Color")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                            Spacer()
-                            ColorPicker("", selection: $selectedColor)
-                                .labelsHidden()
-                        }
+                        .padding(.bottom, 24)
                     }
-                    .padding(.horizontal)
-
-                    Spacer()
 
                     Button {
                         classManager.addClass(Class(
@@ -84,6 +83,7 @@ struct AddClassView: View {
                     }
                     .disabled(className.isEmpty)
                     .padding(.horizontal)
+                    .padding(.top, 8)
                     .padding(.bottom, 20)
                 }
             }
