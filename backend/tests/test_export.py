@@ -22,22 +22,18 @@ SAMPLE_EVENTS = [
     }
 ]
 
-FAKE_CREDS = {"token": "fake-token", "refresh_token": "fake-refresh"}
-
-
 @pytest.fixture
 def client():
     return TestClient(app)
 
 
 def test_export_ics_valid(client):
-    """Valid request with authenticated user returns a text/calendar response containing VEVENTs."""
-    with patch("app.get_google_credentials", return_value=FAKE_CREDS):
-        resp = client.post(
-            "/export",
-            params={"email": "student@example.com", "format": "ics"},
-            json={"events": SAMPLE_EVENTS}
-        )
+    """A valid request returns a text/calendar response containing VEVENTs."""
+    resp = client.post(
+        "/export",
+        params={"email": "student@example.com", "format": "ics"},
+        json={"events": SAMPLE_EVENTS}
+    )
     assert resp.status_code == 200
     assert "text/calendar" in resp.headers["content-type"]
     assert "attachment" in resp.headers["content-disposition"]
@@ -49,13 +45,12 @@ def test_export_ics_valid(client):
 
 
 def test_export_csv_valid(client):
-    """Valid request with authenticated user returns a text/csv response with correct columns."""
-    with patch("app.get_google_credentials", return_value=FAKE_CREDS):
-        resp = client.post(
-            "/export",
-            params={"email": "student@example.com", "format": "csv"},
-            json={"events": SAMPLE_EVENTS}
-        )
+    """A valid request returns a text/csv response with the correct columns."""
+    resp = client.post(
+        "/export",
+        params={"email": "student@example.com", "format": "csv"},
+        json={"events": SAMPLE_EVENTS}
+    )
     assert resp.status_code == 200
     assert "text/csv" in resp.headers["content-type"]
     assert "attachment" in resp.headers["content-disposition"]
@@ -69,35 +64,39 @@ def test_export_csv_valid(client):
 
 def test_export_invalid_format(client):
     """Unsupported format parameter returns 400."""
-    with patch("app.get_google_credentials", return_value=FAKE_CREDS):
-        resp = client.post(
-            "/export",
-            params={"email": "student@example.com", "format": "pdf"},
-            json={"events": SAMPLE_EVENTS}
-        )
+    resp = client.post(
+        "/export",
+        params={"email": "student@example.com", "format": "pdf"},
+        json={"events": SAMPLE_EVENTS}
+    )
     assert resp.status_code == 400
     assert "format" in resp.json()["error"].lower()
 
 
-def test_export_unauthenticated(client):
-    """Email with no stored credentials returns 401."""
+def test_export_works_without_credentials(client):
+    """Export only serializes the request body, so guests (no stored creds) can use it."""
     with patch("app.get_google_credentials", return_value=None):
         resp = client.post(
             "/export",
-            params={"email": "unknown@example.com", "format": "ics"},
+            params={"email": "guest@plannr.local", "format": "ics"},
             json={"events": SAMPLE_EVENTS}
         )
-    assert resp.status_code == 401
-    assert "authenticated" in resp.json()["error"].lower()
+    assert resp.status_code == 200
+    assert "BEGIN:VEVENT" in resp.text
+
+
+def test_export_without_email_param(client):
+    """The email query param is optional."""
+    resp = client.post("/export", params={"format": "csv"}, json={"events": SAMPLE_EVENTS})
+    assert resp.status_code == 200
 
 
 def test_export_empty_events(client):
-    """Authenticated user with an empty events list returns 400."""
-    with patch("app.get_google_credentials", return_value=FAKE_CREDS):
-        resp = client.post(
-            "/export",
-            params={"email": "student@example.com", "format": "ics"},
-            json={"events": []}
-        )
+    """An empty events list returns 400."""
+    resp = client.post(
+        "/export",
+        params={"email": "student@example.com", "format": "ics"},
+        json={"events": []}
+    )
     assert resp.status_code == 400
     assert "no events" in resp.json()["error"].lower()

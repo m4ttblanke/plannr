@@ -284,21 +284,11 @@ async def auth_callback(request: Request, code: str = Query(...), state: str = Q
         return RedirectResponse(url=app_callback_url)
 
     except Exception as e:
-        print(f"OAuth callback error: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.exception("OAuth callback error")
         # Redirect to app with error
         from urllib.parse import quote
         error_url = f"plannr://auth/callback?error={quote(str(e))}"
         return RedirectResponse(url=error_url)
-        
-
-
-@app.post('/google-oauth-login', tags=['OAuth'])
-@limiter.limit("10/minute")
-async def google_oauth_login(request: Request):
-    """Legacy endpoint - use /auth/google instead"""
-    return RedirectResponse(url='/auth/google')
 
 
 @app.get('/me', tags=['OAuth'])
@@ -632,62 +622,9 @@ Return a **single JSON object** in this exact format:
             ) from e
         raise SyllabusParsingError("Gemini's response was malformed. Please try again.") from e
 
-    print("\n=== PARSED JSON ===")
-    print(parsed)
+    logger.info("Gemini returned %d events",
+                len(parsed.get("events", [])) if isinstance(parsed, dict) else 0)
     return parsed
-
-
-@app.post('/calendar', tags=['Syllabus to Calendar'])
-@limiter.limit("20/minute")
-async def add_to_calendar(request: Request, email: str = Query(...), body: CalendarSyncRequest = Body(...)):
-    """Add parsed syllabus events to user's Google Calendar"""
-    try:
-        creds_data = get_google_credentials(email)
-        if not creds_data:
-            return JSONResponse(
-                status_code=401,
-                content={"error": "User not authenticated. Please sign in with Google first."}
-            )
-
-        service = build('calendar', 'v3', credentials=_build_credentials(creds_data))
-
-        created_events = []
-        for event in body.events:
-            # Create calendar event
-            calendar_event = {
-                'summary': event.title,
-                'description': event.description,
-                'start': {
-                    'date': event.date,  # All-day event format: YYYY-MM-DD
-                },
-                'end': {
-                    'date': event.date,
-                },
-            }
-
-            result = service.events().insert(calendarId='primary', body=calendar_event).execute()
-            created_events.append({
-                'title': event.title,
-                'date': event.date,
-                'calendar_event_id': result.get('id')
-            })
-
-        return JSONResponse(
-            status_code=200,
-            content={
-                "message": f"Successfully added {len(created_events)} events to calendar",
-                "events": created_events
-            }
-        )
-
-    except Exception as e:
-        print(f"Calendar sync error: {e}")
-        import traceback
-        traceback.print_exc()
-        return JSONResponse(
-            status_code=400,
-            content={"error": f"Failed to add events to calendar: {str(e)}"}
-        )
 
 
 def _find_or_create_calendar(service, class_name: str, background_color: Optional[str] = None, foreground_color: Optional[str] = None) -> str:
@@ -884,21 +821,19 @@ async def delete_class_calendar(request: Request, email: str = Query(...), googl
 @limiter.limit("20/minute")
 async def export_events(
     request: Request,
-    email: str = Query(...),
     format: str = Query(...),
+    email: str = Query(None),  # accepted for backwards compatibility; not required
     body: CalendarSyncRequest = Body(...)
 ):
-    """Export parsed syllabus events as a downloadable .ics or .csv file."""
+    """Export parsed syllabus events as a downloadable .ics or .csv file.
+
+    No Google credentials are required — this only serializes the events in the
+    request body, so it works for guest users too.
+    """
     if format.lower() not in ['ics', 'csv']:
         return JSONResponse(
             status_code=400,
             content={"error": "format must be 'ics' or 'csv'"}
-        )
-
-    if not get_google_credentials(email):
-        return JSONResponse(
-            status_code=401,
-            content={"error": "User not authenticated. Please sign in with Google first."}
         )
 
     if not body.events:
