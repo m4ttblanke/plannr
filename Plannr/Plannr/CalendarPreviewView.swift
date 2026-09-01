@@ -144,7 +144,7 @@ struct CalendarPreviewView: View {
                     editingEvent = nil
                 }
             }
-            .alert(syncSuccess == true ? "Succesfully added all events to your Google Calendar" : "Failed to add to your Google Calendar", isPresented: $showSyncAlert) {
+            .alert(syncSuccess == true ? "Successfully added all events to your Google Calendar" : "Failed to add to your Google Calendar", isPresented: $showSyncAlert) {
                 Button("OK", role: .cancel) {
                     if syncSuccess == true, let syncResp = pendingSyncResponse {
                         // Build lookup: localId → googleEventId
@@ -822,7 +822,7 @@ struct WeeklyCalendarView: View {
             .padding(.horizontal, 0)
             
             VStack(spacing: 12){
-                ForEach(eventsForDate(selectedDate), id: \.title){
+                ForEach(eventsForDate(selectedDate)){
                     event in EventCard(event: event, colorOverride: sharedEventColor)
                 }
             }
@@ -831,7 +831,7 @@ struct WeeklyCalendarView: View {
         .background(Color.gray.opacity(0.1))
         .cornerRadius(16)
     }
-    
+
     func daysInWeek() -> [Date] {
         let startOfWeek = calendar.date(from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: selectedDate))!
         return (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: startOfWeek) }
@@ -885,7 +885,7 @@ struct DayColumn: View {
             // Event dots
             if !events.isEmpty {
                 HStack(spacing: 2) {
-                    ForEach(events.prefix(3), id: \.title) { event in
+                    ForEach(events.prefix(3)) { _ in
                         Circle()
                             .fill(sharedEventColor)
                             .frame(width: 6, height: 6)
@@ -980,7 +980,7 @@ struct MonthlyCalendarView: View {
             .padding(.horizontal, 0)
             
             VStack(spacing: 12){
-                ForEach(eventsForDate(selectedDate), id: \.title){
+                ForEach(eventsForDate(selectedDate)){
                     event in EventCard(event: event, colorOverride: sharedEventColor)
                 }
             }
@@ -989,7 +989,7 @@ struct MonthlyCalendarView: View {
         .background(Color.gray.opacity(0.1))
         .cornerRadius(16)
     }
-    
+
     func daysInMonth() -> [Date] {
         let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: selectedDate))!
         let range = calendar.range(of: .day, in: .month, for: selectedDate)!

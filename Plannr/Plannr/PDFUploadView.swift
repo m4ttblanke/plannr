@@ -402,15 +402,15 @@ extension Color {
     }
     
     func toHex() -> String {
-        guard let components = UIColor(self).cgColor.components else { return "007AFF" }
-        
-        let r = Float(components[0])
-        let g = Float(components[1])
-        let b = Float(components[2])
-        
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        // getRed(...) normalizes any color space (grayscale, P3, …). cgColor.components
+        // could return fewer than 3 entries for a grayscale color, which crashed on
+        // components[1] / components[2].
+        guard UIColor(self).getRed(&r, green: &g, blue: &b, alpha: &a) else { return "007AFF" }
+
         return String(format: "%02lX%02lX%02lX",
-                     lroundf(r * 255),
-                     lroundf(g * 255),
-                     lroundf(b * 255))
+                     lroundf(Float(r) * 255),
+                     lroundf(Float(g) * 255),
+                     lroundf(Float(b) * 255))
     }
 }
