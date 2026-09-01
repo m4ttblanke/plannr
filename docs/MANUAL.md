@@ -14,7 +14,9 @@ Plannr is built for students who want to stay organized without spending hours s
 
 ### Sign In / Guest Mode
 
-Users can sign in with their Google account to enable full calendar sync and persistent data storage. A Guest Mode is also available for users who want to try the app without signing in; events in guest mode are not saved between sessions.
+Users can sign in with their Google account to enable full calendar sync and persistent data storage. A Guest Mode is also available for users who want to try the app without signing in; classes and events created in guest mode are not saved between sessions, and Google Calendar sync is unavailable. Guests can still parse syllabi, review events, and export them as `.ics` or `.csv`.
+
+If Google access is later revoked (for example, by removing the app from your Google Account settings), Plannr detects this on next launch, signs you out, and prompts you to sign in again.
 
 <img src="MANUAL_IMAGES/login.png" alt="alt text" width="300">
 
@@ -28,7 +30,12 @@ Users can add multiple classes and view their full class list on the home page. 
 
 ### Upload Syllabi
 
-Users can upload their syllabi in four ways: PDF file upload, camera document scanning (with OCR for scanned pages), photo library import, or manual text paste. All methods convert the input into a format ready for AI processing.
+Users can upload their syllabi in four ways: PDF file upload, camera document scanning, photo library import, or manual text paste. Scanned pages and photos are run through OCR (text recognition) automatically. All methods convert the input into a format ready for AI processing.
+
+Notes:
+- Uploads are limited to 10 MB. OCR reads at most the first 30 pages of a scanned document.
+- Camera scanning requires a physical device (it is not available on the iOS Simulator) and camera permission.
+- For scanned or photographed syllabi, clear, high-contrast, straight-on images produce the best results.
 
 <img src="MANUAL_IMAGES/upload.png" alt="alt text" width="300">
 
@@ -42,7 +49,7 @@ Once a syllabus is uploaded, Plannr uses Google Gemini to intelligently parse th
 
 ### Preview Calendar
 
-Before syncing, users can review all extracted events in a calendar preview. Events can be edited (title, date, time, description) or removed before they are added to Google Calendar.
+Before syncing, users can review all extracted events in a calendar preview, and accept or decline each one. Events can be edited (title, date, type, description) or removed before they are added to Google Calendar. Synced events are created as all-day entries.
 
 <img src="MANUAL_IMAGES/preview_calendar.png" alt="alt text" width="300">
 
@@ -74,14 +81,27 @@ Users can push all parsed events to their Google Calendar with one tap. Plannr c
 
 ### Export Events
 
-Events can be exported as an iCal (.ics) file compatible with most calendar apps, or as a CSV spreadsheet for use in other tools.
+Events can be exported as an iCal (.ics) file compatible with most calendar apps, or as a CSV spreadsheet for use in other tools. Export is available to signed-in users and guests alike.
 
 <img src="MANUAL_IMAGES/export.png" alt="alt text" width="300">
+
+
+### Profile & Settings
+
+The profile screen (tap the avatar in the top-right of the home screen) collects account and preference options in one place:
+
+- **Profile photo** — use your Google account photo, or pick a custom one from your photo library.
+- **Current Term** — record a term label and start/end dates. This is informational only; it is not yet used to constrain parsing or auto-set class end dates.
+- **Deadline Reminders** — choose how far ahead of a due date to be reminded (same day up to 7 days before, or leave it to Google Calendar's default). When events are synced, this reminder lead time is applied to the Google Calendar entries.
+- **Notifications** — opt in to local reminder notifications on this device, scheduled from the reminder lead time above. These are separate from Google Calendar's own notifications and are limited to this device.
+- **Sync** — enable *Auto-sync* to push edits to Google Calendar immediately instead of waiting for a manual re-sync. Not available in guest mode.
+- **Sign Out** and **Delete Account**. Deleting an account removes the on-device data and asks the backend to delete the stored Google credentials.
+
 
 ## **Known Problems**
 
 - The event type field (e.g. Homework, Exam, Lab, Quiz) is a free-text input rather than a dropdown menu, so values are not standardized.
-- After uploading a class and editing it, the app navigates to Week at a Glance instead of back to the Class Edit screen.
-- When viewing the class list and opening then closing a class, the app incorrectly navigates to Week at a Glance instead of returning to the class list. The app should only navigate to Week at a Glance in two cases:
-  - When the app is first opened and at least one class already exists.
-  - Immediately after a new class is added and synced for the first time.
+- Very large syllabi with many deadlines can exceed what the parser handles in a single pass; the app will suggest splitting the document into smaller uploads.
+- OCR of scanned or photographed syllabi depends on image quality — faint, skewed, or low-contrast scans may yield incomplete results. OCR is also not currently enabled on the production backend, so scanned-only PDFs may need to be uploaded as text-layer PDFs or pasted as text.
+- The "Current Term" dates in Profile & Settings are recorded but not yet wired into parsing or class end dates.
+- Local reminder notifications are capped by iOS at 64 pending notifications per app; students with a very large number of upcoming deadlines may not receive reminders for all of them.
