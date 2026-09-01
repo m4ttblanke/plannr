@@ -9,6 +9,7 @@ import asyncio
 import time
 import secrets
 import hashlib
+import hmac
 import base64
 import csv
 import io
@@ -109,21 +110,68 @@ SCOPES = [
     'openid'
 ]
 
-# In-memory OAuth state store: {state_token: {"ts": timestamp, "cv": code_verifier}}
-_oauth_states: dict[str, dict] = {}
+# OAuth "state" is a signed, self-contained token rather than a server-side
+# session: the PKCE code_verifier and an issue timestamp are packed into the
+# state parameter itself and HMAC-signed with a key derived from the Google
+# client secret. This survives dyno restarts and redeploys (an in-memory store
+# does not) and needs no database round-trip. A signed token is not single-use,
+# but replay is harmless here — Google enforces single use of the auth `code`,
+# which is the value that actually grants access.
 OAUTH_STATE_TTL = 300  # 5 minutes
 
 
-def _cleanup_expired_states():
-    """Remove expired OAuth state tokens."""
-    now = time.time()
-    expired = [s for s, v in _oauth_states.items() if now - v["ts"] > OAUTH_STATE_TTL]
-    for s in expired:
-        del _oauth_states[s]
+def _oauth_state_key() -> bytes:
+    return hashlib.sha256(
+        (settings.google_client_secret or "plannr-dev-secret").encode()
+    ).digest()
 
 
-# Initialize database on startup
-initialize()
+def _b64u(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+
+
+def _b64u_decode(text: str) -> bytes:
+    return base64.urlsafe_b64decode(text + "=" * (-len(text) % 4))
+
+
+def issue_oauth_state(code_verifier: str) -> str:
+    """Pack the PKCE verifier + timestamp into a signed, URL-safe state token."""
+    body = _b64u(json.dumps(
+        {"cv": code_verifier, "ts": int(time.time())}, separators=(",", ":")
+    ).encode())
+    sig = _b64u(hmac.new(_oauth_state_key(), body.encode(), hashlib.sha256).digest())
+    return f"{body}.{sig}"
+
+
+def verify_oauth_state(state: str) -> Optional[str]:
+    """Return the code_verifier if `state` is well-formed, correctly signed and
+    unexpired; otherwise None."""
+    if not state or state.count(".") != 1:
+        return None
+    body, sig = state.split(".", 1)
+    expected = _b64u(hmac.new(_oauth_state_key(), body.encode(), hashlib.sha256).digest())
+    if not hmac.compare_digest(expected, sig):
+        return None
+    try:
+        data = json.loads(_b64u_decode(body))
+        code_verifier, ts = str(data["cv"]), int(data["ts"])
+    except (ValueError, KeyError, TypeError):
+        return None
+    if time.time() - ts > OAUTH_STATE_TTL:
+        return None
+    return code_verifier
+
+
+# Verify database connectivity at startup, but don't take the whole app down if
+# the database is briefly unreachable (Render's free Postgres sleeps/restarts
+# too). pool_pre_ping on the engine recovers connections per-request once it's back.
+try:
+    initialize()
+except Exception:
+    logger.warning(
+        "Database not reachable at startup; continuing and retrying per-request",
+        exc_info=True,
+    )
 
 app = FastAPI(
     title='Plannr API',
@@ -177,14 +225,11 @@ async def google_auth(request: Request):
             content={"error": "Google OAuth credentials not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env"}
         )
 
-    _cleanup_expired_states()
-
-    state = secrets.token_urlsafe(32)
     code_verifier = secrets.token_urlsafe(96)
     code_challenge = base64.urlsafe_b64encode(
         hashlib.sha256(code_verifier.encode()).digest()
     ).rstrip(b"=").decode()
-    _oauth_states[state] = {"ts": time.time(), "cv": code_verifier}
+    state = issue_oauth_state(code_verifier)
 
     flow = get_oauth_flow()
     authorization_url, _ = flow.authorization_url(
@@ -203,19 +248,15 @@ async def google_auth(request: Request):
 async def auth_callback(request: Request, code: str = Query(...), state: str = Query(None), redirect_to_app: bool = Query(True)):
     """Handle OAuth callback from Google"""
     try:
-        # Validate the OAuth state parameter to prevent CSRF attacks
+        # Validate the signed OAuth state parameter to prevent CSRF attacks
         from urllib.parse import quote as _quote
-        if not state or state not in _oauth_states:
-            error_url = f"plannr://auth/callback?error={_quote('Invalid or missing OAuth state. Please try signing in again.')}"
-            return RedirectResponse(url=error_url)
-
-        state_data = _oauth_states.pop(state)  # Single-use: delete immediately
-        if time.time() - state_data["ts"] > OAUTH_STATE_TTL:
-            error_url = f"plannr://auth/callback?error={_quote('OAuth session expired. Please try signing in again.')}"
+        code_verifier = verify_oauth_state(state)
+        if not code_verifier:
+            error_url = f"plannr://auth/callback?error={_quote('Invalid or expired sign-in session. Please try signing in again.')}"
             return RedirectResponse(url=error_url)
 
         flow = get_oauth_flow()
-        flow.fetch_token(code=code, code_verifier=state_data["cv"])
+        flow.fetch_token(code=code, code_verifier=code_verifier)
 
         credentials = flow.credentials
 

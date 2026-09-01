@@ -1,126 +1,84 @@
-"""Tests for OAuth CSRF state parameter validation."""
+"""Tests for OAuth CSRF protection via signed, self-contained state tokens."""
 
 import time
-from unittest.mock import patch
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 
-from app import _oauth_states, _cleanup_expired_states, OAUTH_STATE_TTL
+from app import issue_oauth_state, verify_oauth_state, OAUTH_STATE_TTL
 
 
-@pytest.fixture(autouse=True)
-def clear_state_store():
-    """Ensure a clean state store for every test."""
-    _oauth_states.clear()
-    yield
-    _oauth_states.clear()
+class TestSignedState:
+    """The state token round-trips the PKCE verifier and rejects tampering."""
 
+    def test_roundtrip_returns_verifier(self):
+        token = issue_oauth_state("my-code-verifier")
+        assert verify_oauth_state(token) == "my-code-verifier"
 
-class TestStateStore:
-    """Tests for the in-memory state store and cleanup."""
+    def test_tampered_body_rejected(self):
+        body, sig = issue_oauth_state("v").split(".", 1)
+        assert verify_oauth_state(f"{body}x.{sig}") is None
 
-    def test_cleanup_removes_expired_states(self):
-        _oauth_states["old"] = {"ts": time.time() - OAUTH_STATE_TTL - 1, "cv": "v"}
-        _oauth_states["fresh"] = {"ts": time.time(), "cv": "v"}
-        _cleanup_expired_states()
-        assert "old" not in _oauth_states
-        assert "fresh" in _oauth_states
+    def test_tampered_signature_rejected(self):
+        body, _ = issue_oauth_state("v").split(".", 1)
+        assert verify_oauth_state(f"{body}.deadbeef") is None
 
-    def test_cleanup_keeps_all_when_none_expired(self):
-        _oauth_states["a"] = {"ts": time.time(), "cv": "v"}
-        _oauth_states["b"] = {"ts": time.time(), "cv": "v"}
-        _cleanup_expired_states()
-        assert len(_oauth_states) == 2
+    def test_malformed_rejected(self):
+        assert verify_oauth_state("") is None
+        assert verify_oauth_state("no-dot") is None
+        assert verify_oauth_state("a.b.c") is None
+
+    def test_expired_rejected(self, monkeypatch):
+        token = issue_oauth_state("v")
+        real_time = time.time
+        monkeypatch.setattr("app.time.time", lambda: real_time() + OAUTH_STATE_TTL + 1)
+        assert verify_oauth_state(token) is None
+
+    def test_each_issue_is_unique(self):
+        assert issue_oauth_state("a") != issue_oauth_state("b")
 
 
 class TestAuthCallback:
-    """Tests for /auth/callback state validation."""
+    """/auth/callback rejects missing or invalid state before touching Google."""
+
+    def _client(self):
+        from fastapi.testclient import TestClient
+        from app import app
+        return TestClient(app, follow_redirects=False)
 
     def test_missing_state_rejected(self):
-        """Callback without a state parameter should redirect with error."""
-        from fastapi.testclient import TestClient
-        from app import app
-
-        client = TestClient(app, follow_redirects=False)
-        resp = client.get("/auth/callback", params={"code": "fake_code"})
+        resp = self._client().get("/auth/callback", params={"code": "fake_code"})
         assert resp.status_code == 307
         assert "error=" in resp.headers["location"]
-        assert "Invalid" in resp.headers["location"] or "missing" in resp.headers["location"].lower()
 
     def test_invalid_state_rejected(self):
-        """Callback with a state that was never issued should redirect with error."""
-        from fastapi.testclient import TestClient
-        from app import app
-
-        client = TestClient(app, follow_redirects=False)
-        resp = client.get("/auth/callback", params={"code": "fake_code", "state": "bogus_state"})
-        assert resp.status_code == 307
-        assert "error=" in resp.headers["location"]
-
-    def test_expired_state_rejected(self):
-        """Callback with an expired state should redirect with error."""
-        from fastapi.testclient import TestClient
-        from app import app
-
-        expired_state = "expired_token"
-        _oauth_states[expired_state] = {"ts": time.time() - OAUTH_STATE_TTL - 1, "cv": "v"}
-
-        client = TestClient(app, follow_redirects=False)
-        resp = client.get("/auth/callback", params={"code": "fake_code", "state": expired_state})
-        assert resp.status_code == 307
-        assert "error=" in resp.headers["location"]
-        assert "expired" in resp.headers["location"].lower()
-        # State should be consumed even if expired
-        assert expired_state not in _oauth_states
-
-    def test_state_is_single_use(self):
-        """Using the same state twice should fail the second time."""
-        from fastapi.testclient import TestClient
-        from app import app
-
-        reused_state = "single_use_token"
-        _oauth_states[reused_state] = {"ts": time.time(), "cv": "v"}
-
-        client = TestClient(app, follow_redirects=False)
-
-        # First use: state is valid (will fail on token exchange, but state validation passes)
-        # We just need to confirm the state was consumed
-        client.get("/auth/callback", params={"code": "fake_code", "state": reused_state})
-        assert reused_state not in _oauth_states
-
-        # Second use: state no longer exists
-        resp = client.get("/auth/callback", params={"code": "fake_code", "state": reused_state})
+        resp = self._client().get(
+            "/auth/callback", params={"code": "fake_code", "state": "bogus.state"}
+        )
         assert resp.status_code == 307
         assert "error=" in resp.headers["location"]
 
 
 class TestAuthGoogle:
-    """Tests for /auth/google state generation."""
+    """/auth/google issues a valid signed state in its redirect."""
 
-    def test_google_auth_stores_state(self):
-        """Initiating OAuth should store a state token."""
+    def _state_from_redirect(self, resp):
+        return parse_qs(urlparse(resp.headers["location"]).query)["state"][0]
+
+    def test_google_auth_redirects_with_signed_state(self):
         from fastapi.testclient import TestClient
         from app import app
 
         client = TestClient(app, follow_redirects=False)
         resp = client.get("/auth/google")
-
         assert resp.status_code == 307
-        assert len(_oauth_states) == 1
-
-        state_token = list(_oauth_states.keys())[0]
-        # State should appear in the redirect URL
-        assert state_token in resp.headers["location"]
+        assert verify_oauth_state(self._state_from_redirect(resp)) is not None
 
     def test_each_request_generates_unique_state(self):
-        """Multiple OAuth initiations should each produce a unique state."""
         from fastapi.testclient import TestClient
         from app import app
 
         client = TestClient(app, follow_redirects=False)
-        client.get("/auth/google")
-        client.get("/auth/google")
-
-        assert len(_oauth_states) == 2
-        states = list(_oauth_states.keys())
-        assert states[0] != states[1]
+        s1 = self._state_from_redirect(client.get("/auth/google"))
+        s2 = self._state_from_redirect(client.get("/auth/google"))
+        assert s1 != s2
