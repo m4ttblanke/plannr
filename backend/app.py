@@ -13,6 +13,7 @@ import base64
 import csv
 import io
 import json
+import logging
 from io import BytesIO
 from datetime import date as date_type
 from icalendar import Calendar as ICalendar, Event as ICalEvent
@@ -29,6 +30,28 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from config import settings
 from repositories.user_repository import initialize, get_google_credentials, upsert_google_credentials, delete_user
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+logger = logging.getLogger("plannr")
+
+
+def _mask_email(email: Optional[str]) -> str:
+    """Redact an email for logs: 'student@example.com' -> 's***@example.com'."""
+    if not email or "@" not in email:
+        return "<none>"
+    local, _, domain = email.partition("@")
+    return f"{(local[:1] or '')}***@{domain}"
+
+
+# Upload guardrails: a single large PDF (or a malicious upload) is read fully
+# into memory and, for scanned pages, rasterized at 200 DPI for OCR — both are
+# easy ways to exhaust a small dyno. Reject early instead.
+MAX_SYLLABUS_BYTES = 10 * 1024 * 1024  # 10 MB
+MAX_OCR_PAGES = 30
 
 
 class CalendarEvent(BaseModel):
@@ -270,31 +293,34 @@ async def delete_account(request: Request, email: str = Query(...)):
 @limiter.limit("10/minute")
 async def parse_syllabus(request: Request, file: UploadFile = File(...)):
     try:
-        print(f"\n=== NEW UPLOAD ===")
-        print(f"Filename: {file.filename}")
-        
+        logger.info("Syllabus upload received (filename=%s)", file.filename)
+
         # Read the uploaded file
         contents = await file.read()
-        print(f"File size: {len(contents)} bytes")
-        
+        if len(contents) > MAX_SYLLABUS_BYTES:
+            return JSONResponse(
+                status_code=413,
+                content={"error": (
+                    f"That file is {len(contents) // (1024 * 1024)} MB. "
+                    f"Please upload a syllabus under {MAX_SYLLABUS_BYTES // (1024 * 1024)} MB."
+                )}
+            )
+        logger.info("Syllabus size: %d bytes", len(contents))
+
         # Extract text from PDF
         pdf_text = extract_text_from_pdf(contents)
-        print(f"\n=== EXTRACTED PDF TEXT ===")
-        print(f"Text length: {len(pdf_text)} characters")
-        print(pdf_text[:500])  # First 500 characters
-        
+        logger.info("Extracted %d characters of syllabus text", len(pdf_text))
+
         if not pdf_text:
             return JSONResponse(
                 status_code=400,
                 content={"error": "Could not extract text from PDF"}
             )
-        
+
         # Send to Gemini for parsing
         parsed_events = await parse_with_gemini(pdf_text)
-        
-        print(f"\n=== FINAL RESPONSE ===")
-        print(f"Events parsed: {len(parsed_events.get('events', []))}")
-        
+        logger.info("Parsed %d events from syllabus", len(parsed_events.get('events', [])))
+
         return JSONResponse(
             status_code=200,
             content={
@@ -305,10 +331,7 @@ async def parse_syllabus(request: Request, file: UploadFile = File(...)):
             }
         )
     except Exception as e:
-        print(f"\n=== ERROR IN /SYLLABUS ===")
-        print(f"Error: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.exception("Error handling /syllabus upload")
         return JSONResponse(
             status_code=400,
             content={"error": str(e)}
@@ -323,16 +346,16 @@ def extract_text_from_pdf(pdf_bytes: bytes) -> str:
         text = ""
         for page in pdf_reader.pages:
             text += page.extract_text() or ""
-        
+
         if text.strip():
-            print(f"PyPDF2 extracted {len(text)} characters")
+            logger.info("PyPDF2 extracted %d characters", len(text))
             return text
-        
-        print("No text found via PyPDF2, falling back to OCR...")
+
+        logger.info("No embedded text found, falling back to OCR")
         return extract_text_via_ocr(pdf_bytes)
 
-    except Exception as e:
-        print(f"Error extracting PDF text: {e}")
+    except Exception:
+        logger.exception("PDF text extraction failed, falling back to OCR")
         return extract_text_via_ocr(pdf_bytes)
 
 
@@ -343,19 +366,20 @@ def extract_text_via_ocr(pdf_bytes: bytes) -> str:
         import pytesseract
 
         images = convert_from_bytes(pdf_bytes, dpi=200)
-        print(f"OCR: converted PDF to {len(images)} image(s)")
-        
+        if len(images) > MAX_OCR_PAGES:
+            logger.warning("OCR: capping %d-page PDF at %d pages", len(images), MAX_OCR_PAGES)
+            images = images[:MAX_OCR_PAGES]
+        logger.info("OCR: processing %d page(s)", len(images))
+
         text = ""
-        for i, image in enumerate(images):
-            page_text = pytesseract.image_to_string(image)
-            print(f"OCR page {i+1}: {len(page_text)} characters")
-            text += page_text + "\n"
-        
-        print(f"OCR total: {len(text)} characters extracted")
+        for image in images:
+            text += pytesseract.image_to_string(image) + "\n"
+
+        logger.info("OCR extracted %d characters", len(text))
         return text
 
-    except Exception as e:
-        print(f"OCR failed: {e}")
+    except Exception:
+        logger.exception("OCR failed")
         return ""
 
 class SyllabusParsingError(Exception):
@@ -526,34 +550,28 @@ Return a **single JSON object** in this exact format:
         except genai_errors.APIError as e:
             is_retryable = e.code in GEMINI_RETRYABLE_CODES
             if not is_retryable or attempt == GEMINI_MAX_ATTEMPTS:
-                print(f"\n=== ERROR CALLING GEMINI (attempt {attempt}/{GEMINI_MAX_ATTEMPTS}) ===")
-                print(f"Error: {e}")
+                logger.error("Gemini API error (attempt %d/%d): %s",
+                             attempt, GEMINI_MAX_ATTEMPTS, e)
                 raise SyllabusParsingError(f"Gemini API call failed: {e}") from e
             wait_seconds = 2 ** (attempt - 1)  # 1s, 2s, 4s
-            print(f"\n=== GEMINI {e.code} {e.status} — retrying in {wait_seconds}s "
-                  f"(attempt {attempt}/{GEMINI_MAX_ATTEMPTS}) ===")
+            logger.warning("Gemini %s %s — retrying in %ds (attempt %d/%d)",
+                           e.code, e.status, wait_seconds, attempt, GEMINI_MAX_ATTEMPTS)
             await asyncio.sleep(wait_seconds)
         except Exception as e:
-            print(f"\n=== ERROR CALLING GEMINI ===")
-            print(f"Error: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.exception("Unexpected error calling Gemini")
             raise SyllabusParsingError(f"Gemini API call failed: {e}") from e
 
     response_text = response.text
-    print("\n=== GEMINI RAW RESPONSE ===")
-    print(response_text)
+    logger.debug("Gemini raw response: %s", response_text)
 
     # Look for JSON in the response
     start_idx = response_text.find('{')
     end_idx = response_text.rfind('}') + 1
     if start_idx == -1 or end_idx <= start_idx:
-        print("\n=== NO JSON FOUND IN RESPONSE ===")
+        logger.warning("No JSON object found in Gemini response")
         raise SyllabusParsingError("Gemini did not return a parseable response. Please try again.")
 
     json_str = response_text[start_idx:end_idx]
-    print("\n=== EXTRACTED JSON STRING ===")
-    print(json_str)
 
     try:
         parsed = json.loads(json_str)
@@ -565,7 +583,7 @@ Return a **single JSON object** in this exact format:
             finish_reason = response.candidates[0].finish_reason
         except Exception:
             pass
-        print(f"\n=== JSON DECODE FAILED (finish_reason={finish_reason}) ===")
+        logger.warning("Gemini JSON decode failed (finish_reason=%s)", finish_reason)
         if finish_reason and 'MAX_TOKENS' in str(finish_reason):
             raise SyllabusParsingError(
                 "This syllabus has too many events for Plannr to parse in one pass. "
@@ -676,12 +694,11 @@ def _set_calendar_colors(service, calendar_id: str, background_color: Optional[s
                 body=color_body,
                 colorRgbFormat=True  # Critical: enables custom hex colors
             ).execute()
-            
-            print(f"Successfully set colors for calendar {calendar_id}: {color_body}")
-    except Exception as e:
-        print(f"Warning: Failed to set calendar colors: {e}")
+
+            logger.info("Set colors for calendar %s", calendar_id)
+    except Exception:
         # Don't fail the entire operation if color setting fails
-        pass
+        logger.warning("Failed to set calendar colors", exc_info=True)
 
 
 def _build_google_event_body(event: SyncEventRequest, reminder_minutes: Optional[int] = None) -> dict:
@@ -855,9 +872,7 @@ async def export_events(
         else:
             return _build_csv_response(body.events)
     except Exception as e:
-        print(f"Export error: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.exception("Export failed")
         return JSONResponse(
             status_code=400,
             content={"error": f"Failed to export events: {str(e)}"}
@@ -1021,10 +1036,11 @@ async def stripe_webhook(request: Request):
     if event_type in ('checkout.session.completed', 'checkout.session.async_payment_succeeded'):
         if session.get('payment_status') != 'unpaid':
             email = (session.get('customer_details') or {}).get('email')
-            print(f"=== TESTFLIGHT PAYMENT CONFIRMED === session={session.get('id')} email={email}")
+            logger.info("TestFlight payment confirmed (session=%s, email=%s)",
+                        session.get('id'), _mask_email(email))
             # Extension point: email the TestFlight link here as a durability backstop
             # for customers who never land on /testflight/success.
     elif event_type == 'checkout.session.async_payment_failed':
-        print(f"=== TESTFLIGHT PAYMENT FAILED === session={session.get('id')}")
+        logger.info("TestFlight payment failed (session=%s)", session.get('id'))
 
     return JSONResponse(status_code=200, content={"received": True})
