@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import MessageUI
 
 enum AppTab {
     case myClasses, calendar, weeklyDashboard
@@ -20,6 +21,8 @@ struct PDFUploadView: View {
     @State private var selectedTab: AppTab = .myClasses
     @State private var showProfileSheet = false
     @State private var hasSetInitialTab = false
+    @State private var showMailComposer = false
+    @State private var showReportIssueFallbackAlert = false
 
     init(isGuest: Bool = false) {
         _classManager = StateObject(wrappedValue: ClassManager(isGuest: isGuest))
@@ -63,6 +66,12 @@ struct PDFUploadView: View {
                             }
                             Button(action: { selectedTab = .weeklyDashboard }) {
                                 Label("Week at a Glance", systemImage: "chart.bar.doc.horizontal")
+                            }
+
+                            Divider()
+
+                            Button(action: reportAnIssue) {
+                                Label("Report an Issue", systemImage: "exclamationmark.bubble")
                             }
                         } label: {
                             Image(systemName: "line.3.horizontal")
@@ -164,6 +173,34 @@ struct PDFUploadView: View {
                     .environmentObject(classManager)
                     .environmentObject(settingsManager)
             }
+            .sheet(isPresented: $showMailComposer) {
+                MailComposeView(
+                    recipient: ReportIssue.recipient,
+                    subject: ReportIssue.subject,
+                    body: ReportIssue.body(accountDescription: accountDescription),
+                    onFinish: { showMailComposer = false }
+                )
+                .ignoresSafeArea()
+            }
+            .alert("Report an Issue", isPresented: $showReportIssueFallbackAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("This device has no email set up. Please email \(ReportIssue.recipient) to report an issue.")
+            }
+        }
+    }
+
+    private var accountDescription: String {
+        authManager.isGuest ? "Guest" : (authManager.userEmail ?? "Signed in")
+    }
+
+    /// Opens the in-app mail composer, falling back to the system mail client,
+    /// then to an alert with the address if neither is available.
+    private func reportAnIssue() {
+        if MFMailComposeViewController.canSendMail() {
+            showMailComposer = true
+        } else if !ReportIssue.openMailto(accountDescription: accountDescription) {
+            showReportIssueFallbackAlert = true
         }
     }
 
