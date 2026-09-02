@@ -277,21 +277,34 @@ class AuthManager: ObservableObject {
 
     // MARK: - Account deletion
 
+    /// Seam for tests to simulate timeouts / slow-success without a network.
+    var httpDataProvider: (URLRequest) async throws -> (Data, URLResponse) = {
+        try await URLSession.shared.data(for: $0)
+    }
+
+    private enum DeletionOutcome {
+        case deleted
+        case failed(String)
+    }
+
     /// Delete the account on the backend, then wipe all local state.
     ///
     /// For a signed-in user, local state is wiped **only if the backend confirms
-    /// the deletion** — otherwise the stored Google credentials would be left on
-    /// the server while the app looks signed out. Guests have nothing
-    /// server-side, so they always succeed. Returns false (with `errorMessage`
-    /// set) if the backend call failed; the caller should surface that and keep
-    /// the account intact.
+    /// the deletion**. The backend `DELETE /account` is idempotent, so if the
+    /// response is lost to a timeout the deletion may still have committed — we
+    /// retry once and, if that also can't get a response, probe `GET /me` to see
+    /// whether the account's credentials are already gone before deciding.
+    /// Guests have nothing server-side, so they always succeed. Returns false
+    /// (with `errorMessage` set) on a confirmed failure; the caller should
+    /// surface that and keep the account intact.
     func deleteAccount() async -> Bool {
         await MainActor.run { isDeletingAccount = true }
 
         if !isGuest {
             guard let email = userEmail,
                   let encodedEmail = email.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-                  let url = URL(string: "\(BACKEND_URL)account?email=\(encodedEmail)") else {
+                  let deleteURL = URL(string: "\(BACKEND_URL)account?email=\(encodedEmail)"),
+                  let meURL = URL(string: "\(BACKEND_URL)me?email=\(encodedEmail)") else {
                 await MainActor.run {
                     self.errorMessage = "Couldn't delete your account. Please try again."
                     self.isDeletingAccount = false
@@ -299,21 +312,9 @@ class AuthManager: ObservableObject {
                 return false
             }
 
-            var request = URLRequest(url: url)
-            request.httpMethod = "DELETE"
-
-            do {
-                let (_, response) = try await URLSession.shared.data(for: request)
-                guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-                    await MainActor.run {
-                        self.errorMessage = "Account deletion failed on the server. Your data was not deleted — please try again."
-                        self.isDeletingAccount = false
-                    }
-                    return false
-                }
-            } catch {
+            if case .failed(let message) = await confirmAccountDeletion(deleteURL: deleteURL, meURL: meURL) {
                 await MainActor.run {
-                    self.errorMessage = "Couldn't reach the server to delete your account. Check your connection and try again."
+                    self.errorMessage = message
                     self.isDeletingAccount = false
                 }
                 return false
@@ -325,5 +326,50 @@ class AuthManager: ObservableObject {
 
         await MainActor.run { isDeletingAccount = false }
         return true
+    }
+
+    private func confirmAccountDeletion(deleteURL: URL, meURL: URL) async -> DeletionOutcome {
+        let offlineMessage = "Couldn't reach the server to delete your account. Check your connection and try again."
+
+        for attempt in 1...2 {
+            var request = URLRequest(url: deleteURL)
+            request.httpMethod = "DELETE"
+            request.timeoutInterval = attempt == 1 ? 45 : 30
+            do {
+                let (data, response) = try await httpDataProvider(request)
+                let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+                if (200..<300).contains(code) { return .deleted }
+                // A definite non-success response from the server (e.g. a 500 DB
+                // error): retrying the same request won't help — report it.
+                let serverMessage = (try? JSONDecoder().decode([String: String].self, from: data))?["error"]
+                return .failed(serverMessage
+                    ?? "Account deletion failed on the server (\(code)). Your data was not deleted — please try again.")
+            } catch {
+                if attempt == 2 {
+                    // Neither DELETE got a response. The first attempt may still
+                    // have committed server-side — check whether this account's
+                    // stored credentials are gone before giving up.
+                    return await probeAccountDeleted(meURL: meURL, fallbackFailure: offlineMessage)
+                }
+                // otherwise: fall through and retry once
+            }
+        }
+        return .failed(offlineMessage)
+    }
+
+    /// `GET /me` returns 401 when there are no stored Google credentials for the
+    /// email — i.e. the account was deleted. Any other outcome means we can't
+    /// confirm the deletion, so keep local data.
+    private func probeAccountDeleted(meURL: URL, fallbackFailure: String) async -> DeletionOutcome {
+        var request = URLRequest(url: meURL)
+        request.timeoutInterval = 20
+        do {
+            let (_, response) = try await httpDataProvider(request)
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            if code == 401 || code == 404 { return .deleted }
+            return .failed("We couldn't confirm your account was deleted. Please check your connection and try again.")
+        } catch {
+            return .failed(fallbackFailure)
+        }
     }
 }

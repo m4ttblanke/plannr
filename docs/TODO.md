@@ -32,10 +32,6 @@ Working list of known problems and planned features. Last updated: September 3, 
   request would not trigger the session-expired sign-out. Route all authed
   requests through `send()`.
 
-- **Account deletion, slow-success edge case.** If `DELETE /account` succeeds
-  server-side but the response times out, the client reports failure and keeps
-  local data even though the account is gone. Rare; low urgency.
-
 ### Low priority / cleanup
 
 - `EventEditView` "type" is a free-text field — no dropdown, so values

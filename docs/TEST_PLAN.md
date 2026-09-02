@@ -452,8 +452,8 @@ Needs a second Google account you can sign into.
   **Expect:** `PlannrTests` all pass (`EventReconcilerTests`,
   `ClassScheduleTests`, `CalendarPreviewViewTests`, `UnifiedEventMeetingTests`,
   `ParsedScheduleTests`, `ClassMeetingSyncTests`, `ClassManagerTests`
-  per-account scoping + legacy migration)
-  and `PlannrUITests/GuestFlowUITests`.
+  per-account scoping + legacy migration, `AuthManagerDeleteAccountTests`
+  retry + probe) and `PlannrUITests/GuestFlowUITests`.
 
 ---
 
@@ -470,7 +470,10 @@ Needs a second Google account you can sign into.
   keep it. If you test Delete Account: confirm the dialog → **Expect:** you're
   signed out and, on a healthy backend, the server row is gone. (Stop the
   backend and try again → **Expect:** a "Couldn't Delete Account" alert and your
-  data is **not** wiped locally.)
+  data is **not** wiped locally.) The client retries the delete once and then
+  probes `GET /me` before concluding failure, so a deletion whose response was
+  lost to a timeout still ends up signed out with local data cleared —
+  hard to reproduce by hand; covered by `AuthManagerDeleteAccountTests`.
 
 ---
 
@@ -519,7 +522,7 @@ Needs a second Google account you can sign into.
 | Auto-sync changes setting | §1K |
 | Auto-sync class meetings setting (new/syllabus classes only) | §1K |
 | Local notifications (schedule + clear) | §2d |
-| Delete Account (success + backend-failure guard) | §4 |
+| Delete Account (success + backend-failure guard + timeout retry/probe) | §4 |
 | Landing page (nav, reveal, accordion, ticker, policies) | §2e |
 | TestFlight / Stripe success + error pages + webhook | §2f |
 | Rate limiting / backend endpoints (incl. `/calendar/visibility`) | §2g |
