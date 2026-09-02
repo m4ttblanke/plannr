@@ -233,20 +233,29 @@ struct ProfileView: View {
         }
     }
 
-    // MARK: Week at a Glance
+    // MARK: Class meetings display
 
     private var weekViewSection: some View {
-        SettingsSection(title: "Week at a Glance", icon: "calendar.day.timeline.left") {
+        SettingsSection(title: "Class Meetings", icon: "calendar.day.timeline.left") {
             Toggle(isOn: Binding(
-                get: { settingsManager.showClassMeetingsInWeekView },
-                set: { settingsManager.showClassMeetingsInWeekView = $0 }
+                get: { settingsManager.showClassMeetingsInCalendar },
+                set: { settingsManager.showClassMeetingsInCalendar = $0 }
             )) {
-                Text("Show class meetings")
+                Text("Show in Calendar")
                     .foregroundColor(.white)
             }
             .tint(.yellow)
 
-            Text("Include recurring lecture/section times in the week's list, alongside assignments. Off by default — meetings still go to your Google Calendar when enabled per class.")
+            Toggle(isOn: Binding(
+                get: { settingsManager.showClassMeetingsInWeekView },
+                set: { settingsManager.showClassMeetingsInWeekView = $0 }
+            )) {
+                Text("Show in Week at a Glance")
+                    .foregroundColor(.white)
+            }
+            .tint(.yellow)
+
+            Text("Whether recurring lecture/section times and final exams appear in those two views. Off by default. They still sync to your Google Calendar when enabled per class.")
                 .font(.caption2)
                 .foregroundColor(.gray)
         }

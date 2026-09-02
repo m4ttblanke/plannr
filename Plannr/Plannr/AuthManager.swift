@@ -29,7 +29,8 @@ class AuthManager: ObservableObject {
             for key in ["userEmail", "userName", "userPhotoURL", "savedClasses",
                         "settings.term", "settings.reminderLeadTimeDays",
                         "settings.autoSyncEnabled", "settings.notificationsEnabled",
-                        "settings.showClassMeetingsInWeekView"] {
+                        "settings.showClassMeetingsInWeekView",
+                        "settings.showClassMeetingsInCalendar"] {
                 defaults.removeObject(forKey: key)
             }
             try? FileManager.default.removeItem(

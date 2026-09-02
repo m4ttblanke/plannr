@@ -389,6 +389,15 @@ struct CalendarEvent: Codable, Identifiable {
         self.description = description
     }
 
+    /// Explicit id — used to synthesize stable, non-persisted events (class meetings).
+    init(id: UUID, title: String, date: String, type: String, description: String) {
+        self.id = id
+        self.title = title
+        self.date = date
+        self.type = type
+        self.description = description
+    }
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()

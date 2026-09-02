@@ -162,7 +162,7 @@ final class GuestFlowUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Guest User"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["Current Term"].exists)
         XCTAssertTrue(app.staticTexts["Deadline Reminders"].exists)
-        XCTAssertTrue(app.staticTexts["Week at a Glance"].exists)     // the "Show class meetings" section
+        XCTAssertTrue(app.staticTexts["Class Meetings"].exists)       // the show-meetings settings
         XCTAssertTrue(app.staticTexts["Notifications"].exists)
 
         // Auto-sync is disabled for guests.
@@ -172,15 +172,17 @@ final class GuestFlowUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Exit Guest Mode"].exists || app.buttons["Sign Out"].exists)
     }
 
-    func testShowClassMeetingsToggleFlips() {
+    func testClassMeetingDisplayTogglesFlip() {
         enterGuestMode()
         app.buttons["profileButton"].tap()
 
-        let toggle = app.switches["Show class meetings"]
-        XCTAssertTrue(toggle.waitForExistence(timeout: 3))
-        let before = toggle.value as? String
-        toggle.tap()
-        XCTAssertNotEqual(toggle.value as? String, before, "toggle value should change")
+        for label in ["Show in Calendar", "Show in Week at a Glance"] {
+            let toggle = app.switches[label]
+            XCTAssertTrue(toggle.waitForExistence(timeout: 3), "\(label) toggle should exist")
+            let before = toggle.value as? String
+            toggle.tap()
+            XCTAssertNotEqual(toggle.value as? String, before, "\(label) should flip")
+        }
     }
 
     // MARK: - Guest data does not persist

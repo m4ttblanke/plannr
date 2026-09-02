@@ -31,10 +31,16 @@ class SettingsManager: ObservableObject {
     @Published var notificationsEnabled: Bool {
         didSet { UserDefaults.standard.set(notificationsEnabled, forKey: Keys.notificationsEnabled) }
     }
-    /// Whether recurring class meetings show up in the Week at a Glance list
-    /// alongside assignments. Off by default — that list is about deadlines.
+    /// Whether recurring class meetings (and final exams) show up in the Week at
+    /// a Glance list alongside assignments. Off by default — that list is about
+    /// deadlines.
     @Published var showClassMeetingsInWeekView: Bool {
         didSet { UserDefaults.standard.set(showClassMeetingsInWeekView, forKey: Keys.showClassMeetingsInWeekView) }
+    }
+    /// Whether class meetings / final exams appear in the Calendar tab (grid dots
+    /// + the day and upcoming lists). Off by default.
+    @Published var showClassMeetingsInCalendar: Bool {
+        didSet { UserDefaults.standard.set(showClassMeetingsInCalendar, forKey: Keys.showClassMeetingsInCalendar) }
     }
 
     /// Minutes-before-event value to send to the backend, or nil to use Google's default reminders.
@@ -48,6 +54,7 @@ class SettingsManager: ObservableObject {
         static let autoSyncEnabled = "settings.autoSyncEnabled"
         static let notificationsEnabled = "settings.notificationsEnabled"
         static let showClassMeetingsInWeekView = "settings.showClassMeetingsInWeekView"
+        static let showClassMeetingsInCalendar = "settings.showClassMeetingsInCalendar"
     }
 
     private init() {
@@ -61,6 +68,7 @@ class SettingsManager: ObservableObject {
         autoSyncEnabled = UserDefaults.standard.object(forKey: Keys.autoSyncEnabled) as? Bool ?? false
         notificationsEnabled = UserDefaults.standard.object(forKey: Keys.notificationsEnabled) as? Bool ?? false
         showClassMeetingsInWeekView = UserDefaults.standard.object(forKey: Keys.showClassMeetingsInWeekView) as? Bool ?? false
+        showClassMeetingsInCalendar = UserDefaults.standard.object(forKey: Keys.showClassMeetingsInCalendar) as? Bool ?? false
     }
 
     private func saveTerm() {
@@ -76,5 +84,6 @@ class SettingsManager: ObservableObject {
         autoSyncEnabled = false
         notificationsEnabled = false
         showClassMeetingsInWeekView = false
+        showClassMeetingsInCalendar = false
     }
 }

@@ -6,6 +6,19 @@
 //
 
 import SwiftUI
+import CryptoKit
+
+extension UUID {
+    /// Deterministic UUID derived from a string — lets us synthesize stable ids
+    /// for non-persisted rows (class meetings) so SwiftUI doesn't churn them.
+    init(deterministic string: String) {
+        let digest = Array(Insecure.MD5.hash(data: Data(string.utf8)))
+        self = UUID(uuid: (digest[0], digest[1], digest[2], digest[3],
+                           digest[4], digest[5], digest[6], digest[7],
+                           digest[8], digest[9], digest[10], digest[11],
+                           digest[12], digest[13], digest[14], digest[15]))
+    }
+}
 
 // MARK: - Unified Event Model
 
@@ -14,6 +27,7 @@ struct UnifiedEvent: Identifiable {
     let event: CalendarEvent
     let classColor: Color
     let className: String
+    var isMeeting: Bool = false
 
     init(event: CalendarEvent, classColor: Color, className: String) {
         self.id = event.id
@@ -21,12 +35,38 @@ struct UnifiedEvent: Identifiable {
         self.classColor = classColor
         self.className = className
     }
+
+    /// Wrap a synthesized class-meeting occurrence as a calendar row.
+    init(meeting occ: ClassMeetingOccurrence, classColor: Color) {
+        let suffix: String
+        switch occ.kind {
+        case .lecture: suffix = ""
+        case .section: suffix = " (Section)"
+        case .final:   suffix = " — Final Exam"
+        }
+        let dayFmt = DateFormatter(); dayFmt.dateFormat = "yyyy-MM-dd"
+        let timeFmt = DateFormatter(); timeFmt.dateFormat = "h:mm a"
+        let range = "\(timeFmt.string(from: occ.start)) – \(timeFmt.string(from: occ.end))"
+
+        self.id = UUID(deterministic: occ.id)
+        self.event = CalendarEvent(
+            id: UUID(deterministic: occ.id),
+            title: occ.className + suffix,
+            date: dayFmt.string(from: occ.start),
+            type: occ.kind == .final ? "final" : "meeting",
+            description: range
+        )
+        self.classColor = classColor
+        self.className = occ.className
+        self.isMeeting = true
+    }
 }
 
 // MARK: - Unified Calendar View
 
 struct UnifiedCalendarView: View {
     @EnvironmentObject var classManager: ClassManager
+    @ObservedObject private var settingsManager = SettingsManager.shared
     @State private var isWeekly = true
     @State private var selectedEvent: UnifiedEvent?
 
@@ -36,7 +76,7 @@ struct UnifiedCalendarView: View {
         return f
     }()
 
-    var allEvents: [UnifiedEvent] {
+    private var assignmentEvents: [UnifiedEvent] {
         classManager.classes.flatMap { cls in
             cls.events
                 .filter { !$0.isDeletedLocally }
@@ -44,11 +84,35 @@ struct UnifiedCalendarView: View {
         }
     }
 
+    /// Synthesized class meetings + final exams, when the user has opted to see
+    /// them here. Expanded over a wide window so grid navigation stays populated.
+    private var meetingEvents: [UnifiedEvent] {
+        guard settingsManager.showClassMeetingsInCalendar else { return [] }
+        let calendar = Calendar.current
+        let from = calendar.date(byAdding: .month, value: -2, to: Date()) ?? Date()
+        let to = calendar.date(byAdding: .month, value: 6, to: Date()) ?? Date()
+        return classManager.classes.flatMap { cls -> [UnifiedEvent] in
+            guard let schedule = cls.structuredSchedule, !schedule.isEmpty else { return [] }
+            return schedule.occurrences(
+                from: from, to: to,
+                className: cls.name, classColorHex: cls.colorHex, classID: cls.id,
+                fallbackStart: settingsManager.term.startDate ?? .distantPast
+            ).map { UnifiedEvent(meeting: $0, classColor: cls.color) }
+        }
+    }
+
+    /// Everything the calendar shows: assignments always, meetings when enabled.
+    var allEvents: [UnifiedEvent] { assignmentEvents + meetingEvents }
+
     var upcomingEvents: [UnifiedEvent] {
         let todayString = dateFormatter.string(from: Date())
         return allEvents
             .filter { $0.event.date >= todayString }
-            .sorted { $0.event.date < $1.event.date }
+            .sorted {
+                $0.event.date != $1.event.date
+                    ? $0.event.date < $1.event.date
+                    : $0.event.title < $1.event.title
+            }
     }
 
     var body: some View {
