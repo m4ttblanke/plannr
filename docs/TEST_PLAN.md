@@ -92,6 +92,12 @@ Calendar at [calendar.google.com](https://calendar.google.com).
 
 - [ ] Toggle the **Week / Month** picker at the top; tap a day with a dot.
   **Expect:** the grid switches and the day's events show below.
+- [ ] If the class has a schedule (§1B / §1H) **and** Settings →
+  Class Meetings → *Show in Calendar* is on: the grid also carries the recurring
+  lecture/section dots and a final-exam dot, and a selected meeting day lists a
+  **"Meeting" / "Final" card with no Edit/Accept/Decline** below the grid. These
+  are preview-only — they never appear in the accept/decline list and aren't part
+  of Sync. With the setting off (default) they don't show.
 - [ ] On one event tap **Edit** → change the **Title** and **Description**,
   spin the **Date** wheel forward a day, **Save Changes**.
   **Expect:** the card reflects the new title/date/description.
@@ -490,6 +496,7 @@ Needs a second Google account you can sign into.
 | Upload guardrails (10 MB, not-a-syllabus, timeout) | §2b |
 | AI extraction, type classification, relative dates | §1C |
 | Calendar Preview grid (week/month), accept/decline, edit event | §1D |
+| Class meetings shown (display-only) in the Calendar Preview grid (setting) | §1D |
 | Export .ics / .csv (+ "no accepted events") | §1D |
 | First sync → dedicated colored secondary calendar | §1E |
 | Incremental re-upload (add/remove/update/move, no duplicates) | §1F |

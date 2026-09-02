@@ -72,8 +72,12 @@ struct CalendarPreviewView: View {
                         }
                         .padding(.horizontal)
 
-                        CalendarGridView(events: events, sharedEventColor: sharedEventColor)
-                            .padding(.horizontal)
+                        CalendarGridView(
+                            events: events,
+                            meetingEvents: meetingPreviewEvents,
+                            sharedEventColor: sharedEventColor
+                        )
+                        .padding(.horizontal)
 
                         // Events list
                         VStack(spacing: 12) {
@@ -335,6 +339,26 @@ struct CalendarPreviewView: View {
         }
     }
 
+    /// Recurring lecture/section meetings + the final exam for this class,
+    /// synthesized for the grid so the preview mirrors what will land on Google
+    /// Calendar. Display-only — never merged into `events` (accept/decline/sync).
+    /// Gated by the same Settings toggle as the main Calendar tab.
+    private var meetingPreviewEvents: [CalendarEvent] {
+        guard settingsManager.showClassMeetingsInCalendar else { return [] }
+        let existing = classManager.classes.first(where: { $0.id == existingClassID })
+        guard let schedule = resolvedSchedule(existing: existing), !schedule.isEmpty else { return [] }
+        let cal = Calendar.current
+        let from = cal.date(byAdding: .month, value: -2, to: Date()) ?? Date()
+        let to = cal.date(byAdding: .month, value: 6, to: Date()) ?? Date()
+        return schedule.occurrences(
+            from: from, to: to,
+            className: className,
+            classColorHex: sharedEventColor.toHex(),
+            classID: existingClassID,
+            fallbackStart: settingsManager.term.startDate ?? .distantPast
+        ).map { CalendarEvent(meeting: $0) }
+    }
+
     /// Keep the schedule the user built; otherwise adopt what the syllabus
     /// parser found. Never replace a real schedule with nothing.
     private func resolvedSchedule(existing: Class?) -> ClassSchedule? {
@@ -532,19 +556,23 @@ struct SyncedEventMapping: Decodable {
 struct EventCard: View {
     let event: CalendarEvent
     var colorOverride: Color?
+    /// Display-only (e.g. a synthesized class meeting): no Edit/Accept/Decline row.
+    var readOnly: Bool = false
     var onEdit: (() -> Void)?
     var onAccept: (() -> Void)?
     var onDecline: (() -> Void)?
-    
+
     init(
         event: CalendarEvent,
         colorOverride: Color? = nil,
+        readOnly: Bool = false,
         onEdit: (() -> Void)? = nil,
         onAccept: (() -> Void)? = nil,
         onDecline: (() -> Void)? = nil
     ) {
         self.event = event
         self.colorOverride = colorOverride
+        self.readOnly = readOnly
         self.onEdit = onEdit
         self.onAccept = onAccept
         self.onDecline = onDecline
@@ -600,63 +628,59 @@ struct EventCard: View {
                     .lineLimit(2)
             }
             
-            // Action buttons
-            HStack(spacing: 8) {
-                // Edit button
-                Button(action: {
-                    onEdit?()
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "pencil")
-                            .font(.caption)
-                        Text("Edit")
-                            .font(.caption)
-                            .fontWeight(.medium)
+            // Action buttons — hidden for display-only rows (class meetings)
+            if !readOnly {
+                HStack(spacing: 8) {
+                    // Edit button
+                    Button(action: { onEdit?() }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "pencil")
+                                .font(.caption)
+                            Text("Edit")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.blue.opacity(0.6))
+                        .cornerRadius(8)
                     }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color.blue.opacity(0.6))
-                    .cornerRadius(8)
-                }
-                
-                // Accept button
-                Button(action: {
-                    onAccept?()
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: event.status == .accepted ? "checkmark.circle.fill" : "checkmark.circle")
-                            .font(.caption)
-                        Text("Accept")
-                            .font(.caption)
-                            .fontWeight(.medium)
+
+                    // Accept button
+                    Button(action: { onAccept?() }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: event.status == .accepted ? "checkmark.circle.fill" : "checkmark.circle")
+                                .font(.caption)
+                            Text("Accept")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(event.status == .accepted ? Color.green : Color.green.opacity(0.6))
+                        .cornerRadius(8)
                     }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(event.status == .accepted ? Color.green : Color.green.opacity(0.6))
-                    .cornerRadius(8)
-                }
-                
-                // Decline button
-                Button(action: {
-                    onDecline?()
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: event.status == .declined ? "xmark.circle.fill" : "xmark.circle")
-                            .font(.caption)
-                        Text("Decline")
-                            .font(.caption)
-                            .fontWeight(.medium)
+
+                    // Decline button
+                    Button(action: { onDecline?() }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: event.status == .declined ? "xmark.circle.fill" : "xmark.circle")
+                                .font(.caption)
+                            Text("Decline")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(event.status == .declined ? Color.red : Color.red.opacity(0.6))
+                        .cornerRadius(8)
                     }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(event.status == .declined ? Color.red : Color.red.opacity(0.6))
-                    .cornerRadius(8)
                 }
+                .padding(.top, 4)
             }
-            .padding(.top, 4)
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -789,6 +813,7 @@ struct EventEditView: View {
 // MARK: - Calendar Grid View
 struct CalendarGridView: View {
     let events: [CalendarEvent]
+    var meetingEvents: [CalendarEvent] = []
     let sharedEventColor: Color
     @State private var isWeekly = true
     
@@ -812,9 +837,9 @@ struct CalendarGridView: View {
             }
             
             if isWeekly {
-                WeeklyCalendarView(events: events, sharedEventColor: sharedEventColor)
+                WeeklyCalendarView(events: events, meetingEvents: meetingEvents, sharedEventColor: sharedEventColor)
             } else {
-                MonthlyCalendarView(events: events, sharedEventColor: sharedEventColor)
+                MonthlyCalendarView(events: events, meetingEvents: meetingEvents, sharedEventColor: sharedEventColor)
             }
         }
     }
@@ -823,6 +848,7 @@ struct CalendarGridView: View {
 // MARK: - Weekly Calendar View
 struct WeeklyCalendarView: View {
     let events: [CalendarEvent]
+    var meetingEvents: [CalendarEvent] = []
     let sharedEventColor: Color
     @State private var selectedDate: Date = Date()
     
@@ -862,7 +888,7 @@ struct WeeklyCalendarView: View {
                 ForEach(daysInWeek(), id: \.self) { date in
                     DayColumn(
                         date: date,
-                        events: eventsForDate(date),
+                        events: eventsForDate(date) + meetingsForDate(date),
                         isSelected: calendar.isDate(date, inSameDayAs: selectedDate),
                         sharedEventColor: sharedEventColor
                     ) {
@@ -871,16 +897,24 @@ struct WeeklyCalendarView: View {
                 }
             }
             .padding(.horizontal, 0)
-            
+
             VStack(spacing: 12){
                 ForEach(eventsForDate(selectedDate)){
                     event in EventCard(event: event, colorOverride: sharedEventColor)
+                }
+                ForEach(meetingsForDate(selectedDate)){
+                    event in EventCard(event: event, colorOverride: sharedEventColor, readOnly: true)
                 }
             }
         }
         .padding(.vertical)
         .background(Color.gray.opacity(0.1))
         .cornerRadius(16)
+    }
+
+    func meetingsForDate(_ date: Date) -> [CalendarEvent] {
+        let dateString = dateFormatter.string(from: date)
+        return meetingEvents.filter { $0.date == dateString }
     }
 
     func daysInWeek() -> [Date] {
@@ -965,6 +999,7 @@ struct DayColumn: View {
 // MARK: - Monthly Calendar View
 struct MonthlyCalendarView: View {
     let events: [CalendarEvent]
+    var meetingEvents: [CalendarEvent] = []
     let sharedEventColor: Color
     @State private var selectedDate: Date = Date()
     
@@ -1020,7 +1055,7 @@ struct MonthlyCalendarView: View {
                 ForEach(daysInMonth(), id: \.self) { date in
                     DayCell(
                         date: date,
-                        events: eventsForDate(date),
+                        events: eventsForDate(date) + meetingsForDate(date),
                         isSelected: calendar.isDate(date, inSameDayAs: selectedDate),
                         sharedEventColor: sharedEventColor
                     ) {
@@ -1029,16 +1064,24 @@ struct MonthlyCalendarView: View {
                 }
             }
             .padding(.horizontal, 0)
-            
+
             VStack(spacing: 12){
                 ForEach(eventsForDate(selectedDate)){
                     event in EventCard(event: event, colorOverride: sharedEventColor)
+                }
+                ForEach(meetingsForDate(selectedDate)){
+                    event in EventCard(event: event, colorOverride: sharedEventColor, readOnly: true)
                 }
             }
         }
         .padding(.vertical)
         .background(Color.gray.opacity(0.1))
         .cornerRadius(16)
+    }
+
+    func meetingsForDate(_ date: Date) -> [CalendarEvent] {
+        let dateString = dateFormatter.string(from: date)
+        return meetingEvents.filter { $0.date == dateString }
     }
 
     func daysInMonth() -> [Date] {

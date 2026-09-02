@@ -126,6 +126,48 @@ class CalendarPreviewViewTests: XCTestCase {
         XCTAssertEqual(eventsOnDate.count, 0, "Count should be 0 for no matches")
     }
     
+    // MARK: - Class-meeting preview rows
+
+    /// One occurrence per kind, in the app's own calendar/time zone so the row's
+    /// formatted `date` matches the day it was placed on — the preview grid then
+    /// filters these by that date string exactly like assignment events.
+    private func occurrence(kind: ClassMeetingPattern.Kind, hour: Int = 10) -> ClassMeetingOccurrence {
+        let cal = Calendar.current
+        let start = cal.date(from: DateComponents(year: 2026, month: 3, day: 4, hour: hour, minute: 0))!
+        return ClassMeetingOccurrence(
+            id: "cls-\(kind.rawValue)-20260304",
+            className: "CS 101", classColorHex: "AF52DE",
+            kind: kind, start: start, end: cal.date(byAdding: .minute, value: 50, to: start)!
+        )
+    }
+
+    func testMeetingOccurrenceBecomesADateFilterableRow() {
+        let cal = Calendar.current
+        let rows = [occurrence(kind: .lecture), occurrence(kind: .section, hour: 15), occurrence(kind: .final, hour: 16)]
+            .map { CalendarEvent(meeting: $0) }
+
+        let dayString: String = {
+            let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
+            return f.string(from: cal.date(from: DateComponents(year: 2026, month: 3, day: 4))!)
+        }()
+
+        // All three land on the same day and the grid's date filter picks them up.
+        XCTAssertEqual(rows.filter { $0.date == dayString }.count, 3)
+        XCTAssertEqual(rows.map(\.title),
+                       ["CS 101", "CS 101 (Section)", "CS 101 — Final Exam"])
+        XCTAssertEqual(rows.map(\.type), ["meeting", "meeting", "final"])
+        XCTAssertTrue(rows.allSatisfy { $0.description.contains("–") }, "time range in the description")
+
+        // A different day has none.
+        XCTAssertTrue(rows.filter { $0.date == "2026-03-05" }.isEmpty)
+    }
+
+    func testMeetingRowIDsAreStableAcrossRebuilds() {
+        let occ = occurrence(kind: .lecture)
+        XCTAssertEqual(CalendarEvent(meeting: occ).id, CalendarEvent(meeting: occ).id,
+                       "deterministic ids keep SwiftUI list identity stable")
+    }
+
     /// Test that all events have required properties
     /// Ensures data integrity for calendar display
     func testAllEventsHaveRequiredProperties() {

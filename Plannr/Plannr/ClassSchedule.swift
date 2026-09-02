@@ -229,6 +229,31 @@ struct ClassMeetingOccurrence: Identifiable {
     let kind: ClassMeetingPattern.Kind
     let start: Date
     let end: Date
+
+    /// " (Section)" / " — Final Exam" appended to the class name for the row title.
+    var titleSuffix: String {
+        switch kind {
+        case .lecture: return ""
+        case .section: return " (Section)"
+        case .final:   return " — Final Exam"
+        }
+    }
+}
+
+extension CalendarEvent {
+    /// Synthesize a non-persisted display row from a recurring class-meeting
+    /// occurrence. The id is deterministic so SwiftUI list identity is stable.
+    init(meeting occ: ClassMeetingOccurrence) {
+        let dayFmt = DateFormatter(); dayFmt.dateFormat = "yyyy-MM-dd"
+        let timeFmt = DateFormatter(); timeFmt.dateFormat = "h:mm a"
+        self.init(
+            id: UUID(deterministic: occ.id),
+            title: occ.className + occ.titleSuffix,
+            date: dayFmt.string(from: occ.start),
+            type: occ.kind == .final ? "final" : "meeting",
+            description: "\(timeFmt.string(from: occ.start)) – \(timeFmt.string(from: occ.end))"
+        )
+    }
 }
 
 extension ClassSchedule {

@@ -17,12 +17,6 @@ Working list of known problems and planned features. Last updated: September 3, 
   nothing and the dates don't constrain syllabus date inference or default a
   class's end date. Wire those up or trim.
 
-- **Class meetings in the pre-sync Calendar Preview.** Recurring meetings now
-  show in Week at a Glance and in `UnifiedCalendarView` (both gated by their own
-  Settings toggles), but not in `CalendarPreviewView`'s week/month grid. That
-  screen is pre-sync and syllabus-scoped, so it's lower value — synthesize them
-  there too only if the preview should mirror the live calendar.
-
 - **OCR is not enabled in production.** The Render Python runtime has no
   `tesseract` / `poppler` binaries and there is no `Aptfile` / Dockerfile, so
   OCR of scanned-only PDFs fails in prod ("Could not extract text from PDF").

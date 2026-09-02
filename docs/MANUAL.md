@@ -55,7 +55,7 @@ If the syllabus explicitly states the class's meeting times — e.g. "Lecture: M
 
 ### Preview Calendar
 
-Before syncing, users can review all extracted events in a calendar preview, and accept or decline each one. Events can be edited (title, date, type, description) or removed before they are added to Google Calendar. Synced events are created as all-day entries.
+Before syncing, users can review all extracted events in a calendar preview, and accept or decline each one. Events can be edited (title, date, type, description) or removed before they are added to Google Calendar. Synced events are created as all-day entries. If the class has a schedule and the "Show in Calendar" setting is on, the preview grid also shows the recurring class meetings and final exam for context — these are display-only and aren't part of accept/decline or Sync.
 
 <img src="MANUAL_IMAGES/preview_calendar.png" alt="alt text" width="300">
 

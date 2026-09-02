@@ -38,24 +38,9 @@ struct UnifiedEvent: Identifiable {
 
     /// Wrap a synthesized class-meeting occurrence as a calendar row.
     init(meeting occ: ClassMeetingOccurrence, classColor: Color) {
-        let suffix: String
-        switch occ.kind {
-        case .lecture: suffix = ""
-        case .section: suffix = " (Section)"
-        case .final:   suffix = " — Final Exam"
-        }
-        let dayFmt = DateFormatter(); dayFmt.dateFormat = "yyyy-MM-dd"
-        let timeFmt = DateFormatter(); timeFmt.dateFormat = "h:mm a"
-        let range = "\(timeFmt.string(from: occ.start)) – \(timeFmt.string(from: occ.end))"
-
-        self.id = UUID(deterministic: occ.id)
-        self.event = CalendarEvent(
-            id: UUID(deterministic: occ.id),
-            title: occ.className + suffix,
-            date: dayFmt.string(from: occ.start),
-            type: occ.kind == .final ? "final" : "meeting",
-            description: range
-        )
+        let ev = CalendarEvent(meeting: occ)
+        self.id = ev.id
+        self.event = ev
         self.classColor = classColor
         self.className = occ.className
         self.isMeeting = true
