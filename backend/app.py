@@ -100,6 +100,11 @@ class CalendarClassSyncRequest(BaseModel):
     reminder_minutes: Optional[int] = None  # Minutes before an event to remind; None = Google's default reminders
 
 
+class CalendarVisibilityRequest(BaseModel):
+    google_calendar_id: str
+    selected: bool  # True = shown (checked) in the Google Calendar sidebar; False = hidden
+
+
 class MeetingPatternRequest(BaseModel):
     kind: str                       # "lecture" | "section" — only used for the event title
     byday: List[str]                # RRULE BYDAY tokens, e.g. ["MO", "WE", "FR"]
@@ -890,6 +895,40 @@ async def delete_class_calendar(request: Request, email: str = Query(...), googl
     except Exception as e:
         logger.exception("Calendar delete failed")
         return JSONResponse(status_code=400, content={"error": f"Failed to delete calendar: {str(e)}"})
+
+
+@app.post('/calendar/visibility', tags=['Syllabus to Calendar'])
+@limiter.limit("20/minute")
+async def set_calendar_visibility(request: Request, email: str = Query(...), body: CalendarVisibilityRequest = Body(...)):
+    """Show or hide a class's secondary calendar in the user's Google Calendar
+    list — the sidebar checkbox. Called when a class is switched active/inactive
+    so an inactive class's events stop cluttering the calendar without deleting
+    the calendar itself."""
+    try:
+        creds_data = get_google_credentials(email)
+        if not creds_data:
+            return JSONResponse(status_code=401, content={"error": "User not authenticated."})
+
+        service = build('calendar', 'v3', credentials=_build_credentials(creds_data))
+        try:
+            service.calendarList().patch(
+                calendarId=body.google_calendar_id,
+                body={"selected": body.selected},
+            ).execute()
+        except HttpError as e:
+            if e.resp.status in (404, 410):
+                # Calendar (or its list entry) is already gone — nothing to toggle.
+                return JSONResponse(status_code=200, content={"selected": body.selected, "skipped": True})
+            raise
+        return JSONResponse(status_code=200, content={"selected": body.selected})
+
+    except RefreshError:
+        return JSONResponse(status_code=401, content={
+            "error": "Google access was revoked or expired. Please sign in again."
+        })
+    except Exception as e:
+        logger.exception("Calendar visibility update failed")
+        return JSONResponse(status_code=400, content={"error": f"Failed to update calendar visibility: {str(e)}"})
 
 
 # ── Recurring class meetings ────────────────────────────────────────────────

@@ -147,8 +147,7 @@ struct ClassEditView: View {
             }
             // Auto-transition to inactive if end date has passed
             if let endDate = editableClass.endDate, Date() > endDate, editableClass.status == .active {
-                editableClass.status = .inactive
-                persistClass()
+                goInactive()
             }
         }
     }
@@ -177,14 +176,8 @@ struct ClassEditView: View {
                         .cornerRadius(8)
                 } else {
                     Menu {
-                        Button("ACTIVE") {
-                            editableClass.status = .active
-                            persistClass()
-                        }
-                        Button("INACTIVE") {
-                            editableClass.status = .inactive
-                            persistClass()
-                        }
+                        Button("ACTIVE") { goActive() }
+                        Button("INACTIVE") { goInactive() }
                     } label: {
                         HStack(spacing: 4) {
                             Text(editableClass.status == .active ? "ACTIVE" : "INACTIVE")
@@ -505,6 +498,31 @@ struct ClassEditView: View {
         classManager.updateClass(editableClass)
     }
 
+    // MARK: - Active / inactive transitions
+
+    private func goActive() {
+        editableClass.status = .active
+        persistClass()
+        // Re-check the class's calendar in Google Calendar's sidebar.
+        if !authManager.isGuest && editableClass.googleCalendarId != nil {
+            Task { await setCalendarVisibility(selected: true) }
+        }
+    }
+
+    /// Marking a class done: drop its recurring meetings from Google Calendar and
+    /// uncheck (hide) its calendar there, without deleting the calendar itself.
+    private func goInactive() {
+        editableClass.status = .inactive
+        let hadMeetingSync = editableClass.meetingSyncEnabled
+        if hadMeetingSync { editableClass.meetingSyncEnabled = false }
+        persistClass()
+        guard !authManager.isGuest else { return }
+        Task {
+            if hadMeetingSync { await syncClassMeetings(isToggleAction: false) }
+            await setCalendarVisibility(selected: false)
+        }
+    }
+
     // MARK: - Guest local save (no Google Calendar)
 
     private func saveLocally() {
@@ -587,6 +605,37 @@ struct ClassEditView: View {
             _ = try await authManager.send(request)
         } catch {
             // Silent failure for color sync
+        }
+    }
+
+    /// Check/uncheck this class's calendar in the user's Google Calendar sidebar.
+    /// Called when the class is switched active/inactive. Best-effort and silent:
+    /// a class with no synced calendar yet has nothing to toggle.
+    private func setCalendarVisibility(selected: Bool) async {
+        guard !authManager.isGuest,
+              let calId = editableClass.googleCalendarId,
+              let email = UserDefaults.standard.string(forKey: "userEmail"),
+              let encodedEmail = email.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "\(BACKEND_URL)calendar/visibility?email=\(encodedEmail)") else { return }
+
+        struct VisibilityBody: Encodable {
+            let googleCalendarId: String
+            let selected: Bool
+            enum CodingKeys: String, CodingKey {
+                case googleCalendarId = "google_calendar_id"
+                case selected
+            }
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 90
+        do {
+            request.httpBody = try JSONEncoder().encode(VisibilityBody(googleCalendarId: calId, selected: selected))
+            _ = try await authManager.send(request)
+        } catch {
+            // Silent — visibility is a convenience, not a correctness requirement.
         }
     }
 
