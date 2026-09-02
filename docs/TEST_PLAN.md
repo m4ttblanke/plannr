@@ -258,6 +258,12 @@ Open the profile avatar (top-right of any tab).
 - [ ] **Sync → Auto-sync changes:** turn ON. Go to a class, edit an event.
   **Expect:** it syncs immediately (no "Re-sync" button appears / it clears on
   its own). Turn auto-sync back off.
+- [ ] **Sync → Auto-sync class meetings:** turn ON. Add a new class with a
+  schedule (or upload a syllabus that states meeting times).
+  **Expect:** the new class's **"Add class meetings to Google Calendar"** toggle
+  is already ON when you open it, and 🔎 its recurring lecture/section events are
+  in Google Calendar without you flipping anything. Classes that already existed
+  are untouched. Turn the setting back off; existing on-classes stay on.
 - [ ] **Notifications → Deadline reminders:** turn ON → grant the permission
   prompt. (If you deny it, **Expect:** a "Notifications Disabled" alert.)
 - [ ] **Beta feedback** (hamburger menu → below the tab items): tap
@@ -422,7 +428,7 @@ Follow the "Testing without real money" steps in `README.md`. Then:
   ```
   **Expect:** `PlannrTests` all pass (`EventReconcilerTests`,
   `ClassScheduleTests`, `CalendarPreviewViewTests`, `UnifiedEventMeetingTests`,
-  `ParsedScheduleTests`)
+  `ParsedScheduleTests`, `ClassMeetingSyncTests`)
   and `PlannrUITests/GuestFlowUITests`.
 
 ---
@@ -484,7 +490,8 @@ Follow the "Testing without real money" steps in `README.md`. Then:
 | Profile photo (custom + remove) | §1K |
 | Current Term settings (feeds meeting recurrence) | §1K, §1H |
 | Deadline reminder lead time | §1K, §2d |
-| Auto-sync setting | §1K |
+| Auto-sync changes setting | §1K |
+| Auto-sync class meetings setting (new/syllabus classes only) | §1K |
 | Local notifications (schedule + clear) | §2d |
 | Delete Account (success + backend-failure guard) | §4 |
 | Landing page (nav, reveal, accordion, ticker, policies) | §2e |

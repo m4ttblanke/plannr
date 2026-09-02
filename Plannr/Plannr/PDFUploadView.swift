@@ -175,6 +175,8 @@ struct PDFUploadView: View {
             .sheet(isPresented: $showAddClass) {
                 AddClassView()
                     .environmentObject(classManager)
+                    .environmentObject(authManager)
+                    .environmentObject(settingsManager)
             }
             .sheet(isPresented: $showProfileSheet) {
                 ProfileView()

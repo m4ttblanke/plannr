@@ -280,6 +280,22 @@ struct ProfileView: View {
                  : "Push edits to Google Calendar immediately instead of waiting for a manual re-sync.")
                 .font(.caption2)
                 .foregroundColor(.gray)
+
+            Toggle(isOn: Binding(
+                get: { settingsManager.autoSyncClassMeetings },
+                set: { settingsManager.autoSyncClassMeetings = $0 }
+            )) {
+                Text("Auto-sync class meetings")
+                    .foregroundColor(.white)
+            }
+            .tint(.yellow)
+            .disabled(authManager.isGuest)
+
+            Text(authManager.isGuest
+                 ? "Not available in guest mode."
+                 : "New classes that have a schedule (typed in, or read from the syllabus) push their lecture/section times to Google Calendar automatically. Existing classes are left as they are.")
+                .font(.caption2)
+                .foregroundColor(.gray)
         }
     }
 

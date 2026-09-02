@@ -10,6 +10,8 @@ import SwiftUI
 struct AddClassView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var classManager: ClassManager
+    @EnvironmentObject var authManager: AuthManager
+    @EnvironmentObject var settingsManager: SettingsManager
 
     @State private var className: String = ""
     @State private var schedule = ClassSchedule()
@@ -66,12 +68,7 @@ struct AddClassView: View {
                     }
 
                     Button {
-                        classManager.addClass(Class(
-                            name: className,
-                            schedule: schedule.displayString,
-                            colorHex: selectedColor.toHex(),
-                            structuredSchedule: schedule.isEmpty ? nil : schedule
-                        ))
+                        addClass()
                         dismiss()
                     } label: {
                         Text("Add Class")
@@ -99,9 +96,43 @@ struct AddClassView: View {
             }
         }
     }
+
+    private func addClass() {
+        // "Auto-sync class meetings": a signed-in user who has the setting on gets
+        // meeting sync turned on for any class they create with a schedule.
+        let autoSyncMeetings = !schedule.isEmpty
+            && settingsManager.autoSyncClassMeetings
+            && !authManager.isGuest
+
+        let newClass = Class(
+            name: className,
+            schedule: schedule.displayString,
+            colorHex: selectedColor.toHex(),
+            structuredSchedule: schedule.isEmpty ? nil : schedule,
+            meetingSyncEnabled: autoSyncMeetings
+        )
+        classManager.addClass(newClass)
+
+        if autoSyncMeetings {
+            // Fire-and-forget: if this fails, meetingSyncEnabled stays on and
+            // ClassEditView pushes it the next time the class is opened.
+            Task {
+                let outcome = await ClassMeetingSync.run(
+                    for: newClass,
+                    settings: settingsManager,
+                    send: { try await authManager.send($0) }
+                )
+                if case .updated(let synced) = outcome {
+                    await MainActor.run { classManager.updateClass(synced) }
+                }
+            }
+        }
+    }
 }
 
 #Preview {
     AddClassView()
         .environmentObject(ClassManager())
+        .environmentObject(AuthManager())
+        .environmentObject(SettingsManager.shared)
 }

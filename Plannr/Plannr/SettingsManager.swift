@@ -28,6 +28,12 @@ class SettingsManager: ObservableObject {
     @Published var autoSyncEnabled: Bool {
         didSet { UserDefaults.standard.set(autoSyncEnabled, forKey: Keys.autoSyncEnabled) }
     }
+    /// When on, a newly added class that has a schedule (typed in, or filled in
+    /// by the syllabus parser) turns on "Add class meetings to Google Calendar"
+    /// automatically. Existing classes are left alone. Off by default.
+    @Published var autoSyncClassMeetings: Bool {
+        didSet { UserDefaults.standard.set(autoSyncClassMeetings, forKey: Keys.autoSyncClassMeetings) }
+    }
     @Published var notificationsEnabled: Bool {
         didSet { UserDefaults.standard.set(notificationsEnabled, forKey: Keys.notificationsEnabled) }
     }
@@ -52,6 +58,7 @@ class SettingsManager: ObservableObject {
         static let term = "settings.term"
         static let reminderLeadTimeDays = "settings.reminderLeadTimeDays"
         static let autoSyncEnabled = "settings.autoSyncEnabled"
+        static let autoSyncClassMeetings = "settings.autoSyncClassMeetings"
         static let notificationsEnabled = "settings.notificationsEnabled"
         static let showClassMeetingsInWeekView = "settings.showClassMeetingsInWeekView"
         static let showClassMeetingsInCalendar = "settings.showClassMeetingsInCalendar"
@@ -66,6 +73,7 @@ class SettingsManager: ObservableObject {
         }
         reminderLeadTimeDays = UserDefaults.standard.object(forKey: Keys.reminderLeadTimeDays) as? Int ?? -1
         autoSyncEnabled = UserDefaults.standard.object(forKey: Keys.autoSyncEnabled) as? Bool ?? false
+        autoSyncClassMeetings = UserDefaults.standard.object(forKey: Keys.autoSyncClassMeetings) as? Bool ?? false
         notificationsEnabled = UserDefaults.standard.object(forKey: Keys.notificationsEnabled) as? Bool ?? false
         showClassMeetingsInWeekView = UserDefaults.standard.object(forKey: Keys.showClassMeetingsInWeekView) as? Bool ?? false
         showClassMeetingsInCalendar = UserDefaults.standard.object(forKey: Keys.showClassMeetingsInCalendar) as? Bool ?? false
@@ -82,6 +90,7 @@ class SettingsManager: ObservableObject {
         term = TermSettings()
         reminderLeadTimeDays = -1
         autoSyncEnabled = false
+        autoSyncClassMeetings = false
         notificationsEnabled = false
         showClassMeetingsInWeekView = false
         showClassMeetingsInCalendar = false

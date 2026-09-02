@@ -30,7 +30,8 @@ class AuthManager: ObservableObject {
                         "settings.term", "settings.reminderLeadTimeDays",
                         "settings.autoSyncEnabled", "settings.notificationsEnabled",
                         "settings.showClassMeetingsInWeekView",
-                        "settings.showClassMeetingsInCalendar"] {
+                        "settings.showClassMeetingsInCalendar",
+                        "settings.autoSyncClassMeetings"] {
                 defaults.removeObject(forKey: key)
             }
             try? FileManager.default.removeItem(

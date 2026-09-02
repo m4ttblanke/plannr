@@ -177,9 +177,11 @@ final class GuestFlowUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Class Meetings"].exists)       // the show-meetings settings
         XCTAssertTrue(app.staticTexts["Notifications"].exists)
 
-        // Auto-sync is disabled for guests.
-        let autoSync = app.switches["Auto-sync changes"]
-        if autoSync.exists { XCTAssertFalse(autoSync.isEnabled) }
+        // Sync toggles are disabled for guests.
+        for label in ["Auto-sync changes", "Auto-sync class meetings"] {
+            let toggle = app.switches[label]
+            if toggle.exists { XCTAssertFalse(toggle.isEnabled, "\(label) should be disabled for a guest") }
+        }
 
         XCTAssertTrue(app.buttons["Exit Guest Mode"].exists || app.buttons["Sign Out"].exists)
     }

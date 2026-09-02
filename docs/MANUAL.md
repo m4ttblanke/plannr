@@ -107,7 +107,7 @@ The profile screen (tap the avatar in the top-right of the home screen) collects
 - **Deadline Reminders** — choose how far ahead of a due date to be reminded (same day up to 7 days before, or leave it to Google Calendar's default). When events are synced, this reminder lead time is applied to the Google Calendar entries.
 - **Class Meetings** — two toggles, both off by default: *Show in Calendar* and *Show in Week at a Glance*. They control whether recurring lecture/section times and final exams appear in those two in-app views. They do not affect Google Calendar sync, which is enabled per class.
 - **Notifications** — opt in to local reminder notifications on this device, scheduled from the reminder lead time above. These are separate from Google Calendar's own notifications and are limited to this device.
-- **Sync** — enable *Auto-sync* to push edits to Google Calendar immediately instead of waiting for a manual re-sync. Not available in guest mode.
+- **Sync** — *Auto-sync changes* pushes event edits to Google Calendar immediately instead of waiting for a manual re-sync. *Auto-sync class meetings* turns on "Add class meetings to Google Calendar" automatically for any new class you create that has a schedule (typed in or read from the syllabus); existing classes are left as they are, and you can still turn any class off. Both are unavailable in guest mode.
 - **Sign Out** and **Delete Account**. Deleting an account removes the on-device data and asks the backend to delete the stored Google credentials.
 
 

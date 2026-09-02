@@ -185,7 +185,7 @@ struct CalendarPreviewView: View {
                             syncHistory: existingSyncHistory + [SyncSession(events: syncedEvents)],
                             hasUnsyncedChanges: false,
                             structuredSchedule: mergedSchedule,
-                            meetingSyncEnabled: existingClass?.meetingSyncEnabled ?? false,
+                            meetingSyncEnabled: meetingSyncOn(existing: existingClass),
                             meetingEventIds: existingClass?.meetingEventIds ?? []
                         ))
                         pendingSyncResponse = nil
@@ -327,7 +327,7 @@ struct CalendarPreviewView: View {
             syncHistory: existingClass?.syncHistory ?? [],
             hasUnsyncedChanges: false,
             structuredSchedule: mergedSchedule,
-            meetingSyncEnabled: existingClass?.meetingSyncEnabled ?? false,
+            meetingSyncEnabled: meetingSyncOn(existing: existingClass),
             meetingEventIds: existingClass?.meetingEventIds ?? []
         ))
         DispatchQueue.main.async {
@@ -346,6 +346,20 @@ struct CalendarPreviewView: View {
     private func scheduleText(_ schedule: ClassSchedule?) -> String {
         if let schedule, !schedule.isEmpty { return schedule.displayString }
         return classSchedule
+    }
+
+    /// True when the parser just supplied a schedule for a class that had none.
+    private func adoptedSyllabusSchedule(existing: Class?) -> Bool {
+        (existing?.structuredSchedule?.isEmpty ?? true) && !(parsedSchedule?.isEmpty ?? true)
+    }
+
+    /// Keep an existing meeting-sync choice; otherwise turn it on when the user
+    /// opted into "Auto-sync class meetings" and we just adopted a schedule.
+    private func meetingSyncOn(existing: Class?) -> Bool {
+        if existing?.meetingSyncEnabled == true { return true }
+        return adoptedSyllabusSchedule(existing: existing)
+            && settingsManager.autoSyncClassMeetings
+            && !authManager.isGuest
     }
 
     func syncToCalendar() {
