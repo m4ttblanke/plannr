@@ -22,6 +22,22 @@ class AuthManager: ObservableObject {
     private static let localPhotoFilename = "profile_photo.jpg"
 
     init() {
+        // UI tests launch with -uiTestReset to start from a clean, signed-out
+        // state regardless of what a previous run (or manual use) left behind.
+        if CommandLine.arguments.contains("-uiTestReset") {
+            let defaults = UserDefaults.standard
+            for key in ["userEmail", "userName", "userPhotoURL", "savedClasses",
+                        "settings.term", "settings.reminderLeadTimeDays",
+                        "settings.autoSyncEnabled", "settings.notificationsEnabled",
+                        "settings.showClassMeetingsInWeekView"] {
+                defaults.removeObject(forKey: key)
+            }
+            try? FileManager.default.removeItem(
+                at: FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                    .appendingPathComponent(Self.localPhotoFilename)
+            )
+        }
+
         // Check if user is already authenticated (from UserDefaults)
         if let email = UserDefaults.standard.string(forKey: "userEmail") {
             self.userEmail = email

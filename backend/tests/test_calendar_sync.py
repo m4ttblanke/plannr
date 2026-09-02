@@ -33,6 +33,8 @@ class _Events:
     def __init__(self, rec):
         self.rec = rec
         self.patch_raises = {}   # eventId -> exception raised by patch(...).execute()
+        self.list_items = []     # events the full-rebuild path will find and delete
+        self.last_insert_body = None
 
     def patch(self, calendarId, eventId, body):
         self.rec.append(("patch", eventId))
@@ -44,6 +46,7 @@ class _Events:
 
     def insert(self, calendarId, body):
         self.rec.append(("insert", body["summary"]))
+        self.last_insert_body = body
         return _Call(result={"id": "new-" + body["summary"]})
 
     def delete(self, calendarId, eventId):
@@ -52,7 +55,7 @@ class _Events:
 
     def list(self, calendarId, pageToken=None):           # only used by the full rebuild
         self.rec.append(("events.list", None))
-        return _Call(result={"items": []})
+        return _Call(result={"items": self.list_items})
 
 
 class _Calendars:
@@ -207,3 +210,53 @@ def test_stale_calendar_id_falls_through_to_find_or_create(synced):
     assert ("calendars.get", "gone-123") in rec
     assert ("calendarList.list", None) in rec
     assert ("calendars.insert", "CS101") in rec
+
+
+def test_full_rebuild_clears_existing_events_but_keeps_the_calendar(synced):
+    client, rec, fake = synced
+    fake.events().patch_raises["G-boom"] = HttpError(resp=_FakeResp(500), content=b"{}")
+    fake.events().list_items = [{"id": "old-a"}, {"id": "old-b"}]
+
+    resp = _post(client, [
+        {"local_id": "L7", "title": "HW7", "date": "2026-04-12",
+         "google_event_id": "G-boom", "is_deleted": False},
+        {"local_id": "L8", "title": "HW8", "date": "2026-04-13", "is_deleted": False},
+    ])
+    assert resp.status_code == 200
+    # Both pre-existing events deleted, then every non-deleted event re-inserted.
+    assert ("delete", "old-a") in rec and ("delete", "old-b") in rec
+    assert ("insert", "HW7") in rec and ("insert", "HW8") in rec
+    assert not any(k == "calendars.delete" for k, _ in rec)
+    body = resp.json()
+    assert {m["local_id"] for m in body["synced_events"]} == {"L7", "L8"}
+
+
+def test_is_deleted_event_without_google_id_is_a_no_op(synced):
+    client, rec, _ = synced
+    resp = _post(client, [
+        {"local_id": "L9", "title": "Never synced", "date": "2026-04-20",
+         "is_deleted": True},   # no google_event_id
+    ])
+    assert resp.status_code == 200
+    assert resp.json()["synced_events"] == []
+    assert not any(k == "delete" for k, _ in rec)
+    assert not any(k == "insert" for k, _ in rec)
+
+
+def test_reminder_minutes_flow_into_the_event_body(synced):
+    client, rec, fake = synced
+    client.post("/calendar/sync", params={"email": "s@e.com"}, json={
+        "class_name": "CS101",
+        "google_calendar_id": "cal-123",
+        "reminder_minutes": 2880,   # 2 days
+        "events": [{"local_id": "L1", "title": "HW1", "date": "2026-03-01", "is_deleted": False}],
+    })
+    body = fake.events().last_insert_body
+    assert body["reminders"]["useDefault"] is False
+    assert body["reminders"]["overrides"] == [{"method": "popup", "minutes": 2880}]
+
+
+def test_no_reminder_minutes_leaves_google_defaults(synced):
+    client, rec, fake = synced
+    _post(client, [{"local_id": "L1", "title": "HW1", "date": "2026-03-01", "is_deleted": False}])
+    assert "reminders" not in fake.events().last_insert_body

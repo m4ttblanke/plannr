@@ -100,3 +100,42 @@ def test_export_empty_events(client):
     )
     assert resp.status_code == 400
     assert "no events" in resp.json()["error"].lower()
+
+
+def test_ics_has_one_vevent_per_event_with_dates_and_categories(client):
+    resp = client.post(
+        "/export",
+        params={"format": "ics"},
+        json={"events": SAMPLE_EVENTS},
+    )
+    body = resp.text
+    assert body.count("BEGIN:VEVENT") == 2
+    assert body.count("END:VEVENT") == 2
+    assert "DTSTART" in body and "DTEND" in body
+    # All-day dates render as VALUE=DATE:YYYYMMDD.
+    assert "20250501" in body
+    assert "CATEGORIES:exam" in body
+    assert "PRODID:-//Plannr//Syllabus Export//EN" in body
+
+
+def test_csv_quotes_fields_containing_commas(client):
+    tricky = [{
+        "title": 'Essay, final draft',
+        "date": "2026-05-10",
+        "type": "homework",
+        "description": 'Say "hello"; cite sources',
+    }]
+    resp = client.post("/export", params={"format": "csv"}, json={"events": tricky})
+    assert resp.status_code == 200
+    lines = resp.text.strip().splitlines()
+    # csv.writer quotes the comma-bearing title and doubles the inner quotes.
+    assert '"Essay, final draft"' in lines[1]
+    assert '""hello""' in lines[1]
+    # One data row only (the embedded ; and quotes didn't split it).
+    assert len(lines) == 2
+
+
+def test_csv_uppercases_format_param(client):
+    resp = client.post("/export", params={"format": "CSV"}, json={"events": SAMPLE_EVENTS})
+    assert resp.status_code == 200
+    assert "text/csv" in resp.headers["content-type"]

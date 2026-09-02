@@ -78,12 +78,15 @@ struct PDFUploadView: View {
                                 .font(.title2)
                                 .foregroundColor(.white)
                         }
+                        .accessibilityLabel("Menu")
+                        .accessibilityIdentifier("menuButton")
 
                         Text(selectedTab == .myClasses ? "My Classes" : selectedTab == .calendar ? "Calendar" : "Week at a Glance")
                             .font(.largeTitle)
                             .fontWeight(.bold)
                             .foregroundColor(.white)
                             .padding(.leading, 8)
+                            .accessibilityIdentifier("tabTitle")
 
                         Spacer()
 
@@ -94,6 +97,8 @@ struct PDFUploadView: View {
                             ProfileAvatarView(size: 44)
                                 .environmentObject(authManager)
                         }
+                        .accessibilityLabel("Profile")
+                        .accessibilityIdentifier("profileButton")
                     }
                     .padding(.horizontal)
                     .padding(.top, 20)
