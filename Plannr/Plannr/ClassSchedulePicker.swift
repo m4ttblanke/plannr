@@ -4,51 +4,25 @@
 //
 //  Structured input for a class's weekly schedule: which days it meets and at
 //  what time, plus an optional discussion/lab section that meets separately
-//  (a different day and time). The selection is serialized to a display string
-//  (e.g. "MWF 10:00 AM · Section Th 3:00 PM") written back through `schedule`.
+//  (a different day and time). Reads and writes a `ClassSchedule`.
 //
 
 import SwiftUI
 
-enum Weekday: Int, CaseIterable, Identifiable {
-    case sunday = 1, monday, tuesday, wednesday, thursday, friday, saturday
-
-    var id: Int { rawValue }
-
-    /// Compact label used in the serialized schedule string and on the chips.
-    var short: String {
-        ["Su", "M", "T", "W", "Th", "F", "Sa"][rawValue - 1]
-    }
-}
-
 struct ClassSchedulePicker: View {
-    /// Formatted, human-readable schedule. Empty when no days are chosen.
-    @Binding var schedule: String
-
-    @State private var lectureDays: Set<Weekday> = []
-    @State private var lectureTime: Date = ClassSchedulePicker.defaultTime
-    @State private var hasSection: Bool = false
-    @State private var sectionDays: Set<Weekday> = []
-    @State private var sectionTime: Date = ClassSchedulePicker.defaultTime
+    @Binding var schedule: ClassSchedule
 
     private static var defaultTime: Date {
         Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date()
     }
 
-    private var composed: String {
-        let lecture = Self.format(days: lectureDays, time: lectureTime)
-        guard hasSection, !sectionDays.isEmpty else { return lecture }
-        let section = Self.format(days: sectionDays, time: sectionTime)
-        return lecture.isEmpty ? "Section \(section)" : "\(lecture) · Section \(section)"
-    }
-
-    private static func format(days: Set<Weekday>, time: Date) -> String {
-        guard !days.isEmpty else { return "" }
-        let ordered = Weekday.allCases.filter(days.contains).map(\.short).joined()
-        let formatter = DateFormatter()
-        formatter.dateFormat = "h:mm a"
-        return "\(ordered) \(formatter.string(from: time))"
-    }
+    // Local editing state, projected back onto `schedule` on every change.
+    @State private var lectureDays: Set<Weekday> = []
+    @State private var lectureTime: Date = ClassSchedulePicker.defaultTime
+    @State private var hasSection: Bool = false
+    @State private var sectionDays: Set<Weekday> = []
+    @State private var sectionTime: Date = ClassSchedulePicker.defaultTime
+    @State private var didLoad = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -77,8 +51,8 @@ struct ClassSchedulePicker: View {
                 }
             }
 
-            if !composed.isEmpty {
-                Text(composed)
+            if !schedule.displayString.isEmpty {
+                Text(schedule.displayString)
                     .font(.caption)
                     .foregroundColor(.blue)
                     .padding(.top, 2)
@@ -87,8 +61,36 @@ struct ClassSchedulePicker: View {
         .padding(14)
         .background(Color.gray.opacity(0.15))
         .cornerRadius(10)
-        .onChange(of: composed) { _, newValue in schedule = newValue }
-        .onAppear { schedule = composed }
+        .onAppear(perform: loadFromSchedule)
+        .onChange(of: lectureDays) { _, _ in pushToSchedule() }
+        .onChange(of: lectureTime) { _, _ in pushToSchedule() }
+        .onChange(of: hasSection) { _, _ in pushToSchedule() }
+        .onChange(of: sectionDays) { _, _ in pushToSchedule() }
+        .onChange(of: sectionTime) { _, _ in pushToSchedule() }
+    }
+
+    private func loadFromSchedule() {
+        guard !didLoad else { return }
+        didLoad = true
+        lectureDays = Set(schedule.lectureDays.compactMap(Weekday.init(rawValue:)))
+        sectionDays = Set(schedule.sectionDays.compactMap(Weekday.init(rawValue:)))
+        hasSection = !schedule.sectionDays.isEmpty || schedule.sectionTime != nil
+        if let t = schedule.lectureTime { lectureTime = t.date(on: Date()) }
+        if let t = schedule.sectionTime { sectionTime = t.date(on: Date()) }
+    }
+
+    private func pushToSchedule() {
+        var updated = schedule
+        updated.lectureDays = lectureDays.map(\.rawValue).sorted()
+        updated.lectureTime = lectureDays.isEmpty ? nil : TimeOfDay(from: lectureTime)
+        if hasSection {
+            updated.sectionDays = sectionDays.map(\.rawValue).sorted()
+            updated.sectionTime = sectionDays.isEmpty ? nil : TimeOfDay(from: sectionTime)
+        } else {
+            updated.sectionDays = []
+            updated.sectionTime = nil
+        }
+        schedule = updated
     }
 
     private func weekdayRow(selection: Binding<Set<Weekday>>) -> some View {
@@ -128,13 +130,13 @@ struct ClassSchedulePicker: View {
 
 #Preview {
     struct Harness: View {
-        @State var schedule = ""
+        @State var schedule = ClassSchedule()
         var body: some View {
             ZStack {
                 Color.black.ignoresSafeArea()
                 VStack {
                     ClassSchedulePicker(schedule: $schedule)
-                    Text("schedule = \"\(schedule)\"").foregroundColor(.gray).font(.caption)
+                    Text("→ \"\(schedule.displayString)\"").foregroundColor(.gray).font(.caption)
                 }
                 .padding()
             }

@@ -15,20 +15,15 @@ Working list of known problems and planned features. Last updated: September 1, 
 
 ### Medium priority
 
-- **No way to edit a class schedule after creation.**
-  `AddClassView` now has the structured `ClassSchedulePicker`, but
-  `ClassEditView` only *displays* the schedule string. Add the picker there too
-  (needs it to accept an initial value, or to store structured schedule data on
-  the `Class` model).
+- **"Current Term" settings are only half-used.** The term start/end dates now
+  feed the class-meeting recurrence window, but the term *label* still does
+  nothing and the dates don't constrain syllabus date inference or default a
+  class's end date. Wire those up or trim.
 
-- **Schedule is display-only.** The `Class.schedule` string is never used to
-  place recurring class meetings on Google Calendar. If we want that, persist
-  structured `Weekday` + time (and section) on the model and generate events.
-
-- **"Current Term" settings do nothing.** Profile → Settings collects a term
-  label + start/end dates that nothing consumes. Either wire it up (default
-  class end dates, constrain syllabus date inference to the term window) or
-  remove the section.
+- **Class meetings in the in-app calendar grids.** Recurring meetings show in
+  Week at a Glance (when enabled) but not in the `UnifiedCalendarView` /
+  `CalendarPreviewView` week/month grids. Synthesize them there too for a
+  complete picture.
 
 - **OCR is not enabled in production.** The Render Python runtime has no
   `tesseract` / `poppler` binaries and there is no `Aptfile` / Dockerfile, so
@@ -86,7 +81,6 @@ Working list of known problems and planned features. Last updated: September 1, 
 - **Sync resilience** — retry with backoff on transient failures. (The
   delete-and-recreate behavior is fixed: sync is now an incremental
   patch/insert/delete diff against the existing calendar.)
-- **Editable schedule after creation** (see Medium-priority bug).
 - Haptics on accept / decline / sync success.
 - App icon and launch screen pass (currently generated defaults).
 - Backend `/health` endpoint + an uptime monitor (also keeps the free dyno warm,

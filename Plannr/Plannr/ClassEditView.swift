@@ -46,11 +46,17 @@ struct ClassEditView: View {
     @State private var navigateToUpload = false
     @State private var showEndDatePicker = false
     @State private var showSyncSessions = false
+    @State private var scheduleDraft: ClassSchedule
+    @State private var showScheduleEditor = false
+    @State private var isSyncingMeetings = false
+    @State private var meetingSyncError: String?
+    @State private var showMeetingSyncError = false
 
     var onSyncComplete: (() -> Void)?
 
     init(cls: Class, onSyncComplete: (() -> Void)? = nil) {
         _editableClass = State(initialValue: cls)
+        _scheduleDraft = State(initialValue: cls.structuredSchedule ?? ClassSchedule())
         self.onSyncComplete = onSyncComplete
     }
 
@@ -78,6 +84,9 @@ struct ClassEditView: View {
 
                         // ── Header ────────────────────────────────────────
                         classHeader
+
+                        // ── Weekly schedule + class-meeting sync ──────────
+                        scheduleSection
 
                         // ── Events list ───────────────────────────────────
                         eventsSection
@@ -149,22 +158,10 @@ struct ClassEditView: View {
     private var classHeader: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(editableClass.name)
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-
-                    if !editableClass.schedule.isEmpty {
-                        HStack(spacing: 4) {
-                            Image(systemName: "calendar")
-                                .font(.caption)
-                            Text(editableClass.schedule)
-                                .font(.caption)
-                        }
-                        .foregroundColor(.gray)
-                    }
-                }
+                Text(editableClass.name)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
 
                 Spacer()
 
@@ -281,6 +278,78 @@ struct ClassEditView: View {
             }
         }
         .padding(.horizontal)
+    }
+
+    // MARK: - Schedule + class meetings
+
+    private var scheduleHasContent: Bool { !(editableClass.structuredSchedule?.isEmpty ?? true) }
+
+    private var scheduleSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 6) {
+                Image(systemName: "calendar")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                Text(editableClass.schedule.isEmpty ? "No schedule set" : editableClass.schedule)
+                    .font(.caption)
+                    .foregroundColor(editableClass.schedule.isEmpty ? .gray : .white)
+                Spacer()
+                Button(showScheduleEditor ? "Done" : "Edit") {
+                    withAnimation(.easeInOut(duration: 0.15)) { showScheduleEditor.toggle() }
+                }
+                .font(.caption)
+                .foregroundColor(.blue)
+            }
+
+            if showScheduleEditor {
+                ClassSchedulePicker(schedule: $scheduleDraft)
+                    .onChange(of: scheduleDraft) { _, newValue in
+                        editableClass.structuredSchedule = newValue.isEmpty ? nil : newValue
+                        editableClass.schedule = newValue.displayString
+                        persistClass()
+                        if editableClass.meetingSyncEnabled && !authManager.isGuest {
+                            Task { await syncClassMeetings(isToggleAction: false) }
+                        }
+                    }
+            }
+
+            if !authManager.isGuest {
+                Toggle(isOn: Binding(
+                    get: { editableClass.meetingSyncEnabled },
+                    set: { newValue in
+                        editableClass.meetingSyncEnabled = newValue
+                        persistClass()
+                        Task { await syncClassMeetings() }
+                    }
+                )) {
+                    HStack(spacing: 6) {
+                        if isSyncingMeetings {
+                            ProgressView().scaleEffect(0.7)
+                        }
+                        Text("Add class meetings to Google Calendar")
+                            .font(.subheadline)
+                            .foregroundColor(.white)
+                    }
+                }
+                .tint(.blue)
+                .disabled(isSyncingMeetings || !scheduleHasContent)
+
+                Text(scheduleHasContent
+                     ? "Adds your weekly lecture/section times to this class's calendar as recurring events. They don't show in Week at a Glance unless enabled in Settings."
+                     : "Set a schedule above first.")
+                    .font(.caption2)
+                    .foregroundColor(.gray)
+            }
+        }
+        .padding()
+        .background(Color.gray.opacity(0.12))
+        .cornerRadius(12)
+        .padding(.horizontal)
+        .alert("Class Meetings", isPresented: $showMeetingSyncError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(meetingSyncError ?? "Something went wrong. Please try again.")
+        }
     }
 
     // MARK: - Events section
@@ -501,6 +570,133 @@ struct ClassEditView: View {
             _ = try await authManager.send(request)
         } catch {
             // Silent failure for color sync
+        }
+    }
+
+    // MARK: - Class meeting sync
+
+    private func syncClassMeetings(isToggleAction: Bool = true) async {
+        guard !authManager.isGuest,
+              let email = UserDefaults.standard.string(forKey: "userEmail"),
+              let encodedEmail = email.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "\(BACKEND_URL)calendar/meetings?email=\(encodedEmail)") else { return }
+
+        let enabled = editableClass.meetingSyncEnabled
+        let schedule = editableClass.structuredSchedule
+
+        struct PatternBody: Encodable {
+            let kind: String
+            let byday: [String]
+            let start_time: String
+            let duration_minutes: Int
+            let google_event_id: String?
+        }
+        struct MeetingsRequestBody: Encodable {
+            let class_name: String
+            let google_calendar_id: String?
+            let background_color: String?
+            let foreground_color: String?
+            let timezone: String
+            let start_date: String
+            let until_date: String?
+            let patterns: [PatternBody]
+            let remove_event_ids: [String]
+        }
+        struct MeetingsResponse: Decodable {
+            struct Meeting: Decodable {
+                let kind: String
+                let googleEventId: String
+                enum CodingKeys: String, CodingKey { case kind; case googleEventId = "google_event_id" }
+            }
+            let googleCalendarId: String
+            let meetings: [Meeting]
+            enum CodingKeys: String, CodingKey {
+                case googleCalendarId = "google_calendar_id"
+                case meetings
+            }
+        }
+
+        // Build the patterns to create/update, pairing each with the existing
+        // recurring event id by position; anything left over gets removed.
+        var patterns: [PatternBody] = []
+        var removeIds: [String] = []
+        let existingIds = editableClass.meetingEventIds
+
+        if enabled, let schedule, !schedule.isEmpty {
+            for (index, pattern) in schedule.patterns.enumerated() {
+                patterns.append(PatternBody(
+                    kind: pattern.kind.rawValue,
+                    byday: pattern.days.compactMap { Weekday(rawValue: $0)?.byday },
+                    start_time: pattern.time.iso,
+                    duration_minutes: pattern.durationMinutes,
+                    google_event_id: index < existingIds.count ? existingIds[index] : nil
+                ))
+            }
+            if existingIds.count > schedule.patterns.count {
+                removeIds = Array(existingIds[schedule.patterns.count...])
+            }
+        } else {
+            removeIds = existingIds  // disabled or no schedule → remove all meeting events
+        }
+
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+        let startDate = df.string(from: settingsManager.term.startDate ?? Date())
+        let untilDate = (editableClass.endDate ?? settingsManager.term.endDate).map { df.string(from: $0) }
+
+        let requestBody = MeetingsRequestBody(
+            class_name: editableClass.name,
+            google_calendar_id: editableClass.googleCalendarId,
+            background_color: editableClass.colorHex.hasPrefix("#") ? editableClass.colorHex : "#\(editableClass.colorHex)",
+            foreground_color: "#FFFFFF",
+            timezone: TimeZone.current.identifier,
+            start_date: startDate,
+            until_date: untilDate,
+            patterns: patterns,
+            remove_event_ids: removeIds
+        )
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        do {
+            request.httpBody = try JSONEncoder().encode(requestBody)
+        } catch {
+            return
+        }
+
+        await MainActor.run { isSyncingMeetings = true }
+
+        do {
+            let (data, http) = try await authManager.send(request)
+            await MainActor.run {
+                isSyncingMeetings = false
+                if http.statusCode == 401 { return }
+                if http.statusCode == 200,
+                   let resp = try? JSONDecoder().decode(MeetingsResponse.self, from: data) {
+                    editableClass.googleCalendarId = resp.googleCalendarId
+                    editableClass.meetingEventIds = enabled ? resp.meetings.map(\.googleEventId) : []
+                    persistClass()
+                } else {
+                    let msg = (try? JSONDecoder().decode([String: String].self, from: data))?["error"]
+                    meetingSyncError = msg ?? "Couldn't update class meetings. Please try again."
+                    showMeetingSyncError = true
+                    if isToggleAction {
+                        editableClass.meetingSyncEnabled = !enabled  // put the toggle back
+                        persistClass()
+                    }
+                }
+            }
+        } catch {
+            await MainActor.run {
+                isSyncingMeetings = false
+                meetingSyncError = "Network error: \(error.localizedDescription)"
+                showMeetingSyncError = true
+                if isToggleAction {
+                    editableClass.meetingSyncEnabled = !enabled
+                    persistClass()
+                }
+            }
         }
     }
 

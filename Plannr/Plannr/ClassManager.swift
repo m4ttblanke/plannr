@@ -93,6 +93,9 @@ struct Class: Identifiable, Codable, Hashable {
             && lhs.hasUnsyncedChanges == rhs.hasUnsyncedChanges
             && lhs.events.count == rhs.events.count
             && lhs.syncHistory.count == rhs.syncHistory.count
+            && lhs.structuredSchedule == rhs.structuredSchedule
+            && lhs.meetingSyncEnabled == rhs.meetingSyncEnabled
+            && lhs.meetingEventIds == rhs.meetingEventIds
     }
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
@@ -110,6 +113,14 @@ struct Class: Identifiable, Codable, Hashable {
     var endDate: Date?
     var hasUnsyncedChanges: Bool
     var syncHistory: [SyncSession]
+    /// Structured weekly meeting schedule (days + times). `schedule` is its
+    /// display string; this is what drives calendar recurrence.
+    var structuredSchedule: ClassSchedule?
+    /// Whether the class's recurring meetings are pushed to Google Calendar.
+    var meetingSyncEnabled: Bool
+    /// Google Calendar event ids for the recurring meeting events (one per
+    /// pattern: lecture, section). Kept so they can be updated or removed.
+    var meetingEventIds: [String]
 
     var color: Color {
         get { Color(hex: colorHex) }
@@ -117,7 +128,8 @@ struct Class: Identifiable, Codable, Hashable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, name, schedule, colorHex, events, status, googleCalendarId, lastSynced, endDate, hasUnsyncedChanges, syncHistory
+        case id, name, schedule, colorHex, events, status, googleCalendarId, lastSynced, endDate
+        case hasUnsyncedChanges, syncHistory, structuredSchedule, meetingSyncEnabled, meetingEventIds
     }
 
     init(
@@ -130,19 +142,18 @@ struct Class: Identifiable, Codable, Hashable {
         lastSynced: Date? = nil,
         endDate: Date? = nil,
         syncHistory: [SyncSession] = [],
-        hasUnsyncedChanges: Bool = false
+        hasUnsyncedChanges: Bool = false,
+        structuredSchedule: ClassSchedule? = nil,
+        meetingSyncEnabled: Bool = false,
+        meetingEventIds: [String] = []
     ) {
-        self.id = UUID()
-        self.name = name
-        self.schedule = schedule
-        self.colorHex = colorHex
-        self.events = events
-        self.status = status
-        self.googleCalendarId = googleCalendarId
-        self.lastSynced = lastSynced
-        self.endDate = endDate
-        self.syncHistory = syncHistory
-        self.hasUnsyncedChanges = hasUnsyncedChanges
+        self.init(
+            id: UUID(), name: name, schedule: schedule, colorHex: colorHex, events: events,
+            status: status, googleCalendarId: googleCalendarId, lastSynced: lastSynced,
+            endDate: endDate, syncHistory: syncHistory, hasUnsyncedChanges: hasUnsyncedChanges,
+            structuredSchedule: structuredSchedule, meetingSyncEnabled: meetingSyncEnabled,
+            meetingEventIds: meetingEventIds
+        )
     }
 
     init(
@@ -156,7 +167,10 @@ struct Class: Identifiable, Codable, Hashable {
         lastSynced: Date? = nil,
         endDate: Date? = nil,
         syncHistory: [SyncSession] = [],
-        hasUnsyncedChanges: Bool = false
+        hasUnsyncedChanges: Bool = false,
+        structuredSchedule: ClassSchedule? = nil,
+        meetingSyncEnabled: Bool = false,
+        meetingEventIds: [String] = []
     ) {
         self.id = id
         self.name = name
@@ -169,6 +183,9 @@ struct Class: Identifiable, Codable, Hashable {
         self.endDate = endDate
         self.syncHistory = syncHistory
         self.hasUnsyncedChanges = hasUnsyncedChanges
+        self.structuredSchedule = structuredSchedule
+        self.meetingSyncEnabled = meetingSyncEnabled
+        self.meetingEventIds = meetingEventIds
     }
 
     init(from decoder: Decoder) throws {
@@ -184,5 +201,8 @@ struct Class: Identifiable, Codable, Hashable {
         endDate = try container.decodeIfPresent(Date.self, forKey: .endDate)
         syncHistory = try container.decodeIfPresent([SyncSession].self, forKey: .syncHistory) ?? []
         hasUnsyncedChanges = try container.decodeIfPresent(Bool.self, forKey: .hasUnsyncedChanges) ?? false
+        structuredSchedule = try container.decodeIfPresent(ClassSchedule.self, forKey: .structuredSchedule)
+        meetingSyncEnabled = try container.decodeIfPresent(Bool.self, forKey: .meetingSyncEnabled) ?? false
+        meetingEventIds = try container.decodeIfPresent([String].self, forKey: .meetingEventIds) ?? []
     }
 }

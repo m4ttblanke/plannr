@@ -12,7 +12,7 @@ struct AddClassView: View {
     @EnvironmentObject var classManager: ClassManager
 
     @State private var className: String = ""
-    @State private var classSchedule: String = ""
+    @State private var schedule = ClassSchedule()
     @State private var selectedColor: Color = .blue
 
     var body: some View {
@@ -46,7 +46,7 @@ struct AddClassView: View {
                                     Text("Schedule (Optional)")
                                         .font(.headline)
                                         .foregroundColor(.white)
-                                    ClassSchedulePicker(schedule: $classSchedule)
+                                    ClassSchedulePicker(schedule: $schedule)
                                 }
 
                                 // Color picker
@@ -68,8 +68,9 @@ struct AddClassView: View {
                     Button {
                         classManager.addClass(Class(
                             name: className,
-                            schedule: classSchedule,
-                            colorHex: selectedColor.toHex()
+                            schedule: schedule.displayString,
+                            colorHex: selectedColor.toHex(),
+                            structuredSchedule: schedule.isEmpty ? nil : schedule
                         ))
                         dismiss()
                     } label: {

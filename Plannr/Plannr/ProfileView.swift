@@ -87,6 +87,7 @@ struct ProfileView: View {
                     header
                     termSection
                     reminderSection
+                    weekViewSection
                     syncSection
                     notificationSection
                     accountSection
@@ -229,6 +230,25 @@ struct ProfileView: View {
         case 0: return "Same day"
         case 1: return "1 day before"
         default: return "\(days) days before"
+        }
+    }
+
+    // MARK: Week at a Glance
+
+    private var weekViewSection: some View {
+        SettingsSection(title: "Week at a Glance", icon: "calendar.day.timeline.left") {
+            Toggle(isOn: Binding(
+                get: { settingsManager.showClassMeetingsInWeekView },
+                set: { settingsManager.showClassMeetingsInWeekView = $0 }
+            )) {
+                Text("Show class meetings")
+                    .foregroundColor(.white)
+            }
+            .tint(.yellow)
+
+            Text("Include recurring lecture/section times in the week's list, alongside assignments. Off by default — meetings still go to your Google Calendar when enabled per class.")
+                .font(.caption2)
+                .foregroundColor(.gray)
         }
     }
 

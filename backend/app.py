@@ -16,7 +16,7 @@ import io
 import json
 import logging
 from io import BytesIO
-from datetime import date as date_type
+from datetime import date as date_type, timedelta
 from icalendar import Calendar as ICalendar, Event as ICalEvent
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
@@ -98,6 +98,27 @@ class CalendarClassSyncRequest(BaseModel):
     background_color: Optional[str] = None  # Hex color for calendar background (e.g., "#FF5733")
     foreground_color: Optional[str] = None  # Hex color for text (e.g., "#FFFFFF")
     reminder_minutes: Optional[int] = None  # Minutes before an event to remind; None = Google's default reminders
+
+
+class MeetingPatternRequest(BaseModel):
+    kind: str                       # "lecture" | "section" — only used for the event title
+    byday: List[str]                # RRULE BYDAY tokens, e.g. ["MO", "WE", "FR"]
+    start_time: str                 # "HH:MM" 24-hour, local to `timezone`
+    duration_minutes: int = 50
+    google_event_id: Optional[str] = None  # set to update an existing recurring event
+
+
+class ClassMeetingsRequest(BaseModel):
+    class_name: str
+    google_calendar_id: Optional[str] = None
+    background_color: Optional[str] = None
+    foreground_color: Optional[str] = None
+    timezone: str = "America/Los_Angeles"
+    start_date: str                 # "YYYY-MM-DD" — recurrence anchor (first possible meeting)
+    until_date: Optional[str] = None  # "YYYY-MM-DD" inclusive; None = open-ended
+    patterns: List[MeetingPatternRequest] = []
+    remove_event_ids: List[str] = []  # recurring meeting events to delete
+
 
 # Gemini client — None if key not configured
 _gemini_client = genai.Client(api_key=settings.gemini_api_key) if settings.gemini_api_key else None
@@ -856,6 +877,124 @@ async def delete_class_calendar(request: Request, email: str = Query(...), googl
     except Exception as e:
         logger.exception("Calendar delete failed")
         return JSONResponse(status_code=400, content={"error": f"Failed to delete calendar: {str(e)}"})
+
+
+# ── Recurring class meetings ────────────────────────────────────────────────
+
+_BYDAY_TO_PYWEEKDAY = {"MO": 0, "TU": 1, "WE": 2, "TH": 3, "FR": 4, "SA": 5, "SU": 6}
+
+
+def _first_occurrence_on_or_after(start_date_str: str, byday: List[str]) -> date_type:
+    """First calendar date on/after `start_date_str` whose weekday is in `byday`."""
+    start = date_type.fromisoformat(start_date_str)
+    targets = {_BYDAY_TO_PYWEEKDAY[b] for b in byday if b in _BYDAY_TO_PYWEEKDAY}
+    if not targets:
+        return start
+    for offset in range(7):
+        day = start + timedelta(days=offset)
+        if day.weekday() in targets:
+            return day
+    return start
+
+
+def _add_minutes_to_hhmm(hhmm: str, minutes: int) -> str:
+    hours, mins = (int(part) for part in hhmm.split(":"))
+    total = hours * 60 + mins + minutes
+    return f"{(total // 60) % 24:02d}:{total % 60:02d}"
+
+
+def _build_meeting_event_body(pattern: "MeetingPatternRequest", req: "ClassMeetingsRequest") -> dict:
+    first_day = _first_occurrence_on_or_after(req.start_date, pattern.byday)
+    start_dt = f"{first_day.isoformat()}T{pattern.start_time}:00"
+    end_dt = f"{first_day.isoformat()}T{_add_minutes_to_hhmm(pattern.start_time, pattern.duration_minutes)}:00"
+
+    rrule = f"RRULE:FREQ=WEEKLY;BYDAY={','.join(pattern.byday)}"
+    if req.until_date:
+        # UNTIL must be a UTC timestamp; end-of-day covers the final meeting.
+        rrule += f";UNTIL={req.until_date.replace('-', '')}T235959Z"
+
+    suffix = " (Section)" if pattern.kind == "section" else ""
+    return {
+        "summary": f"{req.class_name}{suffix}",
+        "start": {"dateTime": start_dt, "timeZone": req.timezone},
+        "end": {"dateTime": end_dt, "timeZone": req.timezone},
+        "recurrence": [rrule],
+        "transparency": "transparent",  # class time shows as "free", not a busy block
+        "reminders": {"useDefault": False, "overrides": []},
+    }
+
+
+@app.post('/calendar/meetings', tags=['Syllabus to Calendar'])
+@limiter.limit("20/minute")
+async def sync_class_meetings(request: Request, email: str = Query(...),
+                              body: ClassMeetingsRequest = Body(...)):
+    """Create/update/remove a class's recurring weekly meeting events on its
+    secondary Google Calendar.
+
+    Each pattern (lecture, section) is a single recurring event with an RRULE, so
+    a whole term is two events, not dozens. Patterns with a google_event_id are
+    patched in place; the rest are inserted. `remove_event_ids` are deleted (used
+    when the user turns meeting sync off).
+
+    Returns {google_calendar_id, meetings: [{kind, google_event_id}]}.
+    """
+    try:
+        creds_data = get_google_credentials(email)
+        if not creds_data:
+            return JSONResponse(status_code=401, content={"error": "User not authenticated."})
+
+        service = build('calendar', 'v3', credentials=_build_credentials(creds_data))
+
+        # Reuse or find-or-create the class's calendar.
+        cal_id = None
+        if body.google_calendar_id:
+            try:
+                service.calendars().get(calendarId=body.google_calendar_id).execute()
+                cal_id = body.google_calendar_id
+            except Exception:
+                pass
+        if not cal_id:
+            cal_id = _find_or_create_calendar(
+                service, body.class_name, body.background_color, body.foreground_color
+            )
+
+        for event_id in body.remove_event_ids:
+            try:
+                service.events().delete(calendarId=cal_id, eventId=event_id).execute()
+            except Exception:
+                pass  # already gone — fine
+
+        meetings = []
+        for pattern in body.patterns:
+            if not pattern.byday:
+                continue
+            event_body = _build_meeting_event_body(pattern, body)
+            if pattern.google_event_id:
+                try:
+                    result = service.events().patch(
+                        calendarId=cal_id, eventId=pattern.google_event_id, body=event_body
+                    ).execute()
+                except HttpError as patch_err:
+                    if patch_err.resp.status in (404, 410):
+                        result = service.events().insert(calendarId=cal_id, body=event_body).execute()
+                    else:
+                        raise
+            else:
+                result = service.events().insert(calendarId=cal_id, body=event_body).execute()
+            meetings.append({"kind": pattern.kind, "google_event_id": result["id"]})
+
+        return JSONResponse(status_code=200, content={
+            "google_calendar_id": cal_id,
+            "meetings": meetings,
+        })
+
+    except RefreshError:
+        return JSONResponse(status_code=401, content={
+            "error": "Google access was revoked or expired. Please sign in again."
+        })
+    except Exception as e:
+        logger.exception("Class meeting sync failed")
+        return JSONResponse(status_code=400, content={"error": f"Meeting sync failed: {str(e)}"})
 
 
 @app.post('/export', tags=['Export'])

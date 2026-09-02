@@ -12,7 +12,8 @@ import SwiftUI
 struct WeeklyDashboardView: View {
    @EnvironmentObject var classManager: ClassManager
    @EnvironmentObject var authManager: AuthManager
-  
+   @ObservedObject private var settingsManager = SettingsManager.shared
+
    @State private var currentWeek: Date = Date()
    @State private var showCompletedItems = true
    @State private var selectedFilter: EventFilter = .all
@@ -368,8 +369,39 @@ struct WeeklyDashboardView: View {
                        toggleEventCompletion(event)
                    }
                }
+
+               if !classMeetingsThisWeek.isEmpty {
+                   Text("Class Meetings")
+                       .font(.subheadline)
+                       .fontWeight(.semibold)
+                       .foregroundColor(.gray)
+                       .frame(maxWidth: .infinity, alignment: .leading)
+                       .padding(.top, 4)
+                   ForEach(classMeetingsThisWeek) { meeting in
+                       ClassMeetingRowView(meeting: meeting)
+                   }
+               }
            }
        }
+   }
+
+   /// Recurring class meetings that fall in the displayed week, when the user has
+   /// opted to see them here (Settings → Week at a Glance). Only shown for the
+   /// "All" filter — filtering by an assignment type hides them.
+   private var classMeetingsThisWeek: [ClassMeetingOccurrence] {
+       guard settingsManager.showClassMeetingsInWeekView, selectedFilter == .all else { return [] }
+       let calendar = Calendar.current
+       guard let week = calendar.dateInterval(of: .weekOfYear, for: currentWeek) else { return [] }
+       return classManager.classes
+           .compactMap { cls -> [ClassMeetingOccurrence]? in
+               guard let schedule = cls.structuredSchedule, !schedule.isEmpty else { return nil }
+               return schedule.occurrences(
+                   from: week.start, to: week.end,
+                   className: cls.name, classColorHex: cls.colorHex, classID: cls.id
+               )
+           }
+           .flatMap { $0 }
+           .sorted { $0.start < $1.start }
    }
   
    // MARK: - Helper Properties
@@ -621,6 +653,56 @@ struct EventRowView: View {
       
        formatter.dateFormat = "EEEE, MMM d"
        return formatter.string(from: date)
+   }
+}
+
+
+// MARK: - Class Meeting Row
+
+struct ClassMeetingRowView: View {
+   let meeting: ClassMeetingOccurrence
+
+   private var timeText: String {
+       let f = DateFormatter()
+       f.dateFormat = "EEE  h:mm a"
+       return f.string(from: meeting.start)
+   }
+
+   var body: some View {
+       HStack(spacing: 12) {
+           Image(systemName: "book.closed.fill")
+               .foregroundColor(Color(hex: meeting.classColorHex))
+               .font(.title3)
+
+           VStack(alignment: .leading, spacing: 4) {
+               HStack {
+                   Text(meeting.className + (meeting.kind == .section ? " · Section" : ""))
+                       .font(.subheadline)
+                       .fontWeight(.medium)
+                       .foregroundColor(.white)
+                   Spacer()
+                   Text("Class")
+                       .font(.caption2)
+                       .fontWeight(.medium)
+                       .foregroundColor(.white.opacity(0.8))
+                       .padding(.horizontal, 8)
+                       .padding(.vertical, 4)
+                       .background(Color(hex: meeting.classColorHex).opacity(0.35))
+                       .cornerRadius(8)
+               }
+               HStack(spacing: 4) {
+                   Image(systemName: "clock")
+                       .foregroundColor(.gray)
+                       .font(.caption)
+                   Text(timeText)
+                       .font(.caption)
+                       .foregroundColor(.gray)
+               }
+           }
+       }
+       .padding()
+       .background(Color.gray.opacity(0.1))
+       .cornerRadius(12)
    }
 }
 

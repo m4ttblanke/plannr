@@ -31,6 +31,11 @@ class SettingsManager: ObservableObject {
     @Published var notificationsEnabled: Bool {
         didSet { UserDefaults.standard.set(notificationsEnabled, forKey: Keys.notificationsEnabled) }
     }
+    /// Whether recurring class meetings show up in the Week at a Glance list
+    /// alongside assignments. Off by default — that list is about deadlines.
+    @Published var showClassMeetingsInWeekView: Bool {
+        didSet { UserDefaults.standard.set(showClassMeetingsInWeekView, forKey: Keys.showClassMeetingsInWeekView) }
+    }
 
     /// Minutes-before-event value to send to the backend, or nil to use Google's default reminders.
     var reminderMinutes: Int? {
@@ -42,6 +47,7 @@ class SettingsManager: ObservableObject {
         static let reminderLeadTimeDays = "settings.reminderLeadTimeDays"
         static let autoSyncEnabled = "settings.autoSyncEnabled"
         static let notificationsEnabled = "settings.notificationsEnabled"
+        static let showClassMeetingsInWeekView = "settings.showClassMeetingsInWeekView"
     }
 
     private init() {
@@ -54,6 +60,7 @@ class SettingsManager: ObservableObject {
         reminderLeadTimeDays = UserDefaults.standard.object(forKey: Keys.reminderLeadTimeDays) as? Int ?? -1
         autoSyncEnabled = UserDefaults.standard.object(forKey: Keys.autoSyncEnabled) as? Bool ?? false
         notificationsEnabled = UserDefaults.standard.object(forKey: Keys.notificationsEnabled) as? Bool ?? false
+        showClassMeetingsInWeekView = UserDefaults.standard.object(forKey: Keys.showClassMeetingsInWeekView) as? Bool ?? false
     }
 
     private func saveTerm() {
@@ -68,5 +75,6 @@ class SettingsManager: ObservableObject {
         reminderLeadTimeDays = -1
         autoSyncEnabled = false
         notificationsEnabled = false
+        showClassMeetingsInWeekView = false
     }
 }
