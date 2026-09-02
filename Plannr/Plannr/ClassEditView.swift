@@ -321,7 +321,7 @@ struct ClassEditView: View {
                 .disabled(isSyncingMeetings || !scheduleHasContent)
 
                 Text(scheduleHasContent
-                     ? "Adds your weekly lecture/section times to this class's calendar as recurring events. They don't show in Week at a Glance unless enabled in Settings."
+                     ? "Adds your weekly lecture/section times to this class's calendar as recurring events. They don't show in Week at a Glance or Calendar views unless enabled in Settings."
                      : "Set a schedule above first.")
                     .font(.caption2)
                     .foregroundColor(.gray)
