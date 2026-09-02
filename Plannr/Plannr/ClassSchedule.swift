@@ -66,47 +66,106 @@ struct ClassMeetingPattern: Hashable {
     enum Kind: String, Codable { case lecture, section }
     var kind: Kind
     var days: [Int]                 // Weekday.rawValue, sorted
-    var time: TimeOfDay
+    var start: TimeOfDay
     var durationMinutes: Int
 }
 
-struct ClassSchedule: Codable, Hashable {
+/// Default meeting length used when only a start time is known.
+let defaultMeetingMinutes = 50
+
+struct ClassSchedule: Hashable {
     var lectureDays: [Int] = []
-    var lectureTime: TimeOfDay?
-    var lectureDurationMinutes: Int = 50
+    var lectureStart: TimeOfDay?
+    var lectureEnd: TimeOfDay?
 
     var sectionDays: [Int] = []
-    var sectionTime: TimeOfDay?
-    var sectionDurationMinutes: Int = 50
+    var sectionStart: TimeOfDay?
+    var sectionEnd: TimeOfDay?
+
+    init() {}
 
     var isEmpty: Bool { patterns.isEmpty }
 
+    /// Minutes between a start and end time; `defaultMeetingMinutes` if the end
+    /// is missing or not after the start.
+    static func duration(from start: TimeOfDay, to end: TimeOfDay?) -> Int {
+        guard let end else { return defaultMeetingMinutes }
+        let minutes = (end.hour * 60 + end.minute) - (start.hour * 60 + start.minute)
+        return minutes > 0 ? minutes : defaultMeetingMinutes
+    }
+
     var patterns: [ClassMeetingPattern] {
         var out: [ClassMeetingPattern] = []
-        if !lectureDays.isEmpty, let t = lectureTime {
-            out.append(.init(kind: .lecture, days: lectureDays.sorted(), time: t,
-                             durationMinutes: lectureDurationMinutes))
+        if !lectureDays.isEmpty, let s = lectureStart {
+            out.append(.init(kind: .lecture, days: lectureDays.sorted(), start: s,
+                             durationMinutes: Self.duration(from: s, to: lectureEnd)))
         }
-        if !sectionDays.isEmpty, let t = sectionTime {
-            out.append(.init(kind: .section, days: sectionDays.sorted(), time: t,
-                             durationMinutes: sectionDurationMinutes))
+        if !sectionDays.isEmpty, let s = sectionStart {
+            out.append(.init(kind: .section, days: sectionDays.sorted(), start: s,
+                             durationMinutes: Self.duration(from: s, to: sectionEnd)))
         }
         return out
     }
 
-    /// "MWF 9:00 AM · Section Th 3:00 PM"
+    /// "MWF 9:00 AM – 9:50 AM · Section Th 3:00 PM – 4:15 PM"
     var displayString: String {
-        func part(_ days: [Int], _ time: TimeOfDay?) -> String? {
-            guard !days.isEmpty, let time else { return nil }
+        func part(_ days: [Int], _ start: TimeOfDay?, _ end: TimeOfDay?) -> String? {
+            guard !days.isEmpty, let start else { return nil }
             let d = days.sorted().compactMap { Weekday(rawValue: $0)?.short }.joined()
-            return "\(d) \(time.display)"
+            if let end, (end.hour * 60 + end.minute) > (start.hour * 60 + start.minute) {
+                return "\(d) \(start.display) – \(end.display)"
+            }
+            return "\(d) \(start.display)"
         }
-        switch (part(lectureDays, lectureTime), part(sectionDays, sectionTime)) {
+        switch (part(lectureDays, lectureStart, lectureEnd),
+                part(sectionDays, sectionStart, sectionEnd)) {
         case let (l?, s?): return "\(l) · Section \(s)"
         case let (l?, nil): return l
         case let (nil, s?): return "Section \(s)"
         default: return ""
         }
+    }
+}
+
+extension ClassSchedule: Codable {
+    enum CodingKeys: String, CodingKey {
+        case lectureDays, lectureStart, lectureEnd, sectionDays, sectionStart, sectionEnd
+        // Legacy keys (start-time + fixed duration), read for migration only.
+        case lectureTime, lectureDurationMinutes, sectionTime, sectionDurationMinutes
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        lectureDays = try c.decodeIfPresent([Int].self, forKey: .lectureDays) ?? []
+        sectionDays = try c.decodeIfPresent([Int].self, forKey: .sectionDays) ?? []
+
+        lectureStart = try c.decodeIfPresent(TimeOfDay.self, forKey: .lectureStart)
+            ?? (try c.decodeIfPresent(TimeOfDay.self, forKey: .lectureTime))
+        lectureEnd = try c.decodeIfPresent(TimeOfDay.self, forKey: .lectureEnd)
+            ?? Self.legacyEnd(start: lectureStart,
+                              minutes: try c.decodeIfPresent(Int.self, forKey: .lectureDurationMinutes))
+
+        sectionStart = try c.decodeIfPresent(TimeOfDay.self, forKey: .sectionStart)
+            ?? (try c.decodeIfPresent(TimeOfDay.self, forKey: .sectionTime))
+        sectionEnd = try c.decodeIfPresent(TimeOfDay.self, forKey: .sectionEnd)
+            ?? Self.legacyEnd(start: sectionStart,
+                              minutes: try c.decodeIfPresent(Int.self, forKey: .sectionDurationMinutes))
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(lectureDays, forKey: .lectureDays)
+        try c.encodeIfPresent(lectureStart, forKey: .lectureStart)
+        try c.encodeIfPresent(lectureEnd, forKey: .lectureEnd)
+        try c.encode(sectionDays, forKey: .sectionDays)
+        try c.encodeIfPresent(sectionStart, forKey: .sectionStart)
+        try c.encodeIfPresent(sectionEnd, forKey: .sectionEnd)
+    }
+
+    private static func legacyEnd(start: TimeOfDay?, minutes: Int?) -> TimeOfDay? {
+        guard let start, let minutes, minutes > 0 else { return nil }
+        let total = start.hour * 60 + start.minute + minutes
+        return TimeOfDay(hour: (total / 60) % 24, minute: total % 60)
     }
 }
 
@@ -137,7 +196,7 @@ extension ClassSchedule {
             var day = calendar.startOfDay(for: from)
             while day < to {
                 if targetWeekdays.contains(calendar.component(.weekday, from: day)) {
-                    let start = pattern.time.date(on: day, calendar: calendar)
+                    let start = pattern.start.date(on: day, calendar: calendar)
                     if start >= from && start < to {
                         let end = calendar.date(byAdding: .minute, value: pattern.durationMinutes, to: start) ?? start
                         result.append(ClassMeetingOccurrence(

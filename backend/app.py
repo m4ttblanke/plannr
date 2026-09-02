@@ -815,16 +815,21 @@ async def sync_class_calendar(request: Request, email: str = Query(...), body: C
         except RefreshError:
             raise  # dead token — no point attempting a full rebuild; handled below
         except Exception as incremental_err:
-            # ── Fallback: rebuild the entire calendar ─────────────────────────
+            # ── Fallback: rebuild the assignment events on the calendar ───────
             logger.warning("Incremental sync failed (%s); falling back to full rebuild",
                            incremental_err)
-            # Delete all events in the calendar
+            # Delete existing events, but NOT the recurring class-meeting events
+            # (they're managed by /calendar/meetings and tagged).
             page_token = None
             while True:
                 events_result = service.events().list(
-                    calendarId=cal_id, pageToken=page_token
+                    calendarId=cal_id, singleEvents=False, pageToken=page_token
                 ).execute()
                 for ev in events_result.get('items', []):
+                    is_meeting = (ev.get('extendedProperties', {}).get('private', {})
+                                  .get(MEETING_TAG_KEY) == MEETING_TAG_VALUE)
+                    if is_meeting or ev.get('recurrence'):
+                        continue
                     try:
                         service.events().delete(calendarId=cal_id, eventId=ev['id']).execute()
                     except Exception:
@@ -898,9 +903,15 @@ def _first_occurrence_on_or_after(start_date_str: str, byday: List[str]) -> date
 
 
 def _add_minutes_to_hhmm(hhmm: str, minutes: int) -> str:
-    hours, mins = (int(part) for part in hhmm.split(":"))
-    total = hours * 60 + mins + minutes
+    parts = hhmm.split(":")
+    total = int(parts[0]) * 60 + int(parts[1]) + minutes
     return f"{(total // 60) % 24:02d}:{total % 60:02d}"
+
+
+# Every Plannr-managed class-meeting event carries this private extended property,
+# so they can be found (and cleaned up / skipped) independent of any stored id.
+MEETING_TAG_KEY = "plannrMeeting"
+MEETING_TAG_VALUE = "1"
 
 
 def _build_meeting_event_body(pattern: "MeetingPatternRequest", req: "ClassMeetingsRequest") -> dict:
@@ -909,8 +920,9 @@ def _build_meeting_event_body(pattern: "MeetingPatternRequest", req: "ClassMeeti
     end_dt = f"{first_day.isoformat()}T{_add_minutes_to_hhmm(pattern.start_time, pattern.duration_minutes)}:00"
 
     rrule = f"RRULE:FREQ=WEEKLY;BYDAY={','.join(pattern.byday)}"
-    if req.until_date:
-        # UNTIL must be a UTC timestamp; end-of-day covers the final meeting.
+    # Only add UNTIL when it is actually after the first meeting — a backwards
+    # window would make Google reject the rule or produce zero instances.
+    if req.until_date and req.until_date.replace('-', '') > first_day.isoformat().replace('-', ''):
         rrule += f";UNTIL={req.until_date.replace('-', '')}T235959Z"
 
     suffix = " (Section)" if pattern.kind == "section" else ""
@@ -921,20 +933,44 @@ def _build_meeting_event_body(pattern: "MeetingPatternRequest", req: "ClassMeeti
         "recurrence": [rrule],
         "transparency": "transparent",  # class time shows as "free", not a busy block
         "reminders": {"useDefault": False, "overrides": []},
+        "extendedProperties": {"private": {
+            MEETING_TAG_KEY: MEETING_TAG_VALUE, "plannrMeetingKind": pattern.kind,
+        }},
     }
+
+
+def _delete_tagged_meeting_events(service, cal_id: str) -> None:
+    """Remove every Plannr-managed meeting event from the calendar. Called before
+    re-creating them, so the endpoint is fully declarative and self-healing —
+    stale ids from a previous partial failure don't accumulate as duplicates."""
+    page_token = None
+    while True:
+        result = service.events().list(
+            calendarId=cal_id,
+            privateExtendedProperty=f"{MEETING_TAG_KEY}={MEETING_TAG_VALUE}",
+            showDeleted=False, maxResults=250, pageToken=page_token,
+        ).execute()
+        for item in result.get("items", []):
+            try:
+                service.events().delete(calendarId=cal_id, eventId=item["id"]).execute()
+            except Exception:
+                pass
+        page_token = result.get("nextPageToken")
+        if not page_token:
+            break
 
 
 @app.post('/calendar/meetings', tags=['Syllabus to Calendar'])
 @limiter.limit("20/minute")
 async def sync_class_meetings(request: Request, email: str = Query(...),
                               body: ClassMeetingsRequest = Body(...)):
-    """Create/update/remove a class's recurring weekly meeting events on its
-    secondary Google Calendar.
+    """Make a class's recurring weekly meeting events on its secondary Google
+    Calendar exactly match `body.patterns`.
 
-    Each pattern (lecture, section) is a single recurring event with an RRULE, so
-    a whole term is two events, not dozens. Patterns with a google_event_id are
-    patched in place; the rest are inserted. `remove_event_ids` are deleted (used
-    when the user turns meeting sync off).
+    Declarative: every call first removes all Plannr-tagged meeting events from
+    the calendar, then inserts one recurring RRULE event per pattern (lecture,
+    section) — so a whole term is one or two events, and a retry after a failure
+    can never leave duplicates. Send `patterns: []` to turn meeting sync off.
 
     Returns {google_calendar_id, meetings: [{kind, google_event_id}]}.
     """
@@ -943,45 +979,42 @@ async def sync_class_meetings(request: Request, email: str = Query(...),
         if not creds_data:
             return JSONResponse(status_code=401, content={"error": "User not authenticated."})
 
+        # Turning meetings off for a class that has no calendar at all is a no-op
+        # — don't create a calendar just to leave it empty.
+        if not body.patterns and not body.google_calendar_id:
+            return JSONResponse(status_code=200, content={"google_calendar_id": None, "meetings": []})
+
         service = build('calendar', 'v3', credentials=_build_credentials(creds_data))
 
-        # Reuse or find-or-create the class's calendar.
         cal_id = None
         if body.google_calendar_id:
             try:
                 service.calendars().get(calendarId=body.google_calendar_id).execute()
                 cal_id = body.google_calendar_id
             except Exception:
-                pass
+                cal_id = None  # deleted externally — fall through to find-or-create
         if not cal_id:
             cal_id = _find_or_create_calendar(
                 service, body.class_name, body.background_color, body.foreground_color
             )
 
+        # Clean slate: drop any previously-created meeting events (tagged) plus
+        # any ids the client explicitly asked to remove.
+        _delete_tagged_meeting_events(service, cal_id)
         for event_id in body.remove_event_ids:
             try:
                 service.events().delete(calendarId=cal_id, eventId=event_id).execute()
             except Exception:
-                pass  # already gone — fine
+                pass
 
         meetings = []
         for pattern in body.patterns:
             if not pattern.byday:
                 continue
-            event_body = _build_meeting_event_body(pattern, body)
-            if pattern.google_event_id:
-                try:
-                    result = service.events().patch(
-                        calendarId=cal_id, eventId=pattern.google_event_id, body=event_body
-                    ).execute()
-                except HttpError as patch_err:
-                    if patch_err.resp.status in (404, 410):
-                        result = service.events().insert(calendarId=cal_id, body=event_body).execute()
-                    else:
-                        raise
-            else:
-                result = service.events().insert(calendarId=cal_id, body=event_body).execute()
-            meetings.append({"kind": pattern.kind, "google_event_id": result["id"]})
+            created = service.events().insert(
+                calendarId=cal_id, body=_build_meeting_event_body(pattern, body)
+            ).execute()
+            meetings.append({"kind": pattern.kind, "google_event_id": created["id"]})
 
         return JSONResponse(status_code=200, content={
             "google_calendar_id": cal_id,

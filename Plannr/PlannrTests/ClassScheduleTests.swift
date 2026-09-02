@@ -2,8 +2,8 @@
 //  ClassScheduleTests.swift
 //  PlannrTests
 //
-//  Tests for ClassSchedule: display string, meeting patterns, and the
-//  occurrence expansion used by Week at a Glance.
+//  Tests for ClassSchedule: display string, start/end times, meeting patterns,
+//  the occurrence expansion used by Week at a Glance, and legacy decoding.
 //
 
 import XCTest
@@ -17,17 +17,24 @@ final class ClassScheduleTests: XCTestCase {
         return c
     }
 
-    /// Start-of-day for a y/m/d in the test calendar.
     private func day(_ year: Int, _ month: Int, _ dayOfMonth: Int) -> Date {
         calendar.date(from: DateComponents(year: year, month: month, day: dayOfMonth))!
+    }
+
+    /// A lecture-only schedule.
+    private func lecture(days: [Weekday], start: TimeOfDay, end: TimeOfDay? = nil) -> ClassSchedule {
+        var s = ClassSchedule()
+        s.lectureDays = days.map(\.rawValue)
+        s.lectureStart = start
+        s.lectureEnd = end
+        return s
     }
 
     // MARK: - TimeOfDay
 
     func testTimeOfDayFormatting() {
-        let t = TimeOfDay(hour: 9, minute: 5)
-        XCTAssertEqual(t.iso, "09:05")
-        XCTAssertFalse(t.display.isEmpty)
+        XCTAssertEqual(TimeOfDay(hour: 9, minute: 5).iso, "09:05")
+        XCTAssertFalse(TimeOfDay(hour: 9, minute: 5).display.isEmpty)
     }
 
     func testTimeOfDayClampsOutOfRange() {
@@ -37,21 +44,29 @@ final class ClassScheduleTests: XCTestCase {
 
     // MARK: - displayString
 
-    func testDisplayStringLectureOnly() {
-        var s = ClassSchedule()
-        s.lectureDays = [Weekday.monday.rawValue, Weekday.wednesday.rawValue, Weekday.friday.rawValue]
-        s.lectureTime = TimeOfDay(hour: 9, minute: 0)
+    func testDisplayStringStartOnly() {
+        let s = lecture(days: [.monday, .wednesday, .friday], start: TimeOfDay(hour: 9, minute: 0))
         XCTAssertEqual(s.displayString, "MWF \(TimeOfDay(hour: 9, minute: 0).display)")
     }
 
+    func testDisplayStringWithEndShowsARange() {
+        let s = lecture(days: [.monday, .wednesday, .friday],
+                        start: TimeOfDay(hour: 9, minute: 0), end: TimeOfDay(hour: 10, minute: 15))
+        XCTAssertEqual(
+            s.displayString,
+            "MWF \(TimeOfDay(hour: 9, minute: 0).display) – \(TimeOfDay(hour: 10, minute: 15).display)"
+        )
+    }
+
     func testDisplayStringLecturePlusSection() {
-        var s = ClassSchedule()
-        s.lectureDays = [Weekday.tuesday.rawValue, Weekday.thursday.rawValue]
-        s.lectureTime = TimeOfDay(hour: 11, minute: 0)
+        var s = lecture(days: [.tuesday, .thursday], start: TimeOfDay(hour: 11, minute: 0))
         s.sectionDays = [Weekday.friday.rawValue]
-        s.sectionTime = TimeOfDay(hour: 15, minute: 0)
-        let expected = "TTh \(TimeOfDay(hour: 11, minute: 0).display) · Section F \(TimeOfDay(hour: 15, minute: 0).display)"
-        XCTAssertEqual(s.displayString, expected)
+        s.sectionStart = TimeOfDay(hour: 15, minute: 0)
+        s.sectionEnd = TimeOfDay(hour: 16, minute: 15)
+        XCTAssertEqual(
+            s.displayString,
+            "TTh \(TimeOfDay(hour: 11, minute: 0).display) · Section F \(TimeOfDay(hour: 15, minute: 0).display) – \(TimeOfDay(hour: 16, minute: 15).display)"
+        )
     }
 
     func testEmptyScheduleHasEmptyStringAndIsEmpty() {
@@ -59,27 +74,34 @@ final class ClassScheduleTests: XCTestCase {
         XCTAssertTrue(ClassSchedule().isEmpty)
     }
 
-    // MARK: - patterns
+    // MARK: - patterns & duration
 
-    func testPatternsFromLectureAndSection() {
-        var s = ClassSchedule()
-        s.lectureDays = [Weekday.friday.rawValue, Weekday.monday.rawValue]
-        s.lectureTime = TimeOfDay(hour: 9, minute: 0)
-        s.lectureDurationMinutes = 75
+    func testDurationDerivedFromStartAndEnd() {
+        var s = lecture(days: [.monday, .friday],
+                        start: TimeOfDay(hour: 9, minute: 0), end: TimeOfDay(hour: 10, minute: 15))
         s.sectionDays = [Weekday.thursday.rawValue]
-        s.sectionTime = TimeOfDay(hour: 14, minute: 0)
+        s.sectionStart = TimeOfDay(hour: 14, minute: 0)   // no end
 
         let patterns = s.patterns
         XCTAssertEqual(patterns.count, 2)
         XCTAssertEqual(patterns[0].kind, .lecture)
-        XCTAssertEqual(patterns[0].days, [Weekday.monday.rawValue, Weekday.friday.rawValue], "days are sorted")
+        XCTAssertEqual(patterns[0].days, [Weekday.monday.rawValue, Weekday.friday.rawValue])
         XCTAssertEqual(patterns[0].durationMinutes, 75)
         XCTAssertEqual(patterns[1].kind, .section)
+        XCTAssertEqual(patterns[1].durationMinutes, defaultMeetingMinutes, "no end → default length")
     }
 
-    func testPatternsSkipsIncompletePattern() {
+    func testEndBeforeStartFallsBackToDefaultDuration() {
+        let s = lecture(days: [.monday],
+                        start: TimeOfDay(hour: 10, minute: 0), end: TimeOfDay(hour: 9, minute: 0))
+        XCTAssertEqual(s.patterns[0].durationMinutes, defaultMeetingMinutes)
+        // ...and the display string drops the bogus range.
+        XCTAssertEqual(s.displayString, "M \(TimeOfDay(hour: 10, minute: 0).display)")
+    }
+
+    func testPatternsSkipsWhenNoStartTime() {
         var s = ClassSchedule()
-        s.lectureDays = [Weekday.monday.rawValue]   // no lectureTime
+        s.lectureDays = [Weekday.monday.rawValue]   // no start
         XCTAssertTrue(s.patterns.isEmpty)
         XCTAssertTrue(s.isEmpty)
     }
@@ -87,14 +109,8 @@ final class ClassScheduleTests: XCTestCase {
     // MARK: - occurrences
 
     func testOccurrencesForOneWeekMWF() {
-        var s = ClassSchedule()
-        s.lectureDays = [Weekday.monday.rawValue, Weekday.wednesday.rawValue, Weekday.friday.rawValue]
-        s.lectureTime = TimeOfDay(hour: 9, minute: 0)
-
-        // Week of Mon 2026-01-05 through Sun 2026-01-11.
-        let from = day(2026, 1, 5)
-        let to = day(2026, 1, 12)
-        let occ = s.occurrences(from: from, to: to,
+        let s = lecture(days: [.monday, .wednesday, .friday], start: TimeOfDay(hour: 9, minute: 0))
+        let occ = s.occurrences(from: day(2026, 1, 5), to: day(2026, 1, 12),
                                 className: "CS101", classColorHex: "007AFF",
                                 classID: UUID(), calendar: calendar)
 
@@ -102,59 +118,86 @@ final class ClassScheduleTests: XCTestCase {
         XCTAssertEqual(occ.map { calendar.component(.day, from: $0.start) }, [5, 7, 9])
         XCTAssertTrue(occ.allSatisfy { calendar.component(.hour, from: $0.start) == 9 })
         XCTAssertTrue(occ.allSatisfy { $0.kind == .lecture })
-        // 50-minute default duration.
-        XCTAssertEqual(calendar.component(.minute, from: occ[0].end), 50)
+        XCTAssertEqual(calendar.component(.minute, from: occ[0].end), 50)   // default 50-min length
+    }
+
+    func testOccurrenceEndUsesTheScheduledEnd() {
+        let s = lecture(days: [.monday], start: TimeOfDay(hour: 9, minute: 0),
+                        end: TimeOfDay(hour: 10, minute: 20))
+        let occ = s.occurrences(from: day(2026, 1, 5), to: day(2026, 1, 12),
+                                className: "CS101", classColorHex: "007AFF",
+                                classID: UUID(), calendar: calendar)
+        XCTAssertEqual(occ.count, 1)
+        XCTAssertEqual(calendar.component(.hour, from: occ[0].end), 10)
+        XCTAssertEqual(calendar.component(.minute, from: occ[0].end), 20)
     }
 
     func testOccurrencesIncludeSectionAndSort() {
-        var s = ClassSchedule()
-        s.lectureDays = [Weekday.monday.rawValue]
-        s.lectureTime = TimeOfDay(hour: 9, minute: 0)
-        s.sectionDays = [Weekday.monday.rawValue]      // same day, later time
-        s.sectionTime = TimeOfDay(hour: 15, minute: 0)
+        var s = lecture(days: [.monday], start: TimeOfDay(hour: 9, minute: 0))
+        s.sectionDays = [Weekday.monday.rawValue]
+        s.sectionStart = TimeOfDay(hour: 15, minute: 0)
 
-        let from = day(2026, 1, 5)
-        let to = day(2026, 1, 12)
-        let occ = s.occurrences(from: from, to: to,
+        let occ = s.occurrences(from: day(2026, 1, 5), to: day(2026, 1, 12),
                                 className: "CS101", classColorHex: "007AFF",
                                 classID: UUID(), calendar: calendar)
-
-        XCTAssertEqual(occ.count, 2)
-        XCTAssertEqual(occ[0].kind, .lecture)
-        XCTAssertEqual(occ[1].kind, .section)
+        XCTAssertEqual(occ.map(\.kind), [.lecture, .section])
         XCTAssertLessThan(occ[0].start, occ[1].start)
     }
 
     func testOccurrencesRespectRangeBounds() {
-        var s = ClassSchedule()
-        s.lectureDays = Weekday.allCases.map(\.rawValue)   // every day
-        s.lectureTime = TimeOfDay(hour: 9, minute: 0)
-
-        let from = day(2026, 1, 5)
-        let to = day(2026, 1, 8)   // Mon, Tue, Wed only
-        let occ = s.occurrences(from: from, to: to,
+        let s = lecture(days: Weekday.allCases, start: TimeOfDay(hour: 9, minute: 0))
+        let occ = s.occurrences(from: day(2026, 1, 5), to: day(2026, 1, 8),   // Mon–Wed
                                 className: "CS101", classColorHex: "007AFF",
                                 classID: UUID(), calendar: calendar)
         XCTAssertEqual(occ.count, 3)
     }
 
     func testOccurrenceIDsAreStableAndUnique() {
-        var s = ClassSchedule()
-        s.lectureDays = [Weekday.monday.rawValue, Weekday.wednesday.rawValue]
-        s.lectureTime = TimeOfDay(hour: 9, minute: 0)
+        let s = lecture(days: [.monday, .wednesday], start: TimeOfDay(hour: 9, minute: 0))
         let id = UUID()
-        let from = day(2026, 1, 5)
-        let to = day(2026, 1, 12)
+        let a = s.occurrences(from: day(2026, 1, 5), to: day(2026, 1, 12),
+                              className: "CS101", classColorHex: "007AFF", classID: id, calendar: calendar)
+        let b = s.occurrences(from: day(2026, 1, 5), to: day(2026, 1, 12),
+                              className: "CS101", classColorHex: "007AFF", classID: id, calendar: calendar)
+        XCTAssertEqual(a.map(\.id), b.map(\.id))
+        XCTAssertEqual(Set(a.map(\.id)).count, a.count)
+    }
 
-        let a = s.occurrences(from: from, to: to, className: "CS101", classColorHex: "007AFF", classID: id, calendar: calendar)
-        let b = s.occurrences(from: from, to: to, className: "CS101", classColorHex: "007AFF", classID: id, calendar: calendar)
-        XCTAssertEqual(a.map(\.id), b.map(\.id), "same inputs → same ids")
-        XCTAssertEqual(Set(a.map(\.id)).count, a.count, "ids are unique within a run")
+    // MARK: - Codable (round-trip + legacy migration)
+
+    func testRoundTripPreservesStartAndEnd() throws {
+        var s = lecture(days: [.tuesday, .thursday],
+                        start: TimeOfDay(hour: 11, minute: 0), end: TimeOfDay(hour: 12, minute: 15))
+        s.sectionDays = [Weekday.friday.rawValue]
+        s.sectionStart = TimeOfDay(hour: 14, minute: 0)
+        s.sectionEnd = TimeOfDay(hour: 15, minute: 50)
+
+        let decoded = try JSONDecoder().decode(ClassSchedule.self, from: JSONEncoder().encode(s))
+        XCTAssertEqual(decoded, s)
+    }
+
+    func testDecodesLegacyStartTimePlusDuration() throws {
+        // Shape written before start/end times: `lectureTime` + `lectureDurationMinutes`.
+        let legacy = """
+        {
+          "lectureDays": [2, 4, 6],
+          "lectureTime": { "hour": 9, "minute": 0 },
+          "lectureDurationMinutes": 75,
+          "sectionDays": [],
+          "sectionDurationMinutes": 50
+        }
+        """.data(using: .utf8)!
+
+        let s = try JSONDecoder().decode(ClassSchedule.self, from: legacy)
+        XCTAssertEqual(s.lectureStart, TimeOfDay(hour: 9, minute: 0))
+        XCTAssertEqual(s.lectureEnd, TimeOfDay(hour: 10, minute: 15))   // 9:00 + 75 min
+        XCTAssertEqual(s.patterns.first?.durationMinutes, 75)
+        XCTAssertNil(s.sectionStart)
     }
 
     // MARK: - Weekday tokens
 
-    func testWeekdayBydayTokens() {
+    func testWeekdayTokens() {
         XCTAssertEqual(Weekday.monday.byday, "MO")
         XCTAssertEqual(Weekday.thursday.byday, "TH")
         XCTAssertEqual(Weekday.sunday.byday, "SU")

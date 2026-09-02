@@ -589,7 +589,6 @@ struct ClassEditView: View {
             let byday: [String]
             let start_time: String
             let duration_minutes: Int
-            let google_event_id: String?
         }
         struct MeetingsRequestBody: Encodable {
             let class_name: String
@@ -600,7 +599,6 @@ struct ClassEditView: View {
             let start_date: String
             let until_date: String?
             let patterns: [PatternBody]
-            let remove_event_ids: [String]
         }
         struct MeetingsResponse: Decodable {
             struct Meeting: Decodable {
@@ -608,7 +606,7 @@ struct ClassEditView: View {
                 let googleEventId: String
                 enum CodingKeys: String, CodingKey { case kind; case googleEventId = "google_event_id" }
             }
-            let googleCalendarId: String
+            let googleCalendarId: String?
             let meetings: [Meeting]
             enum CodingKeys: String, CodingKey {
                 case googleCalendarId = "google_calendar_id"
@@ -616,30 +614,20 @@ struct ClassEditView: View {
             }
         }
 
-        // Build the patterns to create/update, pairing each with the existing
-        // recurring event id by position; anything left over gets removed.
-        var patterns: [PatternBody] = []
-        var removeIds: [String] = []
-        let existingIds = editableClass.meetingEventIds
-
-        if enabled, let schedule, !schedule.isEmpty {
-            for (index, pattern) in schedule.patterns.enumerated() {
-                patterns.append(PatternBody(
-                    kind: pattern.kind.rawValue,
-                    byday: pattern.days.compactMap { Weekday(rawValue: $0)?.byday },
-                    start_time: pattern.time.iso,
-                    duration_minutes: pattern.durationMinutes,
-                    google_event_id: index < existingIds.count ? existingIds[index] : nil
-                ))
-            }
-            if existingIds.count > schedule.patterns.count {
-                removeIds = Array(existingIds[schedule.patterns.count...])
-            }
-        } else {
-            removeIds = existingIds  // disabled or no schedule → remove all meeting events
+        // Declarative: the backend replaces its tagged meeting events with exactly
+        // these patterns (empty = remove them all). No id bookkeeping needed here.
+        let patterns: [PatternBody] = (enabled ? (schedule?.patterns ?? []) : []).map { pattern in
+            PatternBody(
+                kind: pattern.kind.rawValue,
+                byday: pattern.days.compactMap { Weekday(rawValue: $0)?.byday },
+                start_time: pattern.start.iso,
+                duration_minutes: pattern.durationMinutes
+            )
         }
 
         let df = DateFormatter()
+        df.locale = Locale(identifier: "en_US_POSIX")
+        df.calendar = Calendar(identifier: .gregorian)
         df.dateFormat = "yyyy-MM-dd"
         let startDate = df.string(from: settingsManager.term.startDate ?? Date())
         let untilDate = (editableClass.endDate ?? settingsManager.term.endDate).map { df.string(from: $0) }
@@ -652,16 +640,22 @@ struct ClassEditView: View {
             timezone: TimeZone.current.identifier,
             start_date: startDate,
             until_date: untilDate,
-            patterns: patterns,
-            remove_event_ids: removeIds
+            patterns: patterns
         )
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // The class calendar may not exist yet, and the backend runs several
+        // Google Calendar calls — allow for a cold start on Render's free tier.
+        request.timeoutInterval = 90
         do {
             request.httpBody = try JSONEncoder().encode(requestBody)
         } catch {
+            await MainActor.run {
+                meetingSyncError = "Couldn't build the request. Please try again."
+                showMeetingSyncError = true
+            }
             return
         }
 
@@ -674,15 +668,21 @@ struct ClassEditView: View {
                 if http.statusCode == 401 { return }
                 if http.statusCode == 200,
                    let resp = try? JSONDecoder().decode(MeetingsResponse.self, from: data) {
-                    editableClass.googleCalendarId = resp.googleCalendarId
-                    editableClass.meetingEventIds = enabled ? resp.meetings.map(\.googleEventId) : []
+                    if let calId = resp.googleCalendarId { editableClass.googleCalendarId = calId }
+                    editableClass.meetingEventIds = resp.meetings.map(\.googleEventId)
                     persistClass()
                 } else {
-                    let msg = (try? JSONDecoder().decode([String: String].self, from: data))?["error"]
-                    meetingSyncError = msg ?? "Couldn't update class meetings. Please try again."
+                    let bodyText = String(data: data, encoding: .utf8) ?? ""
+                    let parsed = (try? JSONDecoder().decode([String: String].self, from: data))
+                    let msg = parsed?["error"] ?? parsed?["detail"]
+                    print("Class meeting sync failed [\(http.statusCode)]: \(bodyText.prefix(500))")
+                    meetingSyncError = msg
+                        ?? "Couldn't update class meetings (server said \(http.statusCode)). Please try again."
                     showMeetingSyncError = true
-                    if isToggleAction {
-                        editableClass.meetingSyncEnabled = !enabled  // put the toggle back
+                    // Only revert the toggle for a definite client error; leave it
+                    // as-is on a 5xx / cold start so a retry doesn't need re-toggling.
+                    if isToggleAction && (400..<500).contains(http.statusCode) {
+                        editableClass.meetingSyncEnabled = !enabled
                         persistClass()
                     }
                 }
@@ -692,10 +692,6 @@ struct ClassEditView: View {
                 isSyncingMeetings = false
                 meetingSyncError = "Network error: \(error.localizedDescription)"
                 showMeetingSyncError = true
-                if isToggleAction {
-                    editableClass.meetingSyncEnabled = !enabled
-                    persistClass()
-                }
             }
         }
     }

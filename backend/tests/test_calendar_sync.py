@@ -53,7 +53,7 @@ class _Events:
         self.rec.append(("delete", eventId))
         return _Call(result={})
 
-    def list(self, calendarId, pageToken=None):           # only used by the full rebuild
+    def list(self, calendarId, singleEvents=None, pageToken=None):   # full rebuild only
         self.rec.append(("events.list", None))
         return _Call(result={"items": self.list_items})
 
@@ -212,10 +212,15 @@ def test_stale_calendar_id_falls_through_to_find_or_create(synced):
     assert ("calendars.insert", "CS101") in rec
 
 
-def test_full_rebuild_clears_existing_events_but_keeps_the_calendar(synced):
+def test_full_rebuild_clears_assignments_but_keeps_calendar_and_meeting_events(synced):
     client, rec, fake = synced
     fake.events().patch_raises["G-boom"] = HttpError(resp=_FakeResp(500), content=b"{}")
-    fake.events().list_items = [{"id": "old-a"}, {"id": "old-b"}]
+    fake.events().list_items = [
+        {"id": "old-a"},
+        {"id": "old-b"},
+        {"id": "meeting-lec", "recurrence": ["RRULE:FREQ=WEEKLY;BYDAY=MO"],
+         "extendedProperties": {"private": {"plannrMeeting": "1"}}},
+    ]
 
     resp = _post(client, [
         {"local_id": "L7", "title": "HW7", "date": "2026-04-12",
@@ -223,12 +228,12 @@ def test_full_rebuild_clears_existing_events_but_keeps_the_calendar(synced):
         {"local_id": "L8", "title": "HW8", "date": "2026-04-13", "is_deleted": False},
     ])
     assert resp.status_code == 200
-    # Both pre-existing events deleted, then every non-deleted event re-inserted.
+    # Assignment events deleted, then re-inserted; the recurring meeting is left alone.
     assert ("delete", "old-a") in rec and ("delete", "old-b") in rec
+    assert ("delete", "meeting-lec") not in rec
     assert ("insert", "HW7") in rec and ("insert", "HW8") in rec
     assert not any(k == "calendars.delete" for k, _ in rec)
-    body = resp.json()
-    assert {m["local_id"] for m in body["synced_events"]} == {"L7", "L8"}
+    assert {m["local_id"] for m in resp.json()["synced_events"]} == {"L7", "L8"}
 
 
 def test_is_deleted_event_without_google_id_is_a_no_op(synced):

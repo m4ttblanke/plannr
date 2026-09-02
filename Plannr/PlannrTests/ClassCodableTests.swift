@@ -20,9 +20,10 @@ final class ClassCodableTests: XCTestCase {
     func testFullRoundTripPreservesEveryField() throws {
         var schedule = ClassSchedule()
         schedule.lectureDays = [Weekday.monday.rawValue, Weekday.wednesday.rawValue]
-        schedule.lectureTime = TimeOfDay(hour: 10, minute: 30)
+        schedule.lectureStart = TimeOfDay(hour: 10, minute: 30)
+        schedule.lectureEnd = TimeOfDay(hour: 11, minute: 45)
         schedule.sectionDays = [Weekday.friday.rawValue]
-        schedule.sectionTime = TimeOfDay(hour: 14, minute: 0)
+        schedule.sectionStart = TimeOfDay(hour: 14, minute: 0)
 
         var event = CalendarEvent(title: "HW1", date: "2026-03-01", type: "homework", description: "ch 1")
         event.googleEventId = "g-1"
@@ -111,7 +112,7 @@ final class ClassCodableTests: XCTestCase {
         var withSchedule = base
         var s = ClassSchedule()
         s.lectureDays = [Weekday.tuesday.rawValue]
-        s.lectureTime = TimeOfDay(hour: 8, minute: 0)
+        s.lectureStart = TimeOfDay(hour: 8, minute: 0)
         withSchedule.structuredSchedule = s
         XCTAssertNotEqual(base, withSchedule)
     }
