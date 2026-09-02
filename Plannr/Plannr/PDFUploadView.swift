@@ -22,7 +22,8 @@ struct PDFUploadView: View {
     @State private var showProfileSheet = false
     @State private var hasSetInitialTab = false
     @State private var showMailComposer = false
-    @State private var showReportIssueFallbackAlert = false
+    @State private var showFeedbackFallbackAlert = false
+    @State private var feedbackKind: ReportIssue.Kind = .issue
 
     init(isGuest: Bool = false) {
         _classManager = StateObject(wrappedValue: ClassManager(isGuest: isGuest))
@@ -70,8 +71,11 @@ struct PDFUploadView: View {
 
                             Divider()
 
-                            Button(action: reportAnIssue) {
+                            Button(action: { sendFeedback(.issue) }) {
                                 Label("Report an Issue", systemImage: "exclamationmark.bubble")
+                            }
+                            Button(action: { sendFeedback(.feature) }) {
+                                Label("Suggest a Feature", systemImage: "lightbulb")
                             }
                         } label: {
                             Image(systemName: "line.3.horizontal")
@@ -181,16 +185,16 @@ struct PDFUploadView: View {
             .sheet(isPresented: $showMailComposer) {
                 MailComposeView(
                     recipient: ReportIssue.recipient,
-                    subject: ReportIssue.subject,
-                    body: ReportIssue.body(accountDescription: accountDescription),
+                    subject: feedbackKind.subject,
+                    body: ReportIssue.body(kind: feedbackKind, accountDescription: accountDescription),
                     onFinish: { showMailComposer = false }
                 )
                 .ignoresSafeArea()
             }
-            .alert("Report an Issue", isPresented: $showReportIssueFallbackAlert) {
+            .alert(feedbackKind.title, isPresented: $showFeedbackFallbackAlert) {
                 Button("OK", role: .cancel) {}
             } message: {
-                Text("This device has no email set up. Please email \(ReportIssue.recipient) to report an issue.")
+                Text("This device has no email set up. Please email \(ReportIssue.recipient) directly.")
             }
         }
     }
@@ -199,13 +203,14 @@ struct PDFUploadView: View {
         authManager.isGuest ? "Guest" : (authManager.userEmail ?? "Signed in")
     }
 
-    /// Opens the in-app mail composer, falling back to the system mail client,
-    /// then to an alert with the address if neither is available.
-    private func reportAnIssue() {
+    /// Opens the in-app mail composer for the given feedback kind, falling back to
+    /// the system mail client, then to an alert with the address if neither works.
+    private func sendFeedback(_ kind: ReportIssue.Kind) {
+        feedbackKind = kind
         if MFMailComposeViewController.canSendMail() {
             showMailComposer = true
-        } else if !ReportIssue.openMailto(accountDescription: accountDescription) {
-            showReportIssueFallbackAlert = true
+        } else if !ReportIssue.openMailto(kind: kind, accountDescription: accountDescription) {
+            showFeedbackFallbackAlert = true
         }
     }
 

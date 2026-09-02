@@ -250,13 +250,17 @@ Open the profile avatar (top-right of any tab).
   its own). Turn auto-sync back off.
 - [ ] **Notifications → Deadline reminders:** turn ON → grant the permission
   prompt. (If you deny it, **Expect:** a "Notifications Disabled" alert.)
-- [ ] **Report an issue path** (also reachable from the hamburger menu):
-  hamburger → **Report an Issue**.
+- [ ] **Beta feedback** (hamburger menu → below the tab items): tap
+  **Report an Issue**.
   **Expect:** a mail composer prefilled **To: mattheweblanke@gmail.com**,
-  subject **"Plannr Beta — Issue Report"**, body with a prompt + your app
-  version / iOS version / device. (On a Simulator with no Mail account you may
-  get the "email mattheweblanke@gmail.com" alert instead — that's the fallback.)
-  Cancel out of the composer.
+  subject **"Plannr Beta — Issue Report"**, body with a "describe the
+  issue / steps to reproduce" prompt + your app version / iOS version / device.
+  (On a Simulator with no Mail account you get a "Report an Issue" alert with the
+  address instead — that's the fallback.) Cancel out.
+- [ ] Hamburger menu → **Suggest a Feature** (directly below "Report an Issue").
+  **Expect:** the same composer but subject **"Plannr Beta — Feature
+  Suggestion"** and a "what would you like / why" prompt. Fallback alert title is
+  **"Suggest a Feature"**. Cancel out.
 
 ### L. Guest mode
 
@@ -443,7 +447,7 @@ Follow the "Testing without real money" steps in `README.md`. Then:
 | My Classes list, badges, event counts | §1B, §1E |
 | Delete class (+ its Google calendar) | §1M |
 | Hamburger navigation + default-tab logic | §1I, §1J |
-| Report an Issue (mail composer / fallback) | §1K |
+| Beta feedback — Report an Issue & Suggest a Feature (composer / fallback) | §1K |
 | Upload: PDF / Photos / Manual text | §1C, §2a |
 | Upload: camera scan + OCR | §2a |
 | Upload guardrails (10 MB, not-a-syllabus, timeout) | §2b |

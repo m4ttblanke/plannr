@@ -109,6 +109,11 @@ The profile screen (tap the avatar in the top-right of the home screen) collects
 - **Sign Out** and **Delete Account**. Deleting an account removes the on-device data and asks the backend to delete the stored Google credentials.
 
 
+### Beta Feedback
+
+The hamburger menu (top-left of the home screen) has **Report an Issue** and **Suggest a Feature** items. Each opens a pre-filled email to the Plannr team — an issue report includes an app/OS/device summary; a feature suggestion prompts for what you want and why. If the device has no Mail account set up, the app shows the address to write to instead.
+
+
 ## **Known Problems**
 
 - The event type field (e.g. Homework, Exam, Lab, Quiz) is a free-text input rather than a dropdown menu, so values are not standardized.

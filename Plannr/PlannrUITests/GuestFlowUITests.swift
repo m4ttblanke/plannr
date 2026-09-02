@@ -127,6 +127,7 @@ final class GuestFlowUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Calendar"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.buttons["Week at a Glance"].exists)
         XCTAssertTrue(app.buttons["Report an Issue"].exists)
+        XCTAssertTrue(app.buttons["Suggest a Feature"].exists)
         app.buttons["Calendar"].tap()
 
         XCTAssertEqual(app.staticTexts["tabTitle"].label, "Calendar")
@@ -137,19 +138,30 @@ final class GuestFlowUITests: XCTestCase {
     }
 
     func testReportAnIssueFromMenu() {
+        assertFeedbackItemWorks(menuLabel: "Report an Issue", alertTitle: "Report an Issue")
+    }
+
+    func testSuggestAFeatureFromMenu() {
+        assertFeedbackItemWorks(menuLabel: "Suggest a Feature", alertTitle: "Suggest a Feature")
+    }
+
+    private func assertFeedbackItemWorks(menuLabel: String, alertTitle: String,
+                                         file: StaticString = #filePath, line: UInt = #line) {
         enterGuestMode()
         app.buttons["menuButton"].tap()
-        app.buttons["Report an Issue"].tap()
+        app.buttons[menuLabel].tap()
 
         // No Mail account on the simulator → the mailto fallback alert.
-        let alert = app.alerts["Report an Issue"]
+        let alert = app.alerts[alertTitle]
         if alert.waitForExistence(timeout: 3) {
-            XCTAssertTrue(alert.staticTexts.element(matching: NSPredicate(format: "label CONTAINS[c] 'mattheweblanke@gmail.com'")).exists)
+            XCTAssertTrue(alert.staticTexts.element(matching: NSPredicate(format: "label CONTAINS[c] 'mattheweblanke@gmail.com'")).exists,
+                          file: file, line: line)
             alert.buttons["OK"].tap()
         } else {
             // A real Mail account: the compose sheet came up instead. Just make
             // sure the app didn't crash and something is on screen.
-            XCTAssertTrue(app.navigationBars.firstMatch.exists || app.otherElements.firstMatch.exists)
+            XCTAssertTrue(app.navigationBars.firstMatch.exists || app.otherElements.firstMatch.exists,
+                          file: file, line: line)
         }
     }
 
