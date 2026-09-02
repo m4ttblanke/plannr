@@ -353,25 +353,9 @@ struct ClassEditView: View {
         NavigationStack {
             ZStack {
                 Color.black.ignoresSafeArea()
-                VStack(spacing: 0) {
-                    ScrollView {
-                        ClassSchedulePicker(schedule: $scheduleDraft)
-                            .padding()
-                    }
-                    Button {
-                        showScheduleEditor = false
-                    } label: {
-                        Text("Done")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.blue)
-                            .cornerRadius(12)
-                    }
-                    .padding(.horizontal)
-                    .padding(.vertical, 12)
-                    .background(Color.black)
+                ScrollView {
+                    ClassSchedulePicker(schedule: $scheduleDraft)
+                        .padding()
                 }
             }
             .navigationTitle("Class Schedule")
