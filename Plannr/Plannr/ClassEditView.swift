@@ -294,23 +294,9 @@ struct ClassEditView: View {
                     .font(.caption)
                     .foregroundColor(editableClass.schedule.isEmpty ? .gray : .white)
                 Spacer()
-                Button(showScheduleEditor ? "Done" : "Edit") {
-                    withAnimation(.easeInOut(duration: 0.15)) { showScheduleEditor.toggle() }
-                }
-                .font(.caption)
-                .foregroundColor(.blue)
-            }
-
-            if showScheduleEditor {
-                ClassSchedulePicker(schedule: $scheduleDraft)
-                    .onChange(of: scheduleDraft) { _, newValue in
-                        editableClass.structuredSchedule = newValue.isEmpty ? nil : newValue
-                        editableClass.schedule = newValue.displayString
-                        persistClass()
-                        if editableClass.meetingSyncEnabled && !authManager.isGuest {
-                            Task { await syncClassMeetings(isToggleAction: false) }
-                        }
-                    }
+                Button("Edit") { showScheduleEditor = true }
+                    .font(.caption)
+                    .foregroundColor(.blue)
             }
 
             if !authManager.isGuest {
@@ -345,10 +331,57 @@ struct ClassEditView: View {
         .background(Color.gray.opacity(0.12))
         .cornerRadius(12)
         .padding(.horizontal)
+        .onChange(of: scheduleDraft) { _, newValue in
+            editableClass.structuredSchedule = newValue.isEmpty ? nil : newValue
+            editableClass.schedule = newValue.displayString
+            persistClass()
+            if editableClass.meetingSyncEnabled && !authManager.isGuest {
+                Task { await syncClassMeetings(isToggleAction: false) }
+            }
+        }
+        .sheet(isPresented: $showScheduleEditor) {
+            scheduleEditorSheet
+        }
         .alert("Class Meetings", isPresented: $showMeetingSyncError) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(meetingSyncError ?? "Something went wrong. Please try again.")
+        }
+    }
+
+    private var scheduleEditorSheet: some View {
+        NavigationStack {
+            ZStack {
+                Color.black.ignoresSafeArea()
+                VStack(spacing: 0) {
+                    ScrollView {
+                        ClassSchedulePicker(schedule: $scheduleDraft)
+                            .padding()
+                    }
+                    Button {
+                        showScheduleEditor = false
+                    } label: {
+                        Text("Done")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue)
+                            .cornerRadius(12)
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 12)
+                    .background(Color.black)
+                }
+            }
+            .navigationTitle("Class Schedule")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { showScheduleEditor = false }
+                        .foregroundColor(.white)
+                }
+            }
         }
     }
 
