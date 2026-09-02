@@ -81,6 +81,17 @@ Working list of known problems and planned features. Last updated: September 1, 
 - **Sync resilience** — retry with backoff on transient failures. (The
   delete-and-recreate behavior is fixed: sync is now an incremental
   patch/insert/delete diff against the existing calendar.)
+- **Restore a sync session.** `SyncSessionsView` already lists every past sync
+  with its full event snapshot (`Class.syncHistory: [SyncSession]`), but it's
+  read-only. Add a "Restore this version" action that replaces the class's
+  current `events` with the chosen session's snapshot and pushes the diff to
+  Google Calendar (reuse `EventReconciler` + the incremental sync path so it's
+  an insert/patch/delete, not a rebuild). Considerations: confirm before
+  overwriting local edits; carry `googleEventId`s forward where events still
+  match so calendar entries are updated in place rather than churned; append the
+  restore itself as a new session so it's also undoable; decide whether class
+  meetings / status / color are part of the snapshot or stay as-is (probably
+  events only for v1).
 - Haptics on accept / decline / sync success.
 - App icon and launch screen pass (currently generated defaults).
 - Backend `/health` endpoint + an uptime monitor (also keeps the free dyno warm,
