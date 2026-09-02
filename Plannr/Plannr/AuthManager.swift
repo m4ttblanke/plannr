@@ -19,7 +19,9 @@ class AuthManager: ObservableObject {
     @Published var errorMessage: String?
     @Published var isDeletingAccount: Bool = false
 
-    private static let localPhotoFilename = "profile_photo.jpg"
+    /// Pre-scoping device-wide photo filename. Migrated to a per-account file the
+    /// first time a signed-in session initializes.
+    private static let legacyPhotoFilename = "profile_photo.jpg"
 
     init() {
         // UI tests launch with -uiTestReset to start from a clean, signed-out
@@ -34,10 +36,16 @@ class AuthManager: ObservableObject {
                         "settings.autoSyncClassMeetings"] {
                 defaults.removeObject(forKey: key)
             }
-            try? FileManager.default.removeItem(
-                at: FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-                    .appendingPathComponent(Self.localPhotoFilename)
-            )
+            // Per-account class stores written by real sign-ins.
+            for key in defaults.dictionaryRepresentation().keys where key.hasPrefix("savedClasses.") {
+                defaults.removeObject(forKey: key)
+            }
+            if let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first,
+               let files = try? FileManager.default.contentsOfDirectory(atPath: dir.path) {
+                for file in files where file.hasPrefix("profile_photo") {
+                    try? FileManager.default.removeItem(at: dir.appendingPathComponent(file))
+                }
+            }
         }
 
         // Check if user is already authenticated (from UserDefaults)
@@ -50,7 +58,8 @@ class AuthManager: ObservableObject {
             // (or whose cached values are stale relative to) these fields.
             refreshGoogleProfile()
         }
-        self.localPhotoData = Self.loadLocalPhotoData()
+        migrateLegacyPhotoIfNeeded()
+        self.localPhotoData = loadLocalPhotoData()
     }
 
     /// Re-fetch the current Google profile (name, picture) using the account's stored
@@ -180,6 +189,10 @@ class AuthManager: ObservableObject {
             }
             self.isAuthenticated = true
             self.isLoading = false
+            // Load this account's custom photo (migrating the legacy one on first
+            // sign-in), not whatever the previous session left in memory.
+            self.migrateLegacyPhotoIfNeeded()
+            self.localPhotoData = self.loadLocalPhotoData()
         }
     }
 
@@ -190,6 +203,7 @@ class AuthManager: ObservableObject {
             self.isAuthenticated = true
             self.userEmail = nil
             self.userName = "Guest"
+            self.localPhotoData = self.loadLocalPhotoData()
         }
     }
 
@@ -205,23 +219,47 @@ class AuthManager: ObservableObject {
             self.userEmail = nil
             self.userName = nil
             self.userPhotoURL = nil
+            self.localPhotoData = nil
         }
     }
 
     // MARK: - Local profile photo override
 
-    private static var localPhotoURL: URL? {
+    /// Per-identity so signing into a different account doesn't show the previous
+    /// user's custom photo: `profile_photo_<account-token>.jpg` when signed in,
+    /// `profile_photo_guest.jpg` for a guest.
+    private var localPhotoFilename: String {
+        if let email = userEmail, !isGuest {
+            return "profile_photo_\(AccountScope.token(forEmail: email)).jpg"
+        }
+        return "profile_photo_guest.jpg"
+    }
+
+    private var localPhotoURL: URL? {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?
             .appendingPathComponent(localPhotoFilename)
     }
 
-    private static func loadLocalPhotoData() -> Data? {
+    private func loadLocalPhotoData() -> Data? {
         guard let url = localPhotoURL else { return nil }
         return try? Data(contentsOf: url)
     }
 
+    /// Move the old unscoped `profile_photo.jpg` to the current account's file the
+    /// first time a signed-in session sees it.
+    private func migrateLegacyPhotoIfNeeded() {
+        guard userEmail != nil, !isGuest,
+              let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
+        let fm = FileManager.default
+        let legacy = dir.appendingPathComponent(Self.legacyPhotoFilename)
+        let scoped = dir.appendingPathComponent(localPhotoFilename)
+        if fm.fileExists(atPath: legacy.path), !fm.fileExists(atPath: scoped.path) {
+            try? fm.moveItem(at: legacy, to: scoped)
+        }
+    }
+
     func setLocalProfilePhoto(_ data: Data) {
-        guard let url = Self.localPhotoURL else { return }
+        guard let url = localPhotoURL else { return }
         try? data.write(to: url)
         DispatchQueue.main.async {
             self.localPhotoData = data
@@ -229,7 +267,7 @@ class AuthManager: ObservableObject {
     }
 
     func clearLocalProfilePhoto() {
-        if let url = Self.localPhotoURL {
+        if let url = localPhotoURL {
             try? FileManager.default.removeItem(at: url)
         }
         DispatchQueue.main.async {

@@ -122,5 +122,4 @@ The hamburger menu (top-left of the home screen) has **Report an Issue** and **S
 - Very large syllabi with many deadlines can exceed what the parser handles in a single pass; the app will suggest splitting the document into smaller uploads.
 - OCR of scanned or photographed syllabi depends on image quality — faint, skewed, or low-contrast scans may yield incomplete results. OCR is also not currently enabled on the production backend, so scanned-only PDFs may need to be uploaded as text-layer PDFs or pasted as text.
 - The "Current Term" *label* and parsing/end-date use are not yet wired up; only the term start/end dates are used, as a fallback window for class-meeting recurrence.
-- Classes are stored on the device, not per Google account. Signing out and into a different account on the same device carries the first account's classes over, and their stored calendar/event references still point at the first account. Deleting and re-adding the class on the new account fixes it.
 - Local reminder notifications are capped by iOS at 64 pending notifications per app; students with a very large number of upcoming deadlines may not receive reminders for all of them.

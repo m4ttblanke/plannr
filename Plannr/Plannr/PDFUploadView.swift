@@ -25,8 +25,8 @@ struct PDFUploadView: View {
     @State private var showFeedbackFallbackAlert = false
     @State private var feedbackKind: ReportIssue.Kind = .issue
 
-    init(isGuest: Bool = false) {
-        _classManager = StateObject(wrappedValue: ClassManager(isGuest: isGuest))
+    init(isGuest: Bool = false, accountEmail: String? = nil) {
+        _classManager = StateObject(wrappedValue: ClassManager(isGuest: isGuest, accountEmail: accountEmail))
     }
     
     // Computed property to determine default tab based on whether user has classes

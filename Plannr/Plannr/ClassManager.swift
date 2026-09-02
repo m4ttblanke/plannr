@@ -29,21 +29,50 @@ struct SyncSession: Identifiable, Codable {
 class ClassManager: ObservableObject {
     @Published var classes: [Class] = []
 
-    private let userDefaultsKey = "savedClasses"
-    private let isGuest: Bool
+    /// The pre-scoping, device-wide key. Kept only so a one-time migration can
+    /// hand its contents to the first account that signs in after this version.
+    static let legacyKey = "savedClasses"
 
-    init(isGuest: Bool = false) {
-        self.isGuest = isGuest
-        if !isGuest {
-            loadClasses()
+    /// Where this instance persists — `"savedClasses.<account-token>"` for a
+    /// signed-in user, `legacyKey` for the unscoped fallback (previews/tests),
+    /// or `nil` for a guest (nothing is written).
+    private let storageKey: String?
+
+    /// - Parameters:
+    ///   - isGuest: guest session — classes live only in memory.
+    ///   - accountEmail: the signed-in Google account. Its classes are stored
+    ///     under a key derived from the email, so a different account on the
+    ///     same device starts from an empty list.
+    init(isGuest: Bool = false, accountEmail: String? = nil) {
+        if isGuest {
+            self.storageKey = nil
+        } else if let email = accountEmail, !email.isEmpty {
+            self.storageKey = "savedClasses.\(AccountScope.token(forEmail: email))"
+        } else {
+            self.storageKey = Self.legacyKey
         }
+
+        guard let storageKey else { return }
+
+        // One-time migration: before per-account scoping there was a single
+        // device-wide blob. Give it to whichever account runs first, then drop
+        // the legacy key so no one else inherits it.
+        if storageKey != Self.legacyKey {
+            let defaults = UserDefaults.standard
+            if defaults.data(forKey: storageKey) == nil,
+               let legacy = defaults.data(forKey: Self.legacyKey) {
+                defaults.set(legacy, forKey: storageKey)
+                defaults.removeObject(forKey: Self.legacyKey)
+            }
+        }
+        loadClasses()
     }
-    
+
     func addClass(_ newClass: Class) {
         classes.append(newClass)
         saveClasses()
     }
-    
+
     func removeClass(_ classToRemove: Class) {
         classes.removeAll { $0.id == classToRemove.id }
         saveClasses()
@@ -53,29 +82,34 @@ class ClassManager: ObservableObject {
         classes.removeAll { $0.id == id }
         saveClasses()
     }
-    
+
     func updateClass(_ updatedClass: Class) {
         if let index = classes.firstIndex(where: { $0.id == updatedClass.id }) {
             classes[index] = updatedClass
             saveClasses()
         }
     }
-    
-    /// Wipe all locally stored classes (used when a user deletes their account).
+
+    /// Wipe this account's locally stored classes (used when a user deletes their
+    /// account).
     func clearAllData() {
         classes = []
-        UserDefaults.standard.removeObject(forKey: userDefaultsKey)
+        guard let storageKey else { return }
+        let defaults = UserDefaults.standard
+        defaults.removeObject(forKey: storageKey)
+        defaults.removeObject(forKey: Self.legacyKey)
     }
 
     private func saveClasses() {
-        guard !isGuest else { return }
+        guard let storageKey else { return }
         if let encoded = try? JSONEncoder().encode(classes) {
-            UserDefaults.standard.set(encoded, forKey: userDefaultsKey)
+            UserDefaults.standard.set(encoded, forKey: storageKey)
         }
     }
-    
+
     private func loadClasses() {
-        if let data = UserDefaults.standard.data(forKey: userDefaultsKey),
+        guard let storageKey else { return }
+        if let data = UserDefaults.standard.data(forKey: storageKey),
            let decoded = try? JSONDecoder().decode([Class].self, from: data) {
             classes = decoded
         }

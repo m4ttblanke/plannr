@@ -410,6 +410,23 @@ Follow the "Testing without real money" steps in `README.md`. Then:
   with `true` to re-check it. A bogus calendar id → 200 `{"selected": ...,
   "skipped": true}` (not an error).
 
+### 2h. Two Google accounts on one device (class scoping)
+
+Needs a second Google account you can sign into.
+
+- [ ] Signed in as **account A** with at least one class, note its name. Profile →
+  **Sign Out**. Sign in as **account B**.
+  **Expect:** **My Classes is empty** — B does not see A's classes.
+- [ ] As B, add a class `B-only`. Sign out, sign back in as **A**.
+  **Expect:** A sees its original class(es) and **not** `B-only`.
+- [ ] Set a **custom profile photo** as A (Profile → tap avatar → pick an image).
+  Sign out, sign in as B. **Expect:** B shows the Google photo, **not** A's custom
+  one. Sign back in as A → the custom photo is still there.
+- [ ] **Upgrade path:** on a build that already had classes from **before** this
+  change, the first account you sign in as after updating keeps them; any *other*
+  account signs in to an empty list. (One-time; can't be re-tested without
+  reinstalling.)
+
 ---
 
 ## 3. Automated tests
@@ -428,7 +445,8 @@ Follow the "Testing without real money" steps in `README.md`. Then:
   ```
   **Expect:** `PlannrTests` all pass (`EventReconcilerTests`,
   `ClassScheduleTests`, `CalendarPreviewViewTests`, `UnifiedEventMeetingTests`,
-  `ParsedScheduleTests`, `ClassMeetingSyncTests`)
+  `ParsedScheduleTests`, `ClassMeetingSyncTests`, `ClassManagerTests`
+  per-account scoping + legacy migration)
   and `PlannrUITests/GuestFlowUITests`.
 
 ---
@@ -457,6 +475,7 @@ Follow the "Testing without real money" steps in `README.md`. Then:
 | Google sign-in (success / cancel / persistence / profile fetch) | §1A |
 | Sign-in error surfacing | §1A (cancel), §2c |
 | Guest mode + non-persistence + guest export | §1L |
+| Classes + custom photo scoped per Google account (+ one-time migration) | §2h |
 | Revoked-access sign-out | §2c |
 | Add class + color | §1B |
 | Structured schedule picker (lecture + section) | §1B, §1H |
