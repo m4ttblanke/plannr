@@ -397,7 +397,8 @@ struct WeeklyDashboardView: View {
                guard let schedule = cls.structuredSchedule, !schedule.isEmpty else { return nil }
                return schedule.occurrences(
                    from: week.start, to: week.end,
-                   className: cls.name, classColorHex: cls.colorHex, classID: cls.id
+                   className: cls.name, classColorHex: cls.colorHex, classID: cls.id,
+                   fallbackStart: settingsManager.term.startDate ?? .distantPast
                )
            }
            .flatMap { $0 }
@@ -668,6 +669,16 @@ struct ClassMeetingRowView: View {
        return f.string(from: meeting.start)
    }
 
+   private var meetingKindSuffix: String {
+       switch meeting.kind {
+       case .lecture: return ""
+       case .section: return " · Section"
+       case .final: return " — Final Exam"
+       }
+   }
+
+   private var chipLabel: String { meeting.kind == .final ? "Exam" : "Class" }
+
    var body: some View {
        HStack(spacing: 12) {
            Image(systemName: "book.closed.fill")
@@ -676,12 +687,12 @@ struct ClassMeetingRowView: View {
 
            VStack(alignment: .leading, spacing: 4) {
                HStack {
-                   Text(meeting.className + (meeting.kind == .section ? " · Section" : ""))
+                   Text(meeting.className + meetingKindSuffix)
                        .font(.subheadline)
                        .fontWeight(.medium)
                        .foregroundColor(.white)
                    Spacer()
-                   Text("Class")
+                   Text(chipLabel)
                        .font(.caption2)
                        .fontWeight(.medium)
                        .foregroundColor(.white.opacity(0.8))

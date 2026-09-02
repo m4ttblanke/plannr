@@ -105,7 +105,13 @@ class MeetingPatternRequest(BaseModel):
     byday: List[str]                # RRULE BYDAY tokens, e.g. ["MO", "WE", "FR"]
     start_time: str                 # "HH:MM" 24-hour, local to `timezone`
     duration_minutes: int = 50
-    google_event_id: Optional[str] = None  # set to update an existing recurring event
+    google_event_id: Optional[str] = None  # (ignored — endpoint is declarative)
+
+
+class FinalExamRequest(BaseModel):
+    date: str                       # "YYYY-MM-DD"
+    start_time: str                 # "HH:MM"
+    duration_minutes: int = 120
 
 
 class ClassMeetingsRequest(BaseModel):
@@ -116,7 +122,9 @@ class ClassMeetingsRequest(BaseModel):
     timezone: str = "America/Los_Angeles"
     start_date: str                 # "YYYY-MM-DD" — recurrence anchor (first possible meeting)
     until_date: Optional[str] = None  # "YYYY-MM-DD" inclusive; None = open-ended
+    week_count: Optional[int] = None  # "repeat for X weeks" — overrides until_date when set
     patterns: List[MeetingPatternRequest] = []
+    final_exam: Optional[FinalExamRequest] = None
     remove_event_ids: List[str] = []  # recurring meeting events to delete
 
 
@@ -914,16 +922,28 @@ MEETING_TAG_KEY = "plannrMeeting"
 MEETING_TAG_VALUE = "1"
 
 
+def _meeting_until_date(req: "ClassMeetingsRequest") -> Optional[str]:
+    """Effective recurrence end (ISO date). `week_count` wins over `until_date`."""
+    if req.week_count and req.week_count > 0:
+        try:
+            end = date_type.fromisoformat(req.start_date) + timedelta(days=req.week_count * 7 - 1)
+            return end.isoformat()
+        except ValueError:
+            return req.until_date
+    return req.until_date
+
+
 def _build_meeting_event_body(pattern: "MeetingPatternRequest", req: "ClassMeetingsRequest") -> dict:
     first_day = _first_occurrence_on_or_after(req.start_date, pattern.byday)
     start_dt = f"{first_day.isoformat()}T{pattern.start_time}:00"
     end_dt = f"{first_day.isoformat()}T{_add_minutes_to_hhmm(pattern.start_time, pattern.duration_minutes)}:00"
 
     rrule = f"RRULE:FREQ=WEEKLY;BYDAY={','.join(pattern.byday)}"
+    until = _meeting_until_date(req)
     # Only add UNTIL when it is actually after the first meeting — a backwards
     # window would make Google reject the rule or produce zero instances.
-    if req.until_date and req.until_date.replace('-', '') > first_day.isoformat().replace('-', ''):
-        rrule += f";UNTIL={req.until_date.replace('-', '')}T235959Z"
+    if until and until.replace('-', '') > first_day.isoformat().replace('-', ''):
+        rrule += f";UNTIL={until.replace('-', '')}T235959Z"
 
     suffix = " (Section)" if pattern.kind == "section" else ""
     return {
@@ -935,6 +955,21 @@ def _build_meeting_event_body(pattern: "MeetingPatternRequest", req: "ClassMeeti
         "reminders": {"useDefault": False, "overrides": []},
         "extendedProperties": {"private": {
             MEETING_TAG_KEY: MEETING_TAG_VALUE, "plannrMeetingKind": pattern.kind,
+        }},
+    }
+
+
+def _build_final_exam_event_body(fe: "FinalExamRequest", req: "ClassMeetingsRequest") -> dict:
+    start_dt = f"{fe.date}T{fe.start_time}:00"
+    end_dt = f"{fe.date}T{_add_minutes_to_hhmm(fe.start_time, fe.duration_minutes)}:00"
+    return {
+        "summary": f"{req.class_name} — Final Exam",
+        "start": {"dateTime": start_dt, "timeZone": req.timezone},
+        "end": {"dateTime": end_dt, "timeZone": req.timezone},
+        "transparency": "opaque",           # a final exam is a real commitment
+        "reminders": {"useDefault": True},
+        "extendedProperties": {"private": {
+            MEETING_TAG_KEY: MEETING_TAG_VALUE, "plannrMeetingKind": "final",
         }},
     }
 
@@ -1015,6 +1050,12 @@ async def sync_class_meetings(request: Request, email: str = Query(...),
                 calendarId=cal_id, body=_build_meeting_event_body(pattern, body)
             ).execute()
             meetings.append({"kind": pattern.kind, "google_event_id": created["id"]})
+
+        if body.final_exam:
+            created = service.events().insert(
+                calendarId=cal_id, body=_build_final_exam_event_body(body.final_exam, body)
+            ).execute()
+            meetings.append({"kind": "final", "google_event_id": created["id"]})
 
         return JSONResponse(status_code=200, content={
             "google_calendar_id": cal_id,

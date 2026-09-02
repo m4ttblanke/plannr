@@ -136,7 +136,7 @@ def _lecture(**overrides):
 
 
 def _post(client, patterns=None, remove=None, google_calendar_id="cal-123",
-          until="2026-12-11", start="2026-09-02"):
+          until="2026-12-11", start="2026-09-02", week_count=None, final_exam=None):
     body = {
         "class_name": "CS101",
         "timezone": "America/Los_Angeles",
@@ -147,6 +147,10 @@ def _post(client, patterns=None, remove=None, google_calendar_id="cal-123",
     }
     if google_calendar_id is not None:
         body["google_calendar_id"] = google_calendar_id
+    if week_count is not None:
+        body["week_count"] = week_count
+    if final_exam is not None:
+        body["final_exam"] = final_exam
     return client.post("/calendar/meetings", params={"email": "s@e.com"}, json=body)
 
 
@@ -254,3 +258,56 @@ def test_stale_calendar_id_falls_through_to_find_or_create(meetings):
     assert resp.json()["google_calendar_id"] == "cal-CS101"
     assert ("calendarList.list", None) in rec
     assert ("calendars.insert", "CS101") in rec
+
+
+# ── "Repeat for X weeks" ──────────────────────────────────────────────────
+
+def test_week_count_sets_the_recurrence_until(meetings):
+    client, rec, fake = meetings
+    # start 2026-09-02 (Wed), 10 weeks → last day 2026-11-10.
+    _post(client, patterns=[_lecture()], week_count=10, until="2027-06-01")
+    rrule = fake.events().insert_bodies[0]["recurrence"][0]
+    assert rrule == "RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR;UNTIL=20261110T235959Z"
+
+
+def test_week_count_overrides_until_date(meetings):
+    client, rec, fake = meetings
+    _post(client, patterns=[_lecture()], week_count=1, until="2026-12-31")
+    # 1 week from 2026-09-02 → 2026-09-08.
+    assert "UNTIL=20260908T235959Z" in fake.events().insert_bodies[0]["recurrence"][0]
+
+
+# ── Final exam ────────────────────────────────────────────────────────────
+
+def test_final_exam_inserts_a_one_off_tagged_event(meetings):
+    client, rec, fake = meetings
+    resp = _post(client, patterns=[_lecture()], final_exam={
+        "date": "2026-12-15", "start_time": "19:00", "duration_minutes": 180,
+    })
+    assert resp.status_code == 200
+    kinds = [m["kind"] for m in resp.json()["meetings"]]
+    assert kinds == ["lecture", "final"]
+
+    fe = fake.events().insert_bodies[-1]
+    assert fe["summary"] == "CS101 — Final Exam"
+    assert "recurrence" not in fe                    # one-off, not recurring
+    assert fe["start"]["dateTime"] == "2026-12-15T19:00:00"
+    assert fe["end"]["dateTime"] == "2026-12-15T22:00:00"
+    assert fe["transparency"] == "opaque"
+    assert fe["extendedProperties"]["private"]["plannrMeetingKind"] == "final"
+    assert fe["extendedProperties"]["private"][MEETING_TAG_KEY] == MEETING_TAG_VALUE
+
+
+def test_final_exam_without_patterns_still_inserts(meetings):
+    client, rec, fake = meetings
+    resp = _post(client, patterns=[], final_exam={
+        "date": "2026-12-15", "start_time": "08:00", "duration_minutes": 120,
+    })
+    assert resp.status_code == 200
+    assert [m["kind"] for m in resp.json()["meetings"]] == ["final"]
+
+
+def test_no_final_exam_field_inserts_nothing_extra(meetings):
+    client, rec, fake = meetings
+    _post(client, patterns=[_lecture()])
+    assert len(fake.events().insert_bodies) == 1

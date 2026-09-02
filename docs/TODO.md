@@ -15,8 +15,17 @@ Working list of known problems and planned features. Last updated: September 1, 
 
 ### Medium priority
 
-- **"Current Term" settings are only half-used.** The term start/end dates now
-  feed the class-meeting recurrence window, but the term *label* still does
+- **Local classes aren't scoped to a Google account.** `ClassManager` reads/writes
+  one device-wide `savedClasses` key, and sign-out only clears the auth tokens.
+  Sign out of account A and into B → B inherits A's classes, with `googleCalendarId`
+  / `googleEventId` / `meetingEventIds` still pointing at A's calendar. Namespace
+  the store per account (`savedClasses.<email>`), migrate the existing blob to the
+  signed-in account on first launch, keep guests as-is. Probably scope the custom
+  profile photo too.
+
+- **"Current Term" settings are only half-used.** The term start/end dates feed
+  the class-meeting recurrence window as a *fallback* (a class's own schedule now
+  has "First class" + "repeat for X weeks"), but the term *label* still does
   nothing and the dates don't constrain syllabus date inference or default a
   class's end date. Wire those up or trim.
 

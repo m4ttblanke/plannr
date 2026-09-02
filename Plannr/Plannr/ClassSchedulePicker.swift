@@ -2,9 +2,9 @@
 //  ClassSchedulePicker.swift
 //  Plannr
 //
-//  Structured input for a class's weekly schedule: which days it meets and the
-//  start / end time, plus an optional discussion/lab section that meets
-//  separately. Reads and writes a `ClassSchedule`.
+//  Structured input for a class's weekly schedule: meeting days with start/end
+//  times, an optional section/lab, how many weeks the class runs, and an
+//  optional one-time final exam. Reads and writes a `ClassSchedule`.
 //
 
 import SwiftUI
@@ -18,65 +18,138 @@ struct ClassSchedulePicker: View {
     private static var defaultEnd: Date {
         Calendar.current.date(byAdding: .minute, value: defaultMeetingMinutes, to: defaultStart) ?? defaultStart
     }
+    private static var defaultFinalStart: Date {
+        Calendar.current.date(bySettingHour: 8, minute: 0, second: 0, of: Date()) ?? Date()
+    }
+    private static let weekOptions = Array(1...20)
 
-    // Local editing state, projected back onto `schedule` on every change.
     @State private var lectureDays: Set<Weekday> = []
     @State private var lectureStart: Date = ClassSchedulePicker.defaultStart
     @State private var lectureEnd: Date = ClassSchedulePicker.defaultEnd
-    @State private var hasSection: Bool = false
+    @State private var hasSection = false
     @State private var sectionDays: Set<Weekday> = []
     @State private var sectionStart: Date = ClassSchedulePicker.defaultStart
     @State private var sectionEnd: Date = ClassSchedulePicker.defaultEnd
+
+    @State private var firstMeeting: Date = Calendar.current.startOfDay(for: Date())
+    @State private var limitWeeks = false
+    @State private var weeks = 10
+    @State private var hasFinal = false
+    @State private var finalDate: Date = Calendar.current.date(byAdding: .day, value: 77, to: Date()) ?? Date()
+    @State private var finalStart: Date = ClassSchedulePicker.defaultFinalStart
+    @State private var finalEnd: Date = Calendar.current.date(byAdding: .minute, value: 120,
+                                                              to: ClassSchedulePicker.defaultFinalStart) ?? Date()
     @State private var didLoad = false
+
+    private var hasAnyMeeting: Bool { !lectureDays.isEmpty || (hasSection && !sectionDays.isEmpty) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            weekdayRow(selection: $lectureDays)
-
-            if !lectureDays.isEmpty {
-                timeRangeRow(startLabel: "Starts", start: $lectureStart, end: $lectureEnd)
-            }
-
-            Toggle(isOn: $hasSection.animation(.easeInOut(duration: 0.15))) {
-                Text("Has a separate section / lab")
-                    .font(.subheadline)
-                    .foregroundColor(.white)
-            }
-            .tint(.blue)
-
-            if hasSection {
-                Divider().background(Color.gray.opacity(0.3))
-                Text("Section")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.gray)
-                weekdayRow(selection: $sectionDays)
-                if !sectionDays.isEmpty {
-                    timeRangeRow(startLabel: "Starts", start: $sectionStart, end: $sectionEnd)
-                }
-            }
-
+            lectureBlock
+            sectionBlock
+            if hasAnyMeeting { windowBlock }
             if !schedule.displayString.isEmpty {
-                Text(schedule.displayString)
-                    .font(.caption)
-                    .foregroundColor(.blue)
-                    .padding(.top, 2)
+                Text(schedule.displayString).font(.caption).foregroundColor(.blue).padding(.top, 2)
             }
         }
         .padding(14)
         .background(Color.gray.opacity(0.15))
         .cornerRadius(10)
         .onAppear(perform: loadFromSchedule)
-        .onChange(of: lectureDays) { _, _ in pushToSchedule() }
-        .onChange(of: lectureStart) { _, _ in keepEndAfterStart(&lectureEnd, lectureStart); pushToSchedule() }
-        .onChange(of: lectureEnd) { _, _ in pushToSchedule() }
-        .onChange(of: hasSection) { _, _ in pushToSchedule() }
-        .onChange(of: sectionDays) { _, _ in pushToSchedule() }
-        .onChange(of: sectionStart) { _, _ in keepEndAfterStart(&sectionEnd, sectionStart); pushToSchedule() }
-        .onChange(of: sectionEnd) { _, _ in pushToSchedule() }
     }
 
-    private func keepEndAfterStart(_ end: inout Date, _ start: Date) {
+    // MARK: - Blocks
+
+    private var lectureBlock: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            weekdayRow(selection: $lectureDays)
+            if !lectureDays.isEmpty {
+                timeRangeRow(start: $lectureStart, end: $lectureEnd)
+            }
+            Toggle(isOn: $hasSection.animation(.easeInOut(duration: 0.15))) {
+                Text("Has a separate section / lab").font(.subheadline).foregroundColor(.white)
+            }
+            .tint(.blue)
+        }
+        .onChange(of: lectureDays) { _, _ in push() }
+        .onChange(of: lectureStart) { _, _ in clamp(&lectureEnd, after: lectureStart); push() }
+        .onChange(of: lectureEnd) { _, _ in push() }
+        .onChange(of: hasSection) { _, _ in push() }
+    }
+
+    @ViewBuilder
+    private var sectionBlock: some View {
+        if hasSection {
+            VStack(alignment: .leading, spacing: 14) {
+                Divider().background(Color.gray.opacity(0.3))
+                Text("Section").font(.caption).fontWeight(.semibold).foregroundColor(.gray)
+                weekdayRow(selection: $sectionDays)
+                if !sectionDays.isEmpty {
+                    timeRangeRow(start: $sectionStart, end: $sectionEnd)
+                }
+            }
+            .onChange(of: sectionDays) { _, _ in push() }
+            .onChange(of: sectionStart) { _, _ in clamp(&sectionEnd, after: sectionStart); push() }
+            .onChange(of: sectionEnd) { _, _ in push() }
+        }
+    }
+
+    private var windowBlock: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Divider().background(Color.gray.opacity(0.3))
+
+            HStack {
+                Text("First class").font(.subheadline).foregroundColor(.white)
+                Spacer()
+                DatePicker("", selection: $firstMeeting, displayedComponents: .date)
+                    .labelsHidden().colorScheme(.dark)
+            }
+
+            Toggle(isOn: $limitWeeks.animation(.easeInOut(duration: 0.15))) {
+                Text("Repeat for a set number of weeks").font(.subheadline).foregroundColor(.white)
+            }
+            .tint(.blue)
+
+            if limitWeeks {
+                HStack {
+                    Text("Weeks").font(.subheadline).foregroundColor(.white)
+                    Spacer()
+                    Picker("", selection: $weeks) {
+                        ForEach(Self.weekOptions, id: \.self) { Text("\($0)").tag($0) }
+                    }
+                    .pickerStyle(.menu).tint(.white)
+                }
+            }
+
+            Toggle(isOn: $hasFinal.animation(.easeInOut(duration: 0.15))) {
+                Text("Add a final exam").font(.subheadline).foregroundColor(.white)
+            }
+            .tint(.blue)
+
+            if hasFinal {
+                Text("A one-time event, usually during finals week after classes end.")
+                    .font(.caption2).foregroundColor(.gray)
+                HStack {
+                    Text("Date").font(.subheadline).foregroundColor(.white)
+                    Spacer()
+                    DatePicker("", selection: $finalDate, displayedComponents: .date)
+                        .labelsHidden().colorScheme(.dark)
+                }
+                timeRangeRow(start: $finalStart, end: $finalEnd)
+            }
+        }
+        .onChange(of: firstMeeting) { _, _ in push() }
+        .onChange(of: limitWeeks) { _, _ in push() }
+        .onChange(of: weeks) { _, _ in push() }
+        .onChange(of: hasFinal) { _, _ in push() }
+        .onChange(of: finalDate) { _, _ in push() }
+        .onChange(of: finalStart) { _, _ in clamp(&finalEnd, after: finalStart); push() }
+        .onChange(of: finalEnd) { _, _ in push() }
+    }
+
+    // MARK: - State <-> schedule
+
+    private func clamp(_ end: inout Date, after start: Date) {
         if end <= start {
             end = Calendar.current.date(byAdding: .minute, value: defaultMeetingMinutes, to: start) ?? start
         }
@@ -85,6 +158,7 @@ struct ClassSchedulePicker: View {
     private func loadFromSchedule() {
         guard !didLoad else { return }
         didLoad = true
+
         lectureDays = Set(schedule.lectureDays.compactMap(Weekday.init(rawValue:)))
         sectionDays = Set(schedule.sectionDays.compactMap(Weekday.init(rawValue:)))
         hasSection = !schedule.sectionDays.isEmpty || schedule.sectionStart != nil
@@ -92,43 +166,57 @@ struct ClassSchedulePicker: View {
         if let s = schedule.lectureStart { lectureStart = s.date(on: Date()) }
         lectureEnd = schedule.lectureEnd?.date(on: Date())
             ?? Calendar.current.date(byAdding: .minute, value: defaultMeetingMinutes, to: lectureStart) ?? lectureStart
-
         if let s = schedule.sectionStart { sectionStart = s.date(on: Date()) }
         sectionEnd = schedule.sectionEnd?.date(on: Date())
             ?? Calendar.current.date(byAdding: .minute, value: defaultMeetingMinutes, to: sectionStart) ?? sectionStart
+
+        firstMeeting = schedule.firstMeetingDate ?? Calendar.current.startOfDay(for: Date())
+        if let w = schedule.weekCount { limitWeeks = true; weeks = min(max(w, 1), 20) }
+        if let f = schedule.finalExam {
+            hasFinal = true
+            finalDate = f.date
+            finalStart = f.start.date(on: f.date)
+            finalEnd = f.end?.date(on: f.date)
+                ?? Calendar.current.date(byAdding: .minute, value: 120, to: finalStart) ?? finalStart
+        }
     }
 
-    private func pushToSchedule() {
-        var updated = schedule
-        updated.lectureDays = lectureDays.map(\.rawValue).sorted()
-        updated.lectureStart = lectureDays.isEmpty ? nil : TimeOfDay(from: lectureStart)
-        updated.lectureEnd = lectureDays.isEmpty ? nil : TimeOfDay(from: lectureEnd)
+    private func push() {
+        var s = schedule
+        s.lectureDays = lectureDays.map(\.rawValue).sorted()
+        s.lectureStart = lectureDays.isEmpty ? nil : TimeOfDay(from: lectureStart)
+        s.lectureEnd = lectureDays.isEmpty ? nil : TimeOfDay(from: lectureEnd)
         if hasSection {
-            updated.sectionDays = sectionDays.map(\.rawValue).sorted()
-            updated.sectionStart = sectionDays.isEmpty ? nil : TimeOfDay(from: sectionStart)
-            updated.sectionEnd = sectionDays.isEmpty ? nil : TimeOfDay(from: sectionEnd)
+            s.sectionDays = sectionDays.map(\.rawValue).sorted()
+            s.sectionStart = sectionDays.isEmpty ? nil : TimeOfDay(from: sectionStart)
+            s.sectionEnd = sectionDays.isEmpty ? nil : TimeOfDay(from: sectionEnd)
         } else {
-            updated.sectionDays = []
-            updated.sectionStart = nil
-            updated.sectionEnd = nil
+            s.sectionDays = []; s.sectionStart = nil; s.sectionEnd = nil
         }
-        schedule = updated
+
+        s.firstMeetingDate = hasAnyMeeting ? Calendar.current.startOfDay(for: firstMeeting) : nil
+        s.weekCount = (hasAnyMeeting && limitWeeks) ? weeks : nil
+        s.finalExam = (hasAnyMeeting && hasFinal)
+            ? ClassFinalExam(date: Calendar.current.startOfDay(for: finalDate),
+                             start: TimeOfDay(from: finalStart), end: TimeOfDay(from: finalEnd))
+            : nil
+
+        schedule = s
     }
+
+    // MARK: - Reusable rows
 
     private func weekdayRow(selection: Binding<Set<Weekday>>) -> some View {
         HStack(spacing: 6) {
             ForEach(Weekday.allCases) { day in
                 let isOn = selection.wrappedValue.contains(day)
                 Button {
-                    if isOn { selection.wrappedValue.remove(day) }
-                    else { selection.wrappedValue.insert(day) }
+                    if isOn { selection.wrappedValue.remove(day) } else { selection.wrappedValue.insert(day) }
                 } label: {
                     Text(day.short)
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
+                        .font(.subheadline).fontWeight(.semibold)
                         .foregroundColor(isOn ? .white : .white.opacity(0.6))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 40)
+                        .frame(maxWidth: .infinity).frame(height: 40)
                         .background(isOn ? Color.blue : Color.gray.opacity(0.25))
                         .cornerRadius(8)
                 }
@@ -137,25 +225,19 @@ struct ClassSchedulePicker: View {
         }
     }
 
-    private func timeRangeRow(startLabel: String, start: Binding<Date>, end: Binding<Date>) -> some View {
+    private func timeRangeRow(start: Binding<Date>, end: Binding<Date>) -> some View {
         VStack(spacing: 8) {
             HStack {
-                Text(startLabel)
-                    .font(.subheadline)
-                    .foregroundColor(.white)
+                Text("Starts").font(.subheadline).foregroundColor(.white)
                 Spacer()
                 DatePicker("", selection: start, displayedComponents: .hourAndMinute)
-                    .labelsHidden()
-                    .colorScheme(.dark)
+                    .labelsHidden().colorScheme(.dark)
             }
             HStack {
-                Text("Ends")
-                    .font(.subheadline)
-                    .foregroundColor(.white)
+                Text("Ends").font(.subheadline).foregroundColor(.white)
                 Spacer()
                 DatePicker("", selection: end, in: start.wrappedValue..., displayedComponents: .hourAndMinute)
-                    .labelsHidden()
-                    .colorScheme(.dark)
+                    .labelsHidden().colorScheme(.dark)
             }
         }
     }
@@ -167,11 +249,12 @@ struct ClassSchedulePicker: View {
         var body: some View {
             ZStack {
                 Color.black.ignoresSafeArea()
-                VStack {
-                    ClassSchedulePicker(schedule: $schedule)
-                    Text("→ \"\(schedule.displayString)\"").foregroundColor(.gray).font(.caption)
+                ScrollView {
+                    VStack {
+                        ClassSchedulePicker(schedule: $schedule)
+                        Text("→ \"\(schedule.displayString)\"").foregroundColor(.gray).font(.caption)
+                    }.padding()
                 }
-                .padding()
             }
         }
     }

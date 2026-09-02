@@ -61,13 +61,23 @@ struct TimeOfDay: Codable, Hashable {
     var iso: String { String(format: "%02d:%02d", hour, minute) }
 }
 
-/// One recurring meeting pattern — the lecture, or the section.
+/// One recurring meeting pattern — the lecture, or the section. (`final` is used
+/// only for occurrence display, not for building an RRULE.)
 struct ClassMeetingPattern: Hashable {
-    enum Kind: String, Codable { case lecture, section }
+    enum Kind: String, Codable { case lecture, section, final }
     var kind: Kind
     var days: [Int]                 // Weekday.rawValue, sorted
     var start: TimeOfDay
     var durationMinutes: Int
+}
+
+/// A one-time final exam, held after the last week of class.
+struct ClassFinalExam: Hashable {
+    var date: Date
+    var start: TimeOfDay
+    var end: TimeOfDay?
+
+    var durationMinutes: Int { ClassSchedule.duration(from: start, to: end) }
 }
 
 /// Default meeting length used when only a start time is known.
@@ -82,9 +92,16 @@ struct ClassSchedule: Hashable {
     var sectionStart: TimeOfDay?
     var sectionEnd: TimeOfDay?
 
+    /// First day the class meets. nil → caller's fallback (term start / today).
+    var firstMeetingDate: Date?
+    /// "Repeat for X weeks". nil → open-ended (bounded only by a class/term end).
+    var weekCount: Int?
+    /// Optional one-time final exam.
+    var finalExam: ClassFinalExam?
+
     init() {}
 
-    var isEmpty: Bool { patterns.isEmpty }
+    var isEmpty: Bool { patterns.isEmpty && finalExam == nil }
 
     /// Minutes between a start and end time; `defaultMeetingMinutes` if the end
     /// is missing or not after the start.
@@ -125,11 +142,22 @@ struct ClassSchedule: Hashable {
         default: return ""
         }
     }
+
+    /// The [start, end) range the recurring meetings span, given a fallback for
+    /// when `firstMeetingDate` isn't set. `end` is nil for an open-ended schedule.
+    func meetingWindow(fallbackStart: Date, calendar: Calendar = .current) -> (start: Date, end: Date?) {
+        let start = calendar.startOfDay(for: firstMeetingDate ?? fallbackStart)
+        let end = weekCount.flatMap { calendar.date(byAdding: .day, value: $0 * 7, to: start) }
+        return (start, end)
+    }
 }
+
+extension ClassFinalExam: Codable {}
 
 extension ClassSchedule: Codable {
     enum CodingKeys: String, CodingKey {
         case lectureDays, lectureStart, lectureEnd, sectionDays, sectionStart, sectionEnd
+        case firstMeetingDate, weekCount, finalExam
         // Legacy keys (start-time + fixed duration), read for migration only.
         case lectureTime, lectureDurationMinutes, sectionTime, sectionDurationMinutes
     }
@@ -150,6 +178,10 @@ extension ClassSchedule: Codable {
         sectionEnd = try c.decodeIfPresent(TimeOfDay.self, forKey: .sectionEnd)
             ?? Self.legacyEnd(start: sectionStart,
                               minutes: try c.decodeIfPresent(Int.self, forKey: .sectionDurationMinutes))
+
+        firstMeetingDate = try c.decodeIfPresent(Date.self, forKey: .firstMeetingDate)
+        weekCount = try c.decodeIfPresent(Int.self, forKey: .weekCount)
+        finalExam = try c.decodeIfPresent(ClassFinalExam.self, forKey: .finalExam)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -160,6 +192,9 @@ extension ClassSchedule: Codable {
         try c.encode(sectionDays, forKey: .sectionDays)
         try c.encodeIfPresent(sectionStart, forKey: .sectionStart)
         try c.encodeIfPresent(sectionEnd, forKey: .sectionEnd)
+        try c.encodeIfPresent(firstMeetingDate, forKey: .firstMeetingDate)
+        try c.encodeIfPresent(weekCount, forKey: .weekCount)
+        try c.encodeIfPresent(finalExam, forKey: .finalExam)
     }
 
     private static func legacyEnd(start: TimeOfDay?, minutes: Int?) -> TimeOfDay? {
@@ -180,10 +215,14 @@ struct ClassMeetingOccurrence: Identifiable {
 }
 
 extension ClassSchedule {
-    /// Meeting occurrences that start within `[from, to)`.
+    /// Meeting occurrences that start within `[from, to)`, respecting the
+    /// first-meeting date / "repeat for X weeks" window and including a one-time
+    /// final exam if it falls in range. `fallbackStart` is used when
+    /// `firstMeetingDate` isn't set (pass the term start, or `.distantPast`).
     func occurrences(
         from: Date, to: Date,
         className: String, classColorHex: String, classID: UUID,
+        fallbackStart: Date = .distantPast,
         calendar: Calendar = .current
     ) -> [ClassMeetingOccurrence] {
         guard from < to else { return [] }
@@ -191,24 +230,36 @@ extension ClassSchedule {
         let keyFormatter = DateFormatter()
         keyFormatter.dateFormat = "yyyyMMdd"
 
-        for pattern in patterns {
-            let targetWeekdays = Set(pattern.days)
-            var day = calendar.startOfDay(for: from)
-            while day < to {
-                if targetWeekdays.contains(calendar.component(.weekday, from: day)) {
-                    let start = pattern.start.date(on: day, calendar: calendar)
-                    if start >= from && start < to {
-                        let end = calendar.date(byAdding: .minute, value: pattern.durationMinutes, to: start) ?? start
-                        result.append(ClassMeetingOccurrence(
-                            id: "\(classID.uuidString)-\(pattern.kind.rawValue)-\(keyFormatter.string(from: day))",
-                            className: className, classColorHex: classColorHex,
-                            kind: pattern.kind, start: start, end: end))
-                    }
-                }
-                guard let next = calendar.date(byAdding: .day, value: 1, to: day) else { break }
-                day = next
+        let window = meetingWindow(fallbackStart: fallbackStart, calendar: calendar)
+        let lower = max(calendar.startOfDay(for: from), window.start)
+        let upper = window.end.map { min(to, $0) } ?? to
+
+        var day = lower
+        while day < upper {
+            for pattern in patterns where Set(pattern.days).contains(calendar.component(.weekday, from: day)) {
+                let start = pattern.start.date(on: day, calendar: calendar)
+                guard start >= from, start < to else { continue }
+                let end = calendar.date(byAdding: .minute, value: pattern.durationMinutes, to: start) ?? start
+                result.append(ClassMeetingOccurrence(
+                    id: "\(classID.uuidString)-\(pattern.kind.rawValue)-\(keyFormatter.string(from: day))",
+                    className: className, classColorHex: classColorHex,
+                    kind: pattern.kind, start: start, end: end))
+            }
+            guard let next = calendar.date(byAdding: .day, value: 1, to: day) else { break }
+            day = next
+        }
+
+        if let exam = finalExam {
+            let start = exam.start.date(on: exam.date, calendar: calendar)
+            if start >= from, start < to {
+                let end = calendar.date(byAdding: .minute, value: exam.durationMinutes, to: start) ?? start
+                result.append(ClassMeetingOccurrence(
+                    id: "\(classID.uuidString)-final-\(keyFormatter.string(from: exam.date))",
+                    className: className, classColorHex: classColorHex,
+                    kind: .final, start: start, end: end))
             }
         }
+
         return result.sorted { $0.start < $1.start }
     }
 }

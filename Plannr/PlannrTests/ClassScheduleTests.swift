@@ -195,6 +195,97 @@ final class ClassScheduleTests: XCTestCase {
         XCTAssertNil(s.sectionStart)
     }
 
+    // MARK: - "Repeat for X weeks" window
+
+    func testWeekCountBoundsTheOccurrenceWindow() {
+        var s = lecture(days: [.monday, .wednesday, .friday], start: TimeOfDay(hour: 9, minute: 0))
+        s.firstMeetingDate = day(2026, 1, 5)   // Monday
+        s.weekCount = 2                          // Jan 5 through Jan 18
+
+        // Week 3 (Jan 19–25) is past the window → no occurrences.
+        let outside = s.occurrences(from: day(2026, 1, 19), to: day(2026, 1, 26),
+                                    className: "CS101", classColorHex: "007AFF",
+                                    classID: UUID(), calendar: calendar)
+        XCTAssertTrue(outside.isEmpty)
+
+        // Week 2 (Jan 12–18) is still inside → 3 meetings.
+        let inside = s.occurrences(from: day(2026, 1, 12), to: day(2026, 1, 19),
+                                   className: "CS101", classColorHex: "007AFF",
+                                   classID: UUID(), calendar: calendar)
+        XCTAssertEqual(inside.count, 3)
+    }
+
+    func testFirstMeetingDateExcludesEarlierWeeks() {
+        var s = lecture(days: [.monday], start: TimeOfDay(hour: 9, minute: 0))
+        s.firstMeetingDate = day(2026, 1, 12)   // classes start the 2nd week
+
+        let earlier = s.occurrences(from: day(2026, 1, 5), to: day(2026, 1, 12),
+                                    className: "CS101", classColorHex: "007AFF",
+                                    classID: UUID(), calendar: calendar)
+        XCTAssertTrue(earlier.isEmpty, "no meetings before the first class date")
+
+        let onward = s.occurrences(from: day(2026, 1, 12), to: day(2026, 1, 19),
+                                   className: "CS101", classColorHex: "007AFF",
+                                   classID: UUID(), calendar: calendar)
+        XCTAssertEqual(onward.count, 1)
+    }
+
+    func testMeetingWindowUsesFallbackWhenNoFirstDate() {
+        let s = lecture(days: [.monday], start: TimeOfDay(hour: 9, minute: 0))
+        let window = s.meetingWindow(fallbackStart: day(2026, 1, 5), calendar: calendar)
+        XCTAssertEqual(window.start, day(2026, 1, 5))
+        XCTAssertNil(window.end, "no weekCount → open-ended")
+    }
+
+    // MARK: - Final exam
+
+    func testFinalExamShowsAsAnOccurrence() {
+        var s = lecture(days: [.monday], start: TimeOfDay(hour: 9, minute: 0))
+        s.firstMeetingDate = day(2026, 1, 5)
+        s.weekCount = 2   // regular meetings end Jan 18
+        s.finalExam = ClassFinalExam(date: day(2026, 1, 22),
+                                     start: TimeOfDay(hour: 19, minute: 0),
+                                     end: TimeOfDay(hour: 22, minute: 0))
+
+        // Finals week (Jan 19–25) — no lecture (past window) but the final shows.
+        let occ = s.occurrences(from: day(2026, 1, 19), to: day(2026, 1, 26),
+                                className: "CS101", classColorHex: "007AFF",
+                                classID: UUID(), calendar: calendar)
+        XCTAssertEqual(occ.count, 1)
+        XCTAssertEqual(occ[0].kind, .final)
+        XCTAssertEqual(calendar.component(.hour, from: occ[0].start), 19)
+        XCTAssertEqual(calendar.component(.hour, from: occ[0].end), 22)
+    }
+
+    func testFinalExamOutsideTheVisibleWeekIsNotIncluded() {
+        var s = ClassSchedule()
+        s.finalExam = ClassFinalExam(date: day(2026, 3, 15),
+                                     start: TimeOfDay(hour: 9, minute: 0), end: nil)
+        let occ = s.occurrences(from: day(2026, 1, 5), to: day(2026, 1, 12),
+                                className: "CS101", classColorHex: "007AFF",
+                                classID: UUID(), calendar: calendar)
+        XCTAssertTrue(occ.isEmpty)
+    }
+
+    func testScheduleWithOnlyAFinalExamIsNotEmpty() {
+        var s = ClassSchedule()
+        XCTAssertTrue(s.isEmpty)
+        s.finalExam = ClassFinalExam(date: day(2026, 3, 15),
+                                     start: TimeOfDay(hour: 9, minute: 0), end: nil)
+        XCTAssertFalse(s.isEmpty)
+    }
+
+    func testRoundTripPreservesWindowAndFinalExam() throws {
+        var s = lecture(days: [.monday], start: TimeOfDay(hour: 9, minute: 0))
+        s.firstMeetingDate = day(2026, 1, 5)
+        s.weekCount = 12
+        s.finalExam = ClassFinalExam(date: day(2026, 3, 16),
+                                     start: TimeOfDay(hour: 8, minute: 0),
+                                     end: TimeOfDay(hour: 11, minute: 0))
+        let decoded = try JSONDecoder().decode(ClassSchedule.self, from: JSONEncoder().encode(s))
+        XCTAssertEqual(decoded, s)
+    }
+
     // MARK: - Weekday tokens
 
     func testWeekdayTokens() {

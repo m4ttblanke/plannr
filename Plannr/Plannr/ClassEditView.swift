@@ -590,6 +590,11 @@ struct ClassEditView: View {
             let start_time: String
             let duration_minutes: Int
         }
+        struct FinalExamBody: Encodable {
+            let date: String
+            let start_time: String
+            let duration_minutes: Int
+        }
         struct MeetingsRequestBody: Encodable {
             let class_name: String
             let google_calendar_id: String?
@@ -598,7 +603,9 @@ struct ClassEditView: View {
             let timezone: String
             let start_date: String
             let until_date: String?
+            let week_count: Int?
             let patterns: [PatternBody]
+            let final_exam: FinalExamBody?
         }
         struct MeetingsResponse: Decodable {
             struct Meeting: Decodable {
@@ -629,8 +636,19 @@ struct ClassEditView: View {
         df.locale = Locale(identifier: "en_US_POSIX")
         df.calendar = Calendar(identifier: .gregorian)
         df.dateFormat = "yyyy-MM-dd"
-        let startDate = df.string(from: settingsManager.term.startDate ?? Date())
+
+        // First meeting: the schedule's own date, else the term start, else today.
+        let startDate = df.string(from: schedule?.firstMeetingDate
+                                  ?? settingsManager.term.startDate ?? Date())
+        // "Repeat for X weeks" wins; otherwise fall back to the class/term end.
+        let weekCount = enabled ? schedule?.weekCount : nil
         let untilDate = (editableClass.endDate ?? settingsManager.term.endDate).map { df.string(from: $0) }
+
+        let finalExam: FinalExamBody? = (enabled ? schedule?.finalExam : nil).map { fe in
+            FinalExamBody(date: df.string(from: fe.date),
+                          start_time: fe.start.iso,
+                          duration_minutes: fe.durationMinutes)
+        }
 
         let requestBody = MeetingsRequestBody(
             class_name: editableClass.name,
@@ -640,7 +658,9 @@ struct ClassEditView: View {
             timezone: TimeZone.current.identifier,
             start_date: startDate,
             until_date: untilDate,
-            patterns: patterns
+            week_count: weekCount,
+            patterns: patterns,
+            final_exam: finalExam
         )
 
         var request = URLRequest(url: url)
