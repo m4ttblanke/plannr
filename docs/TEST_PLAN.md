@@ -474,7 +474,8 @@ Needs a second Google account you can sign into.
   retry + probe, `AuthManagerSendTests` 401 choke point,
   `NotificationManagerTests` nearest-60 selection, `TermSettingsTests`
   quarter/semester end date + auto label, `EventTypeTests` category
-  normalization) and `PlannrUITests/GuestFlowUITests`.
+  normalization, `ClassSyncRequestTests` /calendar/sync body + response)
+  and `PlannrUITests/GuestFlowUITests`.
 
 ---
 

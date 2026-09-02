@@ -5,29 +5,6 @@
 
 import SwiftUI
 
-
-// MARK: - Sync response models
-
-private struct ClassSyncResponse: Decodable {
-    let googleCalendarId: String
-    let syncedEvents: [SyncedEventEntry]
-
-    private enum CodingKeys: String, CodingKey {
-        case googleCalendarId = "google_calendar_id"
-        case syncedEvents = "synced_events"
-    }
-}
-
-private struct SyncedEventEntry: Decodable {
-    let localId: String
-    let googleEventId: String
-
-    private enum CodingKeys: String, CodingKey {
-        case localId = "local_id"
-        case googleEventId = "google_event_id"
-    }
-}
-
 // MARK: - ClassEditView
 
 struct ClassEditView: View {
@@ -560,69 +537,19 @@ struct ClassEditView: View {
     // MARK: - Re-sync
 
     private func syncColorChange() async {
-        guard let email = UserDefaults.standard.string(forKey: "userEmail"),
-              let encodedEmail = email.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: "\(BACKEND_URL)calendar/sync?email=\(encodedEmail)") else {
-            return
-        }
-
-        // Reuse existing SyncEventBody and SyncRequestBody structs for consistency
-        struct SyncEventBody: Encodable {
-            let localId: String
-            let title: String
-            let date: String
-            let description: String
-            let type: String
-            let googleEventId: String?
-            let isDeleted: Bool
-
-            enum CodingKeys: String, CodingKey {
-                case localId = "local_id"
-                case title, date, description, type
-                case googleEventId = "google_event_id"
-                case isDeleted = "is_deleted"
-            }
-        }
-
-        struct ColorSyncBody: Encodable {
-            let className: String
-            let googleCalendarId: String?
-            let events: [SyncEventBody] // Empty array for color-only sync
-            let backgroundColor: String?
-            let foregroundColor: String?
-            let reminderMinutes: Int?
-
-            enum CodingKeys: String, CodingKey {
-                case className = "class_name"
-                case googleCalendarId = "google_calendar_id"
-                case events
-                case backgroundColor = "background_color"
-                case foregroundColor = "foreground_color"
-                case reminderMinutes = "reminder_minutes"
-            }
-        }
-
-        let body = ColorSyncBody(
+        // A colour-only sync: same endpoint, no event changes.
+        guard let request = try? ClassSyncRequest.makeRequest(
+            email: UserDefaults.standard.string(forKey: "userEmail"),
             className: editableClass.name,
             googleCalendarId: editableClass.googleCalendarId,
-            events: [], // No event changes, just color
-            backgroundColor: editableClass.colorHex.hasPrefix("#") ? editableClass.colorHex : "#\(editableClass.colorHex)",
-            foregroundColor: "#FFFFFF",
-            reminderMinutes: settingsManager.reminderMinutes
-        )
+            classColorHex: editableClass.colorHex,
+            reminderMinutes: settingsManager.reminderMinutes,
+            events: []
+        ) else { return }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        do {
-            request.httpBody = try JSONEncoder().encode(body)
-            // Routed through `send` so a revoked token still triggers sign-out,
-            // even though the color sync itself reports nothing to the user.
-            _ = try await authManager.send(request)
-        } catch {
-            // Silent failure for color sync
-        }
+        // Routed through `send` so a revoked token still triggers sign-out,
+        // even though the colour sync itself reports nothing to the user.
+        _ = try? await authManager.send(request)
     }
 
     /// Check/uncheck this class's calendar in the user's Google Calendar sidebar.
@@ -692,9 +619,24 @@ struct ClassEditView: View {
     }
 
     private func resyncChanges() async {
-        guard let email = UserDefaults.standard.string(forKey: "userEmail"),
-              let encodedEmail = email.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: "\(BACKEND_URL)calendar/sync?email=\(encodedEmail)") else {
+        // Only send events that actually need action (insert / update / delete);
+        // unchanged, already-synced events are skipped by `incrementalEvents`.
+        let request: URLRequest?
+        do {
+            request = try ClassSyncRequest.makeRequest(
+                email: UserDefaults.standard.string(forKey: "userEmail"),
+                className: editableClass.name,
+                googleCalendarId: editableClass.googleCalendarId,
+                classColorHex: editableClass.colorHex,
+                reminderMinutes: settingsManager.reminderMinutes,
+                events: ClassSyncRequest.incrementalEvents(from: editableClass.events)
+            )
+        } catch {
+            syncErrorMessage = "Failed to encode sync request."
+            showSyncError = true
+            return
+        }
+        guard let request else {
             syncErrorMessage = "Could not determine your account email."
             showSyncError = true
             return
@@ -702,94 +644,13 @@ struct ClassEditView: View {
 
         await MainActor.run { isSyncing = true }
 
-        // Build request body
-        struct SyncEventBody: Encodable {
-            let localId: String
-            let title: String
-            let date: String
-            let description: String
-            let type: String
-            let googleEventId: String?
-            let isDeleted: Bool
-
-            enum CodingKeys: String, CodingKey {
-                case localId = "local_id"
-                case title, date, description, type
-                case googleEventId = "google_event_id"
-                case isDeleted = "is_deleted"
-            }
-        }
-
-        struct SyncRequestBody: Encodable {
-            let className: String
-            let googleCalendarId: String?
-            let events: [SyncEventBody]
-            let backgroundColor: String?
-            let foregroundColor: String?
-            let reminderMinutes: Int?
-
-            enum CodingKeys: String, CodingKey {
-                case className = "class_name"
-                case googleCalendarId = "google_calendar_id"
-                case events
-                case backgroundColor = "background_color"
-                case foregroundColor = "foreground_color"
-                case reminderMinutes = "reminder_minutes"
-            }
-        }
-
-        // Only send events that actually need action:
-        //   - New events (no Google ID, not deleted) → insert
-        //   - Edited events with a Google ID → update
-        //   - Locally-deleted events with a Google ID → delete in GCal
-        // Unchanged, already-synced events are intentionally skipped.
-        let eventsToSync: [SyncEventBody] = editableClass.events.compactMap { ev in
-            let needsInsert  = ev.googleEventId == nil && !ev.isDeletedLocally
-            let needsUpdate  = ev.isEdited && ev.googleEventId != nil
-            let needsDelete  = ev.isDeletedLocally && ev.googleEventId != nil
-            guard needsInsert || needsUpdate || needsDelete else { return nil }
-            return SyncEventBody(
-                localId: ev.id.uuidString,
-                title: ev.title,
-                date: ev.date,
-                description: ev.description,
-                type: ev.type,
-                googleEventId: ev.googleEventId,
-                isDeleted: ev.isDeletedLocally
-            )
-        }
-
-        let body = SyncRequestBody(
-            className: editableClass.name,
-            googleCalendarId: editableClass.googleCalendarId,
-            events: eventsToSync,
-            backgroundColor: editableClass.colorHex.hasPrefix("#") ? editableClass.colorHex : "#\(editableClass.colorHex)",
-            foregroundColor: "#FFFFFF",  // White text for better contrast
-            reminderMinutes: settingsManager.reminderMinutes
-        )
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        do {
-            request.httpBody = try JSONEncoder().encode(body)
-        } catch {
-            await MainActor.run {
-                isSyncing = false
-                syncErrorMessage = "Failed to encode sync request."
-                showSyncError = true
-            }
-            return
-        }
-
         do {
             let (data, http) = try await authManager.send(request)
             await MainActor.run {
                 isSyncing = false
                 if http.statusCode == 401 { return }  // session-expired sign-out already triggered
                 if http.statusCode == 200,
-                   let syncResponse = try? JSONDecoder().decode(ClassSyncResponse.self, from: data) {
+                   let syncResponse = try? JSONDecoder().decode(ClassSyncRequest.Response.self, from: data) {
                     applySync(response: syncResponse)
                 } else if let errBody = try? JSONDecoder().decode([String: String].self, from: data),
                           let errMsg = errBody["error"] {
@@ -809,7 +670,7 @@ struct ClassEditView: View {
         }
     }
 
-    private func applySync(response: ClassSyncResponse) {
+    private func applySync(response: ClassSyncRequest.Response) {
         // Update calendar ID
         editableClass.googleCalendarId = response.googleCalendarId
 

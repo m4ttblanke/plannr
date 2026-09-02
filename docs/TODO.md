@@ -17,12 +17,6 @@ Working list of known problems and planned features. Last updated: September 3, 
   Add an `Aptfile` (`tesseract-ocr`, `poppler-utils`) or switch to a Docker
   deploy. Text-layer PDFs are unaffected.
 
-### Low priority / cleanup
-
-- The inline `/calendar/sync` request-body builder in `CalendarPreviewView`
-  and `ClassEditView` still isn't unit-tested (it's constructed inside the
-  views). The reconcile step that feeds it is covered by `EventReconcilerTests`.
-
 ---
 
 ## Upcoming features

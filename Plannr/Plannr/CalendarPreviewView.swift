@@ -35,7 +35,7 @@ struct CalendarPreviewView: View {
     @State private var exportErrorMessage: String?
     @State private var showExportError = false
     @State private var sharedEventColor: Color
-    @State private var pendingSyncResponse: CalendarSyncResponse?
+    @State private var pendingSyncResponse: ClassSyncRequest.Response?
     
     init(className: String, classSchedule: String, classColor: Color, existingClassID: UUID, events: [CalendarEvent], eventsToDelete: [CalendarEvent] = [], parsedSchedule: ClassSchedule? = nil, onSyncComplete: (() -> Void)? = nil) {
         self.className = className
@@ -398,9 +398,27 @@ struct CalendarPreviewView: View {
             return
         }
 
-        guard let email = UserDefaults.standard.string(forKey: "userEmail"),
-              let encodedEmail = email.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let syncURL = URL(string: "\(BACKEND_URL)calendar/sync?email=\(encodedEmail)") else {
+        let existingClass = classManager.classes.first(where: { $0.id == existingClassID })
+
+        // Full sync: every accepted event (with its Google id, or nil to insert)
+        // plus reconciled deletions. Never recreates the calendar.
+        let syncRequest: URLRequest?
+        do {
+            syncRequest = try ClassSyncRequest.makeRequest(
+                email: UserDefaults.standard.string(forKey: "userEmail"),
+                className: className,
+                googleCalendarId: existingClass?.googleCalendarId,
+                classColorHex: existingClass?.colorHex ?? "007AFF",
+                reminderMinutes: settingsManager.reminderMinutes,
+                events: ClassSyncRequest.fullSyncEvents(accepted: acceptedEvents, deletions: deletions)
+            )
+        } catch {
+            syncMessage = "Failed to encode events."
+            syncSuccess = false
+            showSyncAlert = true
+            return
+        }
+        guard let syncRequest else {
             syncMessage = "Could not determine your account email. Please sign in again."
             syncSuccess = false
             showSyncAlert = true
@@ -409,94 +427,6 @@ struct CalendarPreviewView: View {
 
         isSyncing = true
 
-        let existingClass = classManager.classes.first(where: { $0.id == existingClassID })
-
-        struct SyncEventBody: Encodable {
-            let localId: String
-            let title: String
-            let date: String
-            let description: String
-            let type: String
-            let googleEventId: String?
-            let isDeleted: Bool
-
-            enum CodingKeys: String, CodingKey {
-                case localId = "local_id"
-                case title, date, description, type
-                case googleEventId = "google_event_id"
-                case isDeleted = "is_deleted"
-            }
-        }
-
-        struct SyncRequestBody: Encodable {
-            let className: String
-            let googleCalendarId: String?
-            let events: [SyncEventBody]
-            let backgroundColor: String?
-            let foregroundColor: String?
-            let reminderMinutes: Int?
-
-            enum CodingKeys: String, CodingKey {
-                case className = "class_name"
-                case googleCalendarId = "google_calendar_id"
-                case events
-                case backgroundColor = "background_color"
-                case foregroundColor = "foreground_color"
-                case reminderMinutes = "reminder_minutes"
-            }
-        }
-
-        // Incremental sync: send each accepted event with its googleEventId when
-        // it has one (backend updates in place) or nil (backend inserts), plus
-        // reconciled deletions. Never recreate the calendar.
-        var eventBodies = acceptedEvents.map { ev in
-            SyncEventBody(
-                localId: ev.id.uuidString,
-                title: ev.title,
-                date: ev.date,
-                description: ev.description,
-                type: ev.type,
-                googleEventId: ev.googleEventId,
-                isDeleted: false
-            )
-        }
-        eventBodies += deletions.map { ev in
-            SyncEventBody(
-                localId: ev.id.uuidString,
-                title: ev.title,
-                date: ev.date,
-                description: ev.description,
-                type: ev.type,
-                googleEventId: ev.googleEventId,
-                isDeleted: true
-            )
-        }
-
-        // Reuse the class's existing calendar (nil only for a class that has
-        // never synced — the backend then find-or-creates by name).
-        let body = SyncRequestBody(
-            className: className,
-            googleCalendarId: existingClass?.googleCalendarId,
-            events: eventBodies,
-            backgroundColor: (existingClass?.colorHex.hasPrefix("#") == true) ? existingClass?.colorHex : "#\(existingClass?.colorHex ?? "007AFF")",
-            foregroundColor: "#FFFFFF",
-            reminderMinutes: settingsManager.reminderMinutes
-        )
-
-        var syncRequest = URLRequest(url: syncURL)
-        syncRequest.httpMethod = "POST"
-        syncRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        do {
-            syncRequest.httpBody = try JSONEncoder().encode(body)
-        } catch {
-            isSyncing = false
-            syncMessage = "Failed to encode events."
-            syncSuccess = false
-            showSyncAlert = true
-            return
-        }
-
         Task {
             do {
                 let (data, http) = try await authManager.send(syncRequest)
@@ -504,7 +434,7 @@ struct CalendarPreviewView: View {
                     isSyncing = false
                     if http.statusCode == 401 { return }  // session-expired sign-out already triggered
                     if http.statusCode == 200,
-                       let syncResp = try? JSONDecoder().decode(CalendarSyncResponse.self, from: data) {
+                       let syncResp = try? JSONDecoder().decode(ClassSyncRequest.Response.self, from: data) {
                         syncMessage = "Successfully synced \(acceptedEvents.count) events!"
                         syncSuccess = true
                         pendingSyncResponse = syncResp
@@ -527,28 +457,6 @@ struct CalendarPreviewView: View {
                 }
             }
         }
-    }
-}
-
-// MARK: - Sync response model
-
-struct CalendarSyncResponse: Decodable {
-    let googleCalendarId: String
-    let syncedEvents: [SyncedEventMapping]
-
-    enum CodingKeys: String, CodingKey {
-        case googleCalendarId = "google_calendar_id"
-        case syncedEvents = "synced_events"
-    }
-}
-
-struct SyncedEventMapping: Decodable {
-    let localId: String
-    let googleEventId: String
-
-    enum CodingKeys: String, CodingKey {
-        case localId = "local_id"
-        case googleEventId = "google_event_id"
     }
 }
 
