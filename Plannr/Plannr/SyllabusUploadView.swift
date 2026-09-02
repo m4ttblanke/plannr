@@ -35,6 +35,7 @@ struct SyllabusUploadView: View {
     @State private var pdfFileName: String = "No file attached"
     @State private var syllabusText: String = ""
     @State private var isUploading = false
+    @State private var parseStartedAt: Date?
     @State private var uploadError: String?
     @State private var parsedEvents: [CalendarEvent] = []
     @State private var eventsToDelete: [CalendarEvent] = []
@@ -125,18 +126,9 @@ struct SyllabusUploadView: View {
                 
                 Spacer()
                 
-                // Loading indicator
-                if isUploading {
-                    VStack(spacing: 6) {
-                        ProgressView("Processing...")
-                            .tint(.pink)
-                            .foregroundColor(.white)
-                        Text("This can take up to a minute, especially if Plannr hasn't been used recently.")
-                            .font(.caption2)
-                            .foregroundColor(.gray)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 32)
-                    }
+                // Loading indicator — phased so a cold start doesn't look frozen.
+                if isUploading, let parseStartedAt {
+                    ParseProgressView(startedAt: parseStartedAt)
                 }
                 
                 // Error message
@@ -323,6 +315,7 @@ struct SyllabusUploadView: View {
     // MARK: - Upload PDF
     func uploadPDF(url: URL) {
         isUploading = true
+        parseStartedAt = Date()
         uploadError = nil
         parsedEvents = []
         parsedSchedule = nil
@@ -374,6 +367,7 @@ struct SyllabusUploadView: View {
                         if jsonResponse.events.isEmpty || notSyllabus {
                             self.uploadError = "No events were found. Please ensure you are uploading a valid course syllabus and try again."
                             self.isUploading = false
+                            self.parseStartedAt = nil
                             return
                         }
                         // Auto-accept all parsed events; user can decline individually
@@ -391,6 +385,7 @@ struct SyllabusUploadView: View {
                         self.eventsToDelete = reconciled.toDelete
                         self.parsedSchedule = jsonResponse.schedule?.toClassSchedule()
                         self.isUploading = false
+                        self.parseStartedAt = nil
                         self.navigateToPreview = true
                     }
                 } else {
@@ -405,6 +400,7 @@ struct SyllabusUploadView: View {
                     DispatchQueue.main.async {
                         self.uploadError = "Upload failed: \(errorMessage)"
                         self.isUploading = false
+                        self.parseStartedAt = nil
                     }
                 }
             } catch {
@@ -415,6 +411,7 @@ struct SyllabusUploadView: View {
                         self.uploadError = "Error uploading PDF: \(error.localizedDescription)"
                     }
                     self.isUploading = false
+                    self.parseStartedAt = nil
                 }
             }
         }

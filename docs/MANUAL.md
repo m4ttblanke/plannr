@@ -46,7 +46,7 @@ Notes:
 
 ### AI-Powered Event Extraction
 
-Once a syllabus is uploaded, Plannr uses Google Gemini to intelligently parse the document and extract key academic dates. Events are automatically classified by type (homework, exam, quiz, lab, or other) and resolved to specific calendar dates, including relative references like "Week 3 Friday" or "Finals Week."
+Once a syllabus is uploaded, Plannr uses Google Gemini to intelligently parse the document and extract key academic dates. Events are automatically classified by type (homework, exam, quiz, lab, or other) and resolved to specific calendar dates, including relative references like "Week 3 Friday" or "Finals Week." While it works, the spinner steps through "Waking the server… → Reading your syllabus… → Extracting events…" — the first upload after a while can take up to a minute while the server wakes.
 
 If the syllabus explicitly states the class's meeting times — e.g. "Lecture: MWF 10:00–10:50am", "Discussion Thursdays 3:00pm", "Final Exam: Dec 12, 4:00–7:00pm" — Plannr also fills in the class's structured schedule (lecture days/time, section/lab days/time, final-exam date/time) so you don't have to type it. It only does this when the times are spelled out, and it never overwrites a schedule you set yourself.
 

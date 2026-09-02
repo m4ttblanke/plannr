@@ -82,8 +82,11 @@ Calendar at [calendar.google.com](https://calendar.google.com).
 
 - [ ] Tap the `CS 101` card → **Class edit** screen. Tap **Upload New Syllabus**.
 - [ ] Tap the dashed upload box → **Upload PDF** → pick `syllabus_A.pdf`.
-  **Expect:** "Processing..." spinner with the "can take up to a minute" note.
-  (First request after an idle Render dyno really can take ~30 s.)
+  **Expect:** a spinner whose caption advances **Waking the server… →
+  Reading your syllabus… → Extracting events…** (with 1/2/3 step dots filling
+  in), plus the "first upload after a while" note. On a warm server it blows
+  through the phases in a second or two; on a cold dyno it steps through them
+  over ~30 s so it never looks frozen.
 - [ ] **Expect:** you land on the **Calendar Preview** with a list of extracted
   events, each auto-**Accepted**, tagged by type (homework/exam/quiz/lab/other),
   and dates resolved (including any relative ones like "Week 3 Friday").
@@ -474,8 +477,8 @@ Needs a second Google account you can sign into.
   retry + probe, `AuthManagerSendTests` 401 choke point,
   `NotificationManagerTests` nearest-60 selection, `TermSettingsTests`
   quarter/semester end date + auto label, `EventTypeTests` category
-  normalization, `ClassSyncRequestTests` /calendar/sync body + response)
-  and `PlannrUITests/GuestFlowUITests`.
+  normalization, `ClassSyncRequestTests` /calendar/sync body + response,
+  `ParsePhaseTests` upload-phase timeline) and `PlannrUITests/GuestFlowUITests`.
 
 ---
 

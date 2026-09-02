@@ -28,8 +28,6 @@ Working list of known problems and planned features. Last updated: September 3, 
 - **First-run onboarding** — 3 cards: upload → review & edit → sync.
 - **"Try a sample syllabus"** button on the empty state so a new user sees the
   whole flow without hunting for a PDF.
-- **Phased progress during parsing** — "Waking server… → Reading PDF… →
-  Extracting events…" instead of one spinner (the cold start looks like a hang).
 - **Sync resilience** — retry with backoff on transient failures. (The
   delete-and-recreate behavior is fixed: sync is now an incremental
   patch/insert/delete diff against the existing calendar.)
