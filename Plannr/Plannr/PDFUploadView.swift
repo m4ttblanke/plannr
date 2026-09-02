@@ -16,6 +16,7 @@ struct PDFUploadView: View {
     @StateObject private var classManager: ClassManager
     @StateObject private var settingsManager = SettingsManager.shared
     @EnvironmentObject var authManager: AuthManager
+    @Environment(\.scenePhase) private var scenePhase
     @State private var showAddClass = false
     @State private var navigationPath = NavigationPath()
     @State private var selectedTab: AppTab = .myClasses
@@ -166,6 +167,11 @@ struct PDFUploadView: View {
             .onChange(of: classManager.classes) { _ in syncNotifications() }
             .onChange(of: settingsManager.notificationsEnabled) { _ in syncNotifications() }
             .onChange(of: settingsManager.reminderLeadTimeDays) { _ in syncNotifications() }
+            // Re-sync on every foreground so the "nearest 60" reminder window
+            // rolls forward as earlier ones fire (iOS caps pending reminders at 64).
+            .onChange(of: scenePhase) { newPhase in
+                if newPhase == .active { syncNotifications() }
+            }
             .navigationDestination(for: Class.self) { cls in
                 ClassEditView(cls: cls, onSyncComplete: { navigationPath = NavigationPath() })
                     .environmentObject(classManager)

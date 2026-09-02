@@ -23,10 +23,6 @@ Working list of known problems and planned features. Last updated: September 3, 
   Add an `Aptfile` (`tesseract-ocr`, `poppler-utils`) or switch to a Docker
   deploy. Text-layer PDFs are unaffected.
 
-- **iOS 64-notification cap.** `NotificationManager.sync` schedules one local
-  notification per event; a student with many upcoming deadlines silently loses
-  reminders past 64. Schedule only the nearest N and reschedule as they pass.
-
 ### Low priority / cleanup
 
 - `EventEditView` "type" is a free-text field — no dropdown, so values

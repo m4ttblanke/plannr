@@ -373,9 +373,14 @@ Open the profile avatar (top-right of any tab).
   In Xcode: pause the app, in the console run
   po try await UNUserNotificationCenter.current().pendingNotificationRequests()
   ```
-  **Expect:** one pending request per upcoming event, titled with the class
-  name, body "… is due today" / "… is due in N days".
+  **Expect:** one pending request per upcoming event (up to **60** — the
+  soonest ones), titled with the class name, body "… is due today" / "… is due
+  in N days", ordered by fire date.
 - [ ] Toggle notifications **off** → **Expect:** pending requests cleared.
+- [ ] Background the app and bring it back to the foreground. **Expect:** the
+  pending list is rebuilt (the "nearest 60" window is recomputed from now) —
+  this is how reminders past the 64 cap eventually get scheduled. Selection math
+  is covered by `NotificationManagerTests`.
 
 ### 2e. Landing page (`docs/`)
 
@@ -455,7 +460,8 @@ Needs a second Google account you can sign into.
   `ClassScheduleTests`, `CalendarPreviewViewTests`, `UnifiedEventMeetingTests`,
   `ParsedScheduleTests`, `ClassMeetingSyncTests`, `ClassManagerTests`
   per-account scoping + legacy migration, `AuthManagerDeleteAccountTests`
-  retry + probe, `AuthManagerSendTests` 401 choke point) and
+  retry + probe, `AuthManagerSendTests` 401 choke point,
+  `NotificationManagerTests` nearest-60 selection) and
   `PlannrUITests/GuestFlowUITests`.
 
 ---
@@ -524,7 +530,7 @@ Needs a second Google account you can sign into.
 | Deadline reminder lead time | §1K, §2d |
 | Auto-sync changes setting | §1K |
 | Auto-sync class meetings setting (new/syllabus classes only) | §1K |
-| Local notifications (schedule + clear) | §2d |
+| Local notifications (schedule + clear + nearest-60 cap + foreground re-sync) | §2d, §3 |
 | Delete Account (success + backend-failure guard + timeout retry/probe) | §4 |
 | Landing page (nav, reveal, accordion, ticker, policies) | §2e |
 | TestFlight / Stripe success + error pages + webhook | §2f |
