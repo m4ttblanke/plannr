@@ -107,12 +107,23 @@ class AuthManager: ObservableObject {
         }
     }
 
-    /// Single choke point for authenticated backend requests. Any 401 response —
+    /// Networking seam. Backs both `send` and `deleteAccount`; tests replace it
+    /// to simulate responses / timeouts. `URLSession.shared` is touched nowhere
+    /// else in the app.
+    var httpDataProvider: (URLRequest) async throws -> (Data, URLResponse) = {
+        try await URLSession.shared.data(for: $0)
+    }
+
+    /// The single choke point for **every** backend request. Any 401 response —
     /// from any endpoint — triggers the global session-expired sign-out. Callers
     /// still handle their own non-401 status codes, and should bail out early
     /// (without showing their own error UI) when `http.statusCode == 401`.
+    ///
+    /// The one deliberate bypass is `deleteAccount`, which calls
+    /// `httpDataProvider` directly: there a 401 means "the account is already
+    /// gone", not "session expired". Every other network call goes through here.
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await httpDataProvider(request)
         guard let http = response as? HTTPURLResponse else {
             throw URLError(.badServerResponse)
         }
@@ -276,11 +287,6 @@ class AuthManager: ObservableObject {
     }
 
     // MARK: - Account deletion
-
-    /// Seam for tests to simulate timeouts / slow-success without a network.
-    var httpDataProvider: (URLRequest) async throws -> (Data, URLResponse) = {
-        try await URLSession.shared.data(for: $0)
-    }
 
     private enum DeletionOutcome {
         case deleted

@@ -27,11 +27,6 @@ Working list of known problems and planned features. Last updated: September 3, 
   notification per event; a student with many upcoming deadlines silently loses
   reminders past 64. Schedule only the nearest N and reschedule as they pass.
 
-- **401 interceptor is not fully global.** `AuthManager.send()` covers the sync
-  paths and the launch `/me` call, but a 401 from any other/future authenticated
-  request would not trigger the session-expired sign-out. Route all authed
-  requests through `send()`.
-
 ### Low priority / cleanup
 
 - `EventEditView` "type" is a free-text field — no dropdown, so values

@@ -352,8 +352,10 @@ Open the profile avatar (top-right of any tab).
 - [ ] While signed in, go to
   [myaccount.google.com/permissions](https://myaccount.google.com/permissions),
   find **Plannr**, and **Remove access**.
-- [ ] Back in the app, trigger any synced action (open a class and **Re-sync**,
-  or just **force-quit and relaunch** — the launch `/me` check catches it).
+- [ ] Back in the app, trigger **any** backend action — re-sync a class, toggle
+  class meetings, upload a syllabus, export, or just force-quit and relaunch (the
+  launch `/me` check). Every one of these routes through `AuthManager.send`, so
+  any of them catches the revoked token.
   **Expect:** you're **signed out** and land on the sign-in screen with
   **"Your Google session expired. Please sign in again."**
 - [ ] Sign back in — everything works again.
@@ -453,7 +455,8 @@ Needs a second Google account you can sign into.
   `ClassScheduleTests`, `CalendarPreviewViewTests`, `UnifiedEventMeetingTests`,
   `ParsedScheduleTests`, `ClassMeetingSyncTests`, `ClassManagerTests`
   per-account scoping + legacy migration, `AuthManagerDeleteAccountTests`
-  retry + probe) and `PlannrUITests/GuestFlowUITests`.
+  retry + probe, `AuthManagerSendTests` 401 choke point) and
+  `PlannrUITests/GuestFlowUITests`.
 
 ---
 
@@ -485,7 +488,7 @@ Needs a second Google account you can sign into.
 | Sign-in error surfacing | §1A (cancel), §2c |
 | Guest mode + non-persistence + guest export | §1L |
 | Classes + custom photo scoped per Google account (+ one-time migration) | §2h |
-| Revoked-access sign-out | §2c |
+| Revoked-access sign-out (401 from any backend call) | §2c, §3 |
 | Add class + color | §1B |
 | Structured schedule picker (lecture + section) | §1B, §1H |
 | Schedule auto-fill from syllabus (+ never overwrites a manual one) | §1H |

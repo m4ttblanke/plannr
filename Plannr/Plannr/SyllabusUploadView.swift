@@ -358,53 +358,53 @@ struct SyllabusUploadView: View {
                 body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
                 
                 request.httpBody = body
-                
-                let (responseData, response) = try await URLSession.shared.data(for: request)
-                
-                if let httpResponse = response as? HTTPURLResponse {
-                    if httpResponse.statusCode == 200 {
-                        let jsonResponse = try JSONDecoder().decode(
-                            SyllabusResponse.self,
-                            from: responseData
-                        )
-                        
-                        DispatchQueue.main.async {
-                            let notSyllabus = jsonResponse.events.contains { $0.isSyllabus == false }
-                            if jsonResponse.events.isEmpty || notSyllabus {
-                                self.uploadError = "No events were found. Please ensure you are uploading a valid course syllabus and try again."
-                                self.isUploading = false
-                                return
-                            }
-                            // Auto-accept all parsed events; user can decline individually
-                            let acceptedParsed = jsonResponse.events.map { ev -> CalendarEvent in
-                                var e = ev; e.status = .accepted; return e
-                            }
-                            // Reconcile with existing events: preserves local edits,
-                            // carries googleEventId forward for in-place updates, and
-                            // surfaces events dropped from the new syllabus for deletion.
-                            let reconciled = EventReconciler.reconcile(
-                                parsed: acceptedParsed,
-                                existing: self.existingEvents
-                            )
-                            self.parsedEvents = reconciled.merged
-                            self.eventsToDelete = reconciled.toDelete
-                            self.parsedSchedule = jsonResponse.schedule?.toClassSchedule()
-                            self.isUploading = false
-                            self.navigateToPreview = true
-                        }
-                    } else {
-                        let errorMessage: String
-                        if let errBody = try? JSONDecoder().decode([String: String].self, from: responseData),
-                           let msg = errBody["error"] {
-                            errorMessage = msg
-                        } else {
-                            errorMessage = String(data: responseData, encoding: .utf8) ?? "Unknown error"
-                        }
 
-                        DispatchQueue.main.async {
-                            self.uploadError = "Upload failed: \(errorMessage)"
+                // Routed through `send` so every backend call shares the one
+                // 401 → session-expired choke point (see AuthManager.send).
+                let (responseData, httpResponse) = try await authManager.send(request)
+
+                if httpResponse.statusCode == 200 {
+                    let jsonResponse = try JSONDecoder().decode(
+                        SyllabusResponse.self,
+                        from: responseData
+                    )
+
+                    DispatchQueue.main.async {
+                        let notSyllabus = jsonResponse.events.contains { $0.isSyllabus == false }
+                        if jsonResponse.events.isEmpty || notSyllabus {
+                            self.uploadError = "No events were found. Please ensure you are uploading a valid course syllabus and try again."
                             self.isUploading = false
+                            return
                         }
+                        // Auto-accept all parsed events; user can decline individually
+                        let acceptedParsed = jsonResponse.events.map { ev -> CalendarEvent in
+                            var e = ev; e.status = .accepted; return e
+                        }
+                        // Reconcile with existing events: preserves local edits,
+                        // carries googleEventId forward for in-place updates, and
+                        // surfaces events dropped from the new syllabus for deletion.
+                        let reconciled = EventReconciler.reconcile(
+                            parsed: acceptedParsed,
+                            existing: self.existingEvents
+                        )
+                        self.parsedEvents = reconciled.merged
+                        self.eventsToDelete = reconciled.toDelete
+                        self.parsedSchedule = jsonResponse.schedule?.toClassSchedule()
+                        self.isUploading = false
+                        self.navigateToPreview = true
+                    }
+                } else {
+                    let errorMessage: String
+                    if let errBody = try? JSONDecoder().decode([String: String].self, from: responseData),
+                       let msg = errBody["error"] {
+                        errorMessage = msg
+                    } else {
+                        errorMessage = String(data: responseData, encoding: .utf8) ?? "Unknown error"
+                    }
+
+                    DispatchQueue.main.async {
+                        self.uploadError = "Upload failed: \(errorMessage)"
+                        self.isUploading = false
                     }
                 }
             } catch {

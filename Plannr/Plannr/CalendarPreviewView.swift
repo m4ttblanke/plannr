@@ -279,10 +279,12 @@ struct CalendarPreviewView: View {
 
         Task {
             do {
-                let (data, response) = try await URLSession.shared.data(for: request)
+                // Routed through `send` so every backend call shares the one
+                // 401 → session-expired choke point (see AuthManager.send).
+                let (data, httpResponse) = try await authManager.send(request)
                 await MainActor.run {
                     isExporting = false
-                    if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+                    if httpResponse.statusCode == 200 {
                         let ext = format == "ics" ? "ics" : "csv"
                         let tempURL = FileManager.default.temporaryDirectory
                             .appendingPathComponent("events.\(ext)")
