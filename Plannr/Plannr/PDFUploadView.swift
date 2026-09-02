@@ -35,6 +35,12 @@ struct PDFUploadView: View {
         return classManager.classes.isEmpty ? .myClasses : .weeklyDashboard
     }
 
+    /// The current term's name (typed, or derived from its start month), shown
+    /// under the My Classes title. Empty when no term start date is set.
+    private var termLabel: String {
+        classManager.classes.isEmpty ? "" : settingsManager.term.displayLabel()
+    }
+
     var body: some View {
         NavigationStack(path: $navigationPath) {
             ZStack {
@@ -86,12 +92,20 @@ struct PDFUploadView: View {
                         .accessibilityLabel("Menu")
                         .accessibilityIdentifier("menuButton")
 
-                        Text(selectedTab == .myClasses ? "My Classes" : selectedTab == .calendar ? "Calendar" : "Week at a Glance")
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                            .padding(.leading, 8)
-                            .accessibilityIdentifier("tabTitle")
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(selectedTab == .myClasses ? "My Classes" : selectedTab == .calendar ? "Calendar" : "Week at a Glance")
+                                .font(.largeTitle)
+                                .fontWeight(.bold)
+                                .foregroundColor(.white)
+                                .accessibilityIdentifier("tabTitle")
+
+                            if selectedTab == .myClasses, !termLabel.isEmpty {
+                                Text(termLabel)
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                        .padding(.leading, 8)
 
                         Spacer()
 

@@ -32,6 +32,7 @@ struct ClassSchedulePicker: View {
     @State private var sectionEnd: Date = ClassSchedulePicker.defaultEnd
 
     @State private var firstMeeting: Date = Calendar.current.startOfDay(for: Date())
+    @State private var showAdvanced = false
     @State private var limitWeeks = false
     @State private var weeks = 10
     @State private var hasFinal = false
@@ -105,37 +106,51 @@ struct ClassSchedulePicker: View {
                     .labelsHidden().colorScheme(.dark)
             }
 
-            Toggle(isOn: $limitWeeks.animation(.easeInOut(duration: 0.15))) {
-                Text("Repeat for a set number of weeks").font(.subheadline).foregroundColor(.white)
-            }
-            .tint(.blue)
-
-            if limitWeeks {
+            Button {
+                withAnimation(.easeInOut(duration: 0.15)) { showAdvanced.toggle() }
+            } label: {
                 HStack {
-                    Text("Weeks").font(.subheadline).foregroundColor(.white)
+                    Text("More options").font(.subheadline).foregroundColor(.blue)
                     Spacer()
-                    Picker("", selection: $weeks) {
-                        ForEach(Self.weekOptions, id: \.self) { Text("\($0)").tag($0) }
+                    Image(systemName: showAdvanced ? "chevron.up" : "chevron.down")
+                        .font(.caption).foregroundColor(.blue)
+                }
+            }
+            .buttonStyle(.plain)
+
+            if showAdvanced {
+                Toggle(isOn: $limitWeeks.animation(.easeInOut(duration: 0.15))) {
+                    Text("Repeat for a set number of weeks").font(.subheadline).foregroundColor(.white)
+                }
+                .tint(.blue)
+
+                if limitWeeks {
+                    HStack {
+                        Text("Weeks").font(.subheadline).foregroundColor(.white)
+                        Spacer()
+                        Picker("", selection: $weeks) {
+                            ForEach(Self.weekOptions, id: \.self) { Text("\($0)").tag($0) }
+                        }
+                        .pickerStyle(.menu).tint(.white)
                     }
-                    .pickerStyle(.menu).tint(.white)
                 }
-            }
 
-            Toggle(isOn: $hasFinal.animation(.easeInOut(duration: 0.15))) {
-                Text("Add a final exam").font(.subheadline).foregroundColor(.white)
-            }
-            .tint(.blue)
-
-            if hasFinal {
-                Text("A one-time event, usually during finals week after classes end.")
-                    .font(.caption2).foregroundColor(.gray)
-                HStack {
-                    Text("Date").font(.subheadline).foregroundColor(.white)
-                    Spacer()
-                    DatePicker("", selection: $finalDate, displayedComponents: .date)
-                        .labelsHidden().colorScheme(.dark)
+                Toggle(isOn: $hasFinal.animation(.easeInOut(duration: 0.15))) {
+                    Text("Add a final exam").font(.subheadline).foregroundColor(.white)
                 }
-                timeRangeRow(start: $finalStart, end: $finalEnd)
+                .tint(.blue)
+
+                if hasFinal {
+                    Text("A one-time event, usually during finals week after classes end.")
+                        .font(.caption2).foregroundColor(.gray)
+                    HStack {
+                        Text("Date").font(.subheadline).foregroundColor(.white)
+                        Spacer()
+                        DatePicker("", selection: $finalDate, displayedComponents: .date)
+                            .labelsHidden().colorScheme(.dark)
+                    }
+                    timeRangeRow(start: $finalStart, end: $finalEnd)
+                }
             }
         }
         .onChange(of: firstMeeting) { _, _ in push() }
@@ -172,6 +187,7 @@ struct ClassSchedulePicker: View {
 
         firstMeeting = schedule.firstMeetingDate ?? Calendar.current.startOfDay(for: Date())
         if let w = schedule.weekCount { limitWeeks = true; weeks = min(max(w, 1), 20) }
+        showAdvanced = schedule.weekCount != nil || schedule.finalExam != nil
         if let f = schedule.finalExam {
             hasFinal = true
             finalDate = f.date

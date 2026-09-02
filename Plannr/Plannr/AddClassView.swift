@@ -108,6 +108,7 @@ struct AddClassView: View {
             name: className,
             schedule: schedule.displayString,
             colorHex: selectedColor.toHex(),
+            endDate: settingsManager.term.resolvedEndDate(),
             structuredSchedule: schedule.isEmpty ? nil : schedule,
             meetingSyncEnabled: autoSyncMeetings
         )

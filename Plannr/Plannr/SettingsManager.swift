@@ -7,10 +7,85 @@
 
 import Foundation
 
-struct TermSettings: Codable, Equatable {
+/// How long a term runs, used to derive an end date from the start date.
+enum TermSystem: String, CaseIterable, Identifiable {
+    case quarter
+    case semester
+    case custom
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .quarter:  return "Quarter"
+        case .semester: return "Semester"
+        case .custom:   return "Custom"
+        }
+    }
+
+    /// Weeks from the start date to the term's end. `nil` for `.custom`, where
+    /// the user sets an explicit end date instead.
+    var weeks: Int? {
+        switch self {
+        case .quarter:  return 10
+        case .semester: return 16
+        case .custom:   return nil
+        }
+    }
+}
+
+struct TermSettings: Equatable {
     var label: String = ""
     var startDate: Date?
     var endDate: Date?
+    var system: TermSystem = .quarter
+
+    /// The term's end: an explicit `endDate` when set, otherwise
+    /// `startDate` + the system's week count. `nil` when neither is available.
+    func resolvedEndDate(calendar: Calendar = .current) -> Date? {
+        if let endDate { return endDate }
+        guard let startDate, let weeks = system.weeks else { return nil }
+        return calendar.date(byAdding: .day, value: weeks * 7, to: startDate)
+    }
+
+    /// The user's label, or one derived from the start month ("Fall 2026") when
+    /// they haven't typed one. Empty when there's no start date to derive from.
+    func displayLabel(calendar: Calendar = .current) -> String {
+        let typed = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !typed.isEmpty { return typed }
+        guard let startDate else { return "" }
+        let month = calendar.component(.month, from: startDate)
+        let year = calendar.component(.year, from: startDate)
+        let season: String
+        switch system {
+        case .semester:
+            season = (1...5).contains(month) ? "Spring" : (6...7).contains(month) ? "Summer" : "Fall"
+        case .quarter, .custom:
+            switch month {
+            case 1...3: season = "Winter"
+            case 4...5: season = "Spring"
+            case 6...8: season = "Summer"
+            default:    season = "Fall"
+            }
+        }
+        return "\(season) \(year)"
+    }
+}
+
+extension TermSystem: Codable {}
+
+extension TermSettings: Codable {
+    private enum CodingKeys: String, CodingKey { case label, startDate, endDate, system }
+
+    /// Tolerant decode so a blob written before `system` existed still loads
+    /// (older installs would otherwise fall back to a blank term).
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        label = try c.decodeIfPresent(String.self, forKey: .label) ?? ""
+        startDate = try c.decodeIfPresent(Date.self, forKey: .startDate)
+        endDate = try c.decodeIfPresent(Date.self, forKey: .endDate)
+        system = try c.decodeIfPresent(TermSystem.self, forKey: .system) ?? .quarter
+    }
 }
 
 /// -1 means "use Google Calendar's default reminders" (no override sent to the backend).

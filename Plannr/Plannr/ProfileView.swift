@@ -170,7 +170,7 @@ struct ProfileView: View {
 
     private var termSection: some View {
         SettingsSection(title: "Current Term", icon: "graduationcap.fill") {
-            TextField("e.g. Fall 2026", text: Binding(
+            TextField(termLabelPlaceholder, text: Binding(
                 get: { settingsManager.term.label },
                 set: { settingsManager.term.label = $0 }
             ))
@@ -178,6 +178,15 @@ struct ProfileView: View {
             .background(Color.gray.opacity(0.15))
             .foregroundColor(.white)
             .cornerRadius(8)
+
+            Picker("System", selection: Binding(
+                get: { settingsManager.term.system },
+                set: { setTermSystem($0) }
+            )) {
+                ForEach(TermSystem.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .colorScheme(.dark)
 
             DatePicker(
                 "Start date",
@@ -190,17 +199,54 @@ struct ProfileView: View {
             .foregroundColor(.white)
             .colorScheme(.dark)
 
-            DatePicker(
-                "End date",
-                selection: Binding(
-                    get: { settingsManager.term.endDate ?? Calendar.current.date(byAdding: .month, value: 4, to: Date())! },
-                    set: { settingsManager.term.endDate = $0 }
-                ),
-                displayedComponents: .date
-            )
-            .foregroundColor(.white)
-            .colorScheme(.dark)
+            if settingsManager.term.system == .custom {
+                DatePicker(
+                    "End date",
+                    selection: Binding(
+                        get: { settingsManager.term.endDate ?? settingsManager.term.resolvedEndDate() ?? Calendar.current.date(byAdding: .month, value: 4, to: Date())! },
+                        set: { settingsManager.term.endDate = $0 }
+                    ),
+                    displayedComponents: .date
+                )
+                .foregroundColor(.white)
+                .colorScheme(.dark)
+            } else {
+                HStack {
+                    Text("Ends")
+                        .foregroundColor(.white)
+                    Spacer()
+                    Text(derivedEndText)
+                        .foregroundColor(.gray)
+                }
+            }
+
+            Text("New classes default to this end date. Set it per class from the class screen.")
+                .font(.caption2)
+                .foregroundColor(.gray)
         }
+    }
+
+    private var termLabelPlaceholder: String {
+        let derived = settingsManager.term.displayLabel()
+        return derived.isEmpty ? "e.g. Fall 2026" : derived
+    }
+
+    private var derivedEndText: String {
+        guard let end = settingsManager.term.resolvedEndDate() else { return "set a start date" }
+        let weeks = settingsManager.term.system.weeks
+        let dateText = end.formatted(date: .abbreviated, time: .omitted)
+        return weeks.map { "\(dateText)  ·  \($0) weeks" } ?? dateText
+    }
+
+    private func setTermSystem(_ newValue: TermSystem) {
+        var t = settingsManager.term
+        if newValue == .custom {
+            if t.endDate == nil { t.endDate = t.resolvedEndDate() }
+        } else {
+            t.endDate = nil   // let the system's week count drive it
+        }
+        t.system = newValue
+        settingsManager.term = t
     }
 
     // MARK: Reminders

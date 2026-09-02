@@ -246,9 +246,16 @@ Open the profile avatar (top-right of any tab).
 - [ ] **Photo:** tap the avatar → pick an image from Photos. **Expect:** it
   replaces the Google photo everywhere. Tap **Remove Custom Photo** → back to
   the Google photo.
-- [ ] **Current Term:** type a label ("Fall 2026"); set **Start date** and
-  **End date**. (These feed the class-meeting recurrence window — re-toggle a
-  class's meetings after setting them to see the recurrence end change.)
+- [ ] **Current Term:** leave the label blank, pick **Quarter**, set a **Start
+  date**. **Expect:** the label field's placeholder reads a derived name
+  ("Fall 2026" etc.), "Ends" shows *start + 10 weeks* with a "10 weeks" note,
+  and that same name appears under the **My Classes** title. Switch to
+  **Semester** → "Ends" jumps to +16 weeks. Switch to **Custom** → an editable
+  End date picker appears, seeded from the previous derived value.
+- [ ] Add a new class (or upload a syllabus into one) while a term end is set.
+  **Expect:** the class's **End date** on its edit screen is pre-filled to the
+  term end; you can still change or clear it per class. (This also bounds
+  class-meeting recurrence — re-toggle meetings to see it.)
 - [ ] **Deadline Reminders → Remind me:** pick "2 days before".
 - [ ] **Class Meetings → Show in Week at a Glance:** turn it **ON**. Go back to
   **Week at a Glance**.
@@ -461,8 +468,8 @@ Needs a second Google account you can sign into.
   `ParsedScheduleTests`, `ClassMeetingSyncTests`, `ClassManagerTests`
   per-account scoping + legacy migration, `AuthManagerDeleteAccountTests`
   retry + probe, `AuthManagerSendTests` 401 choke point,
-  `NotificationManagerTests` nearest-60 selection) and
-  `PlannrUITests/GuestFlowUITests`.
+  `NotificationManagerTests` nearest-60 selection, `TermSettingsTests`
+  quarter/semester end date + auto label) and `PlannrUITests/GuestFlowUITests`.
 
 ---
 
@@ -526,7 +533,7 @@ Needs a second Google account you can sign into.
 | Task completion + **persistence across relaunch** | §1J |
 | "Class Meetings" display settings (Calendar + Week at a Glance toggles) + filter behavior | §1K |
 | Profile photo (custom + remove) | §1K |
-| Current Term settings (feeds meeting recurrence) | §1K, §1H |
+| Current Term: quarter/semester system, derived end + label, defaults class end date | §1K, §1H |
 | Deadline reminder lead time | §1K, §2d |
 | Auto-sync changes setting | §1K |
 | Auto-sync class meetings setting (new/syllabus classes only) | §1K |
