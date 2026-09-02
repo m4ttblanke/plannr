@@ -69,6 +69,10 @@ struct UnifiedCalendarView: View {
     @ObservedObject private var settingsManager = SettingsManager.shared
     @State private var isWeekly = true
     @State private var selectedEvent: UnifiedEvent?
+    /// Drives both the grid and the events list below it: the week (or month)
+    /// containing this date is what's shown. Owned here so the list can scope
+    /// itself to whatever range the grid is currently displaying.
+    @State private var selectedDate = Date()
 
     private let dateFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -104,16 +108,32 @@ struct UnifiedCalendarView: View {
     /// Everything the calendar shows: assignments always, meetings when enabled.
     var allEvents: [UnifiedEvent] { assignmentEvents + meetingEvents }
 
-    var upcomingEvents: [UnifiedEvent] {
-        let todayString = dateFormatter.string(from: Date())
-        return allEvents
-            .filter { $0.event.date >= todayString }
+    /// The week or month currently shown in the grid, per the selected view.
+    private var visibleInterval: DateInterval {
+        let cal = Calendar.current
+        let component: Calendar.Component = isWeekly ? .weekOfYear : .month
+        return cal.dateInterval(of: component, for: selectedDate)
+            ?? DateInterval(start: selectedDate, duration: 0)
+    }
+
+    private func eventsInVisibleInterval(_ events: [UnifiedEvent]) -> [UnifiedEvent] {
+        let interval = visibleInterval
+        return events
+            .filter { ev in
+                guard let d = dateFormatter.date(from: ev.event.date) else { return false }
+                return interval.contains(d)
+            }
             .sorted {
                 $0.event.date != $1.event.date
                     ? $0.event.date < $1.event.date
                     : $0.event.title < $1.event.title
             }
     }
+
+    /// Assignments and meetings that fall in the visible week / month, kept
+    /// separate so the list can group them the way Week at a Glance does.
+    private var visibleAssignments: [UnifiedEvent] { eventsInVisibleInterval(assignmentEvents) }
+    private var visibleMeetings: [UnifiedEvent] { eventsInVisibleInterval(meetingEvents) }
 
     var body: some View {
         ScrollView {
@@ -154,53 +174,75 @@ struct UnifiedCalendarView: View {
                     }
 
                     if isWeekly {
-                        UnifiedWeeklyCalendarView(events: allEvents) { selectedEvent = $0 }
+                        UnifiedWeeklyCalendarView(events: allEvents, selectedDate: $selectedDate) { selectedEvent = $0 }
                     } else {
-                        UnifiedMonthlyCalendarView(events: allEvents) { selectedEvent = $0 }
+                        UnifiedMonthlyCalendarView(events: allEvents, selectedDate: $selectedDate) { selectedEvent = $0 }
                     }
                 }
                 .padding(.horizontal)
 
-                // Upcoming Events list
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Upcoming Events")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                        .padding(.horizontal)
-
-                    if upcomingEvents.isEmpty {
-                        VStack(spacing: 12) {
-                            Image(systemName: "calendar.badge.exclamationmark")
-                                .font(.system(size: 48))
-                                .foregroundColor(.gray)
-                            Text("No upcoming events")
-                                .font(.headline)
-                                .foregroundColor(.gray)
-                            Text("Upload syllabi to your classes to see events here.")
-                                .font(.caption)
-                                .foregroundColor(.gray.opacity(0.7))
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 20)
-                    } else {
-                        ForEach(upcomingEvents) { unifiedEvent in
-                            UnifiedEventCard(unifiedEvent: unifiedEvent) {
-                                selectedEvent = unifiedEvent
-                            }
-                            .padding(.horizontal)
-                        }
-                    }
-                }
-                .padding(.bottom, 40)
+                // Events for the visible week / month
+                eventsListSection
             }
             .padding(.top)
         }
         .sheet(item: $selectedEvent) { event in
             EventDetailSheet(unifiedEvent: event)
         }
+    }
+
+    // MARK: Events list (scoped to the visible week / month)
+
+    private var eventsListSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(isWeekly ? "This Week" : "This Month")
+                .font(.title2)
+                .fontWeight(.bold)
+                .foregroundColor(.white)
+                .padding(.horizontal)
+
+            if visibleAssignments.isEmpty && visibleMeetings.isEmpty {
+                emptyState
+            } else {
+                ForEach(visibleAssignments) { unifiedEvent in
+                    UnifiedEventCard(unifiedEvent: unifiedEvent) { selectedEvent = unifiedEvent }
+                        .padding(.horizontal)
+                }
+
+                if !visibleMeetings.isEmpty {
+                    Text("Class Meetings")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.gray)
+                        .padding(.horizontal)
+                        .padding(.top, 4)
+
+                    ForEach(visibleMeetings) { unifiedEvent in
+                        UnifiedEventCard(unifiedEvent: unifiedEvent) { selectedEvent = unifiedEvent }
+                            .padding(.horizontal)
+                    }
+                }
+            }
+        }
+        .padding(.bottom, 40)
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "calendar.badge.exclamationmark")
+                .font(.system(size: 48))
+                .foregroundColor(.gray)
+            Text(isWeekly ? "Nothing this week" : "Nothing this month")
+                .font(.headline)
+                .foregroundColor(.gray)
+            Text("Upload syllabi to your classes to see events here.")
+                .font(.caption)
+                .foregroundColor(.gray.opacity(0.7))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 20)
     }
 }
 
@@ -309,8 +351,8 @@ struct DetailRow: View {
 
 struct UnifiedWeeklyCalendarView: View {
     let events: [UnifiedEvent]
+    @Binding var selectedDate: Date
     let onTapEvent: (UnifiedEvent) -> Void
-    @State private var selectedDate: Date = Date()
 
     private let calendar = Calendar.current
     private let dateFormatter: DateFormatter = {
@@ -392,8 +434,8 @@ struct UnifiedWeeklyCalendarView: View {
 
 struct UnifiedMonthlyCalendarView: View {
     let events: [UnifiedEvent]
+    @Binding var selectedDate: Date
     let onTapEvent: (UnifiedEvent) -> Void
-    @State private var selectedDate: Date = Date()
 
     private let calendar = Calendar.current
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
