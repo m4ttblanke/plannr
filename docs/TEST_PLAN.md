@@ -27,7 +27,10 @@ Calendar at [calendar.google.com](https://calendar.google.com).
   primary account you can't afford to poke).
 - [ ] **Two test syllabi:**
   - `syllabus_A.pdf` — a real course syllabus with a **text layer** (exported
-    from Word/Google Docs, not a scan). 6–15 dated items.
+    from Word/Google Docs, not a scan). 6–15 dated items. Ideally it also states
+    the meeting times plainly (e.g. "Lecture: MWF 10:00–10:50am", "Discussion
+    Thu 3:00–3:50pm", "Final Exam: <date>, <time>") so the schedule auto-fill in
+    §1H can be checked.
   - `syllabus_A_v2.pdf` — a copy of A with: one assignment **added**, one
     **removed**, one assignment's **description changed** (same title & date),
     and one assignment **moved to a different date**. You'll use this for the
@@ -157,10 +160,17 @@ This is the important one — sync must change only what changed.
 
 ### H. Class meetings on the calendar (new)
 
+- [ ] **Schedule auto-fill from the syllabus.** If `syllabus_A.pdf` states the
+  meeting times and you had **not** set a schedule on the class before uploading,
+  the schedule row after the sync should read what the syllabus said (lecture
+  days/time, section days/time). Tap **Edit** — the picker is pre-filled,
+  including the **final-exam** date/time if the syllabus gave one. If you *did*
+  set a schedule in §1B, it is kept as-is (the parser never overwrites it).
+  Re-uploading a syllabus also keeps whatever schedule the class already has.
 - [ ] In the class edit screen, the schedule row shows
-  `MWF 10:00 AM · Section Th 3:00 PM`. Tap **Edit** next to it → the schedule
-  picker opens inline; change the class time to **11:00 AM** → tap **Done**.
-  **Expect:** the row text updates.
+  `MWF 10:00 AM · Section Th 3:00 PM` (yours from §1B, or the syllabus's). Tap
+  **Edit** next to it → the schedule picker opens inline; change the class time
+  to **11:00 AM** → tap **Done**. **Expect:** the row text updates.
 - [ ] Turn **Add class meetings to Google Calendar** ON.
   **Expect:** a brief spinner, no error.
 - [ ] 🔎 Google Calendar, `CS 101` calendar:
@@ -403,15 +413,16 @@ Follow the "Testing without real money" steps in `README.md`. Then:
   cd backend && source venv/bin/activate && python -m pytest -q
   ```
   **Expect:** all pass (OAuth signed-state, export, syllabus retry,
-  `/calendar/sync` patch-not-recreate, `/calendar/meetings` RRULE,
-  `/calendar/visibility` check/uncheck).
+  `/syllabus` meeting-schedule pass-through, `/calendar/sync` patch-not-recreate,
+  `/calendar/meetings` RRULE, `/calendar/visibility` check/uncheck).
 - [ ] **iOS:** in Xcode press **Cmd+U**, or:
   ```bash
   xcodebuild test -project Plannr/Plannr.xcodeproj -scheme Plannr \
     -destination 'platform=iOS Simulator,name=iPhone 16'
   ```
   **Expect:** `PlannrTests` all pass (`EventReconcilerTests`,
-  `ClassScheduleTests`, `CalendarPreviewViewTests`, `UnifiedEventMeetingTests`)
+  `ClassScheduleTests`, `CalendarPreviewViewTests`, `UnifiedEventMeetingTests`,
+  `ParsedScheduleTests`)
   and `PlannrUITests/GuestFlowUITests`.
 
 ---
@@ -443,6 +454,7 @@ Follow the "Testing without real money" steps in `README.md`. Then:
 | Revoked-access sign-out | §2c |
 | Add class + color | §1B |
 | Structured schedule picker (lecture + section) | §1B, §1H |
+| Schedule auto-fill from syllabus (+ never overwrites a manual one) | §1H |
 | Editable schedule after creation | §1H |
 | My Classes list, badges, event counts | §1B, §1E |
 | Delete class (+ its Google calendar) | §1M |

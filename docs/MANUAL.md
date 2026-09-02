@@ -25,7 +25,7 @@ If Google access is later revoked (for example, by removing the app from your Go
 
 Users can add multiple classes and view their full class list on the home page. Each class can be assigned a custom color for easy visual identification across the calendar.
 
-When adding or editing a class, users can set a **structured weekly schedule** — pick the lecture days and a start/end time, and optionally a separate section/lab meeting on its own day and time. The schedule can also carry a first-meeting date, a "repeat for X weeks" limit, and a final-exam date and time.
+When adding or editing a class, users can set a **structured weekly schedule** — pick the lecture days and a start/end time, and optionally a separate section/lab meeting on its own day and time. The schedule can also carry a first-meeting date, a "repeat for X weeks" limit, and a final-exam date and time. Uploading a syllabus that states these times fills them in automatically (see AI-Powered Event Extraction).
 
 Each class has a status shown as a tappable badge on its edit screen: **ACTIVE**, **INACTIVE**, or **NO SYLLABUS** (read-only, until events are added). Switching a class to **INACTIVE** — manually, or automatically once its end date passes — turns off its class-meeting sync, removes its recurring meeting events from Google Calendar, and unchecks (hides) its dedicated calendar in the Google Calendar sidebar without deleting it. Switching back to **ACTIVE** re-checks that calendar.
 
@@ -47,6 +47,8 @@ Notes:
 ### AI-Powered Event Extraction
 
 Once a syllabus is uploaded, Plannr uses Google Gemini to intelligently parse the document and extract key academic dates. Events are automatically classified by type (homework, exam, quiz, lab, or other) and resolved to specific calendar dates, including relative references like "Week 3 Friday" or "Finals Week."
+
+If the syllabus explicitly states the class's meeting times — e.g. "Lecture: MWF 10:00–10:50am", "Discussion Thursdays 3:00pm", "Final Exam: Dec 12, 4:00–7:00pm" — Plannr also fills in the class's structured schedule (lecture days/time, section/lab days/time, final-exam date/time) so you don't have to type it. It only does this when the times are spelled out, and it never overwrites a schedule you set yourself.
 
 <img src="MANUAL_IMAGES/event_extraction.png" alt="alt text" width="300">
 

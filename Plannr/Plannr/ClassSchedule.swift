@@ -22,6 +22,14 @@ enum Weekday: Int, CaseIterable, Identifiable, Codable {
     /// iCalendar RRULE BYDAY token.
     var byday: String { ["SU", "MO", "TU", "WE", "TH", "FR", "SA"][rawValue - 1] }
 
+    /// Parse an RRULE BYDAY token ("MO", "we", …). Case-insensitive.
+    init?(byday token: String) {
+        guard let match = Weekday.allCases.first(where: {
+            $0.byday.caseInsensitiveCompare(token) == .orderedSame
+        }) else { return nil }
+        self = match
+    }
+
     // Note: rawValue (1 = Sunday … 7 = Saturday) matches
     // Calendar.component(.weekday) for the Gregorian calendar, so no mapping is
     // needed when checking whether a date falls on this weekday.
@@ -42,6 +50,15 @@ struct TimeOfDay: Codable, Hashable {
     init(from date: Date, calendar: Calendar = .current) {
         let c = calendar.dateComponents([.hour, .minute], from: date)
         self.init(hour: c.hour ?? 9, minute: c.minute ?? 0)
+    }
+
+    /// Parse "HH:MM" (24-hour). Returns nil for anything that isn't a valid time.
+    init?(iso: String) {
+        let parts = iso.split(separator: ":")
+        guard parts.count >= 2,
+              let hour = Int(parts[0]), let minute = Int(parts[1]),
+              (0...23).contains(hour), (0...59).contains(minute) else { return nil }
+        self.init(hour: hour, minute: minute)
     }
 
     /// A Date on `day` at this time.

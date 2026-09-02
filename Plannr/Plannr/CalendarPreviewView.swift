@@ -18,6 +18,9 @@ struct CalendarPreviewView: View {
     let classColor: Color
     let existingClassID: UUID
     let eventsToDelete: [CalendarEvent]
+    /// Meeting schedule the parser pulled from the syllabus, applied only if the
+    /// class doesn't already have one the user set up.
+    let parsedSchedule: ClassSchedule?
     var onSyncComplete: (() -> Void)? = nil
 
     @State private var events: [CalendarEvent]
@@ -34,12 +37,13 @@ struct CalendarPreviewView: View {
     @State private var sharedEventColor: Color
     @State private var pendingSyncResponse: CalendarSyncResponse?
     
-    init(className: String, classSchedule: String, classColor: Color, existingClassID: UUID, events: [CalendarEvent], eventsToDelete: [CalendarEvent] = [], onSyncComplete: (() -> Void)? = nil) {
+    init(className: String, classSchedule: String, classColor: Color, existingClassID: UUID, events: [CalendarEvent], eventsToDelete: [CalendarEvent] = [], parsedSchedule: ClassSchedule? = nil, onSyncComplete: (() -> Void)? = nil) {
         self.className = className
         self.classSchedule = classSchedule
         self.classColor = classColor
         self.existingClassID = existingClassID
         self.eventsToDelete = eventsToDelete
+        self.parsedSchedule = parsedSchedule
         self.onSyncComplete = onSyncComplete
         _events = State(initialValue: events)
         _sharedEventColor = State(initialValue: classColor)
@@ -165,12 +169,13 @@ struct CalendarPreviewView: View {
                         let existingClass = classManager.classes.first(where: { $0.id == existingClassID })
                         let existingColorHex = existingClass?.colorHex ?? sharedEventColor.toHex()
                         let existingSyncHistory = existingClass?.syncHistory ?? []
+                        let mergedSchedule = resolvedSchedule(existing: existingClass)
 
                         classManager.removeClassByID(existingClassID)
                         classManager.addClass(Class(
                             id: existingClassID,
                             name: className,
-                            schedule: classSchedule,
+                            schedule: scheduleText(mergedSchedule),
                             colorHex: existingColorHex,
                             events: syncedEvents,
                             status: .active,
@@ -178,7 +183,10 @@ struct CalendarPreviewView: View {
                             lastSynced: Date(),
                             endDate: existingClass?.endDate,
                             syncHistory: existingSyncHistory + [SyncSession(events: syncedEvents)],
-                            hasUnsyncedChanges: false
+                            hasUnsyncedChanges: false,
+                            structuredSchedule: mergedSchedule,
+                            meetingSyncEnabled: existingClass?.meetingSyncEnabled ?? false,
+                            meetingEventIds: existingClass?.meetingEventIds ?? []
                         ))
                         pendingSyncResponse = nil
                         DispatchQueue.main.async {
@@ -302,24 +310,42 @@ struct CalendarPreviewView: View {
 
     func saveGuestClass() {
         let acceptedEvents = events.filter { $0.status == .accepted }
-        let existingColorHex = classManager.classes
-            .first(where: { $0.id == existingClassID })?.colorHex
-            ?? sharedEventColor.toHex()
+        let existingClass = classManager.classes.first(where: { $0.id == existingClassID })
+        let existingColorHex = existingClass?.colorHex ?? sharedEventColor.toHex()
+        let mergedSchedule = resolvedSchedule(existing: existingClass)
         classManager.removeClassByID(existingClassID)
         classManager.addClass(Class(
             id: existingClassID,
             name: className,
-            schedule: classSchedule,
+            schedule: scheduleText(mergedSchedule),
             colorHex: existingColorHex,
             events: acceptedEvents,
             status: acceptedEvents.isEmpty ? .noSyllabus : .active,
             googleCalendarId: nil,
             lastSynced: nil,
-            hasUnsyncedChanges: false
+            endDate: existingClass?.endDate,
+            syncHistory: existingClass?.syncHistory ?? [],
+            hasUnsyncedChanges: false,
+            structuredSchedule: mergedSchedule,
+            meetingSyncEnabled: existingClass?.meetingSyncEnabled ?? false,
+            meetingEventIds: existingClass?.meetingEventIds ?? []
         ))
         DispatchQueue.main.async {
             onSyncComplete?()
         }
+    }
+
+    /// Keep the schedule the user built; otherwise adopt what the syllabus
+    /// parser found. Never replace a real schedule with nothing.
+    private func resolvedSchedule(existing: Class?) -> ClassSchedule? {
+        if let s = existing?.structuredSchedule, !s.isEmpty { return s }
+        if let p = parsedSchedule, !p.isEmpty { return p }
+        return existing?.structuredSchedule
+    }
+
+    private func scheduleText(_ schedule: ClassSchedule?) -> String {
+        if let schedule, !schedule.isEmpty { return schedule.displayString }
+        return classSchedule
     }
 
     func syncToCalendar() {

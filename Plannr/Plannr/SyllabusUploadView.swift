@@ -38,6 +38,7 @@ struct SyllabusUploadView: View {
     @State private var uploadError: String?
     @State private var parsedEvents: [CalendarEvent] = []
     @State private var eventsToDelete: [CalendarEvent] = []
+    @State private var parsedSchedule: ClassSchedule?
     @State private var navigateToPreview = false
     
     var body: some View {
@@ -214,6 +215,7 @@ struct SyllabusUploadView: View {
                     existingClassID: existingClassID,
                     events: parsedEvents,
                     eventsToDelete: eventsToDelete,
+                    parsedSchedule: parsedSchedule,
                     onSyncComplete: onSyncComplete
                 )
                 .environmentObject(classManager)
@@ -323,6 +325,7 @@ struct SyllabusUploadView: View {
         isUploading = true
         uploadError = nil
         parsedEvents = []
+        parsedSchedule = nil
         
         Task {
             defer {
@@ -385,6 +388,7 @@ struct SyllabusUploadView: View {
                             )
                             self.parsedEvents = reconciled.merged
                             self.eventsToDelete = reconciled.toDelete
+                            self.parsedSchedule = jsonResponse.schedule?.toClassSchedule()
                             self.isUploading = false
                             self.navigateToPreview = true
                         }

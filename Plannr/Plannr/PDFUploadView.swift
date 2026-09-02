@@ -432,6 +432,92 @@ struct SyllabusResponse: Codable {
     let filename: String?
     let size: Int?
     let events: [CalendarEvent]
+    /// Recurring meeting pattern the parser found in the syllabus, if any.
+    let schedule: ParsedSchedule?
+}
+
+/// The `schedule` object from `POST /syllabus` — the class's meeting days/times
+/// as pulled from the syllabus. Any field may be absent. See
+/// `ParsedSchedule.toClassSchedule()` for the mapping into `ClassSchedule`.
+struct ParsedSchedule: Codable {
+    var lectureDays: [String] = []
+    var lectureStart: String?
+    var lectureEnd: String?
+    var sectionDays: [String] = []
+    var sectionStart: String?
+    var sectionEnd: String?
+    var finalDate: String?
+    var finalStart: String?
+    var finalEnd: String?
+
+    enum CodingKeys: String, CodingKey {
+        case lectureDays = "lecture_days"
+        case lectureStart = "lecture_start"
+        case lectureEnd = "lecture_end"
+        case sectionDays = "section_days"
+        case sectionStart = "section_start"
+        case sectionEnd = "section_end"
+        case finalDate = "final_date"
+        case finalStart = "final_start"
+        case finalEnd = "final_end"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        lectureDays = try c.decodeIfPresent([String].self, forKey: .lectureDays) ?? []
+        lectureStart = try c.decodeIfPresent(String.self, forKey: .lectureStart)
+        lectureEnd = try c.decodeIfPresent(String.self, forKey: .lectureEnd)
+        sectionDays = try c.decodeIfPresent([String].self, forKey: .sectionDays) ?? []
+        sectionStart = try c.decodeIfPresent(String.self, forKey: .sectionStart)
+        sectionEnd = try c.decodeIfPresent(String.self, forKey: .sectionEnd)
+        finalDate = try c.decodeIfPresent(String.self, forKey: .finalDate)
+        finalStart = try c.decodeIfPresent(String.self, forKey: .finalStart)
+        finalEnd = try c.decodeIfPresent(String.self, forKey: .finalEnd)
+    }
+
+    /// Map into a `ClassSchedule`, keeping only the parts that are actually
+    /// usable (days paired with a start time; a final date for a final exam).
+    /// Returns nil when nothing usable came back.
+    func toClassSchedule() -> ClassSchedule? {
+        func days(_ tokens: [String]) -> [Int] {
+            tokens.compactMap { Weekday(byday: $0)?.rawValue }.sorted()
+        }
+
+        var schedule = ClassSchedule()
+
+        let lectureDayInts = days(lectureDays)
+        if !lectureDayInts.isEmpty, let start = lectureStart.flatMap(TimeOfDay.init(iso:)) {
+            schedule.lectureDays = lectureDayInts
+            schedule.lectureStart = start
+            schedule.lectureEnd = lectureEnd.flatMap(TimeOfDay.init(iso:))
+        }
+
+        let sectionDayInts = days(sectionDays)
+        if !sectionDayInts.isEmpty, let start = sectionStart.flatMap(TimeOfDay.init(iso:)) {
+            schedule.sectionDays = sectionDayInts
+            schedule.sectionStart = start
+            schedule.sectionEnd = sectionEnd.flatMap(TimeOfDay.init(iso:))
+        }
+
+        if let finalDate, let date = ParsedSchedule.isoDateFormatter.date(from: finalDate) {
+            let start = finalStart.flatMap(TimeOfDay.init(iso:)) ?? TimeOfDay(hour: 9, minute: 0)
+            schedule.finalExam = ClassFinalExam(
+                date: Calendar.current.startOfDay(for: date),
+                start: start,
+                end: finalEnd.flatMap(TimeOfDay.init(iso:))
+            )
+        }
+
+        return schedule.isEmpty ? nil : schedule
+    }
+
+    private static let isoDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.calendar = Calendar(identifier: .gregorian)
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
 }
 
 extension Color {

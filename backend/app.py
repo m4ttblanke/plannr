@@ -77,8 +77,24 @@ class GeminiSyllabusEvent(BaseModel):
     isSyllabus: bool = True
 
 
+class GeminiSchedule(BaseModel):
+    """The course's recurring meeting pattern, extracted only when the syllabus
+    states it explicitly. Every field is optional — an all-empty schedule is a
+    valid, expected result."""
+    lecture_days: List[str] = []        # BYDAY tokens: MO TU WE TH FR SA SU
+    lecture_start: Optional[str] = None  # "HH:MM", 24-hour, course-local time
+    lecture_end: Optional[str] = None
+    section_days: List[str] = []         # discussion / lab / section / recitation
+    section_start: Optional[str] = None
+    section_end: Optional[str] = None
+    final_date: Optional[str] = None     # "YYYY-MM-DD"
+    final_start: Optional[str] = None    # "HH:MM"
+    final_end: Optional[str] = None
+
+
 class GeminiSyllabusResult(BaseModel):
     events: List[GeminiSyllabusEvent]
+    schedule: Optional[GeminiSchedule] = None
 
 
 class SyncEventRequest(BaseModel):
@@ -404,13 +420,18 @@ async def parse_syllabus(request: Request, file: UploadFile = File(...)):
         parsed_events = await parse_with_gemini(pdf_text)
         logger.info("Parsed %d events from syllabus", len(parsed_events.get('events', [])))
 
+        schedule = _clean_parsed_schedule(parsed_events.get('schedule'))
+        if schedule:
+            logger.info("Parsed a class meeting schedule from syllabus: %s", schedule)
+
         return JSONResponse(
             status_code=200,
             content={
                 "message": "Syllabus received and parsed",
                 "filename": file.filename,
                 "size": len(contents),
-                "events": parsed_events.get('events', [])
+                "events": parsed_events.get('events', []),
+                "schedule": schedule,
             }
         )
     except Exception as e:
@@ -594,6 +615,19 @@ Course codes over long wordy stuff.
 
 ---
 
+## Step 7: Class Meeting Schedule (extract ONLY if explicitly stated)
+
+Separately from deliverables, capture the course's recurring **meeting pattern** — but only when the syllabus states it directly (in a header, an info block, or a "Lecture / Discussion / Lab" line). Examples: "Lecture: MWF 10:00–10:50am", "Discussion Thursdays 3:00-4:15 PM", "Final Exam: Wednesday, Dec 12, 4:00–7:00pm".
+
+- Do NOT infer meeting days/times from week-by-week tables or from assignment due dates. If it isn't stated plainly, leave it empty.
+- `lecture_days` / `section_days`: weekday tokens drawn from {{MO, TU, WE, TH, FR, SA, SU}}.
+- `*_start` / `*_end`: 24-hour "HH:MM" in the course's local time. If only a start time is given, leave the matching `*_end` null.
+- "Discussion", "Section", "Lab", "Recitation", "Quiz section" all map to the `section_*` fields.
+- `final_date`: "YYYY-MM-DD" using the same year rules as above. `final_start` / `final_end`: "HH:MM".
+- Every field is optional. Returning an all-empty schedule is correct and expected when the syllabus doesn't spell the meeting times out.
+
+---
+
 ## Output Format (STRICT)
 
 Return a **single JSON object** in this exact format:
@@ -607,9 +641,22 @@ Return a **single JSON object** in this exact format:
                     "Class": "The name of the class the user is taking here",
                     "isSyllabus": true
                 }}
-            ]
+            ],
+            "schedule": {{
+                "lecture_days": ["MO", "WE", "FR"],
+                "lecture_start": "10:00",
+                "lecture_end": "10:50",
+                "section_days": ["TH"],
+                "section_start": "15:00",
+                "section_end": "16:15",
+                "final_date": "2026-12-12",
+                "final_start": "16:00",
+                "final_end": "19:00"
+            }}
         }}
-        
+
+        For "schedule", omit or null any field the syllabus does not state explicitly; use [] for unknown day lists.
+
         Syllabus:
         {syllabus_text}
         """
@@ -677,6 +724,83 @@ Return a **single JSON object** in this exact format:
     logger.info("Gemini returned %d events",
                 len(parsed.get("events", [])) if isinstance(parsed, dict) else 0)
     return parsed
+
+
+_BYDAY_TOKENS = {"MO", "TU", "WE", "TH", "FR", "SA", "SU"}
+
+
+def _clean_hhmm(value) -> Optional[str]:
+    """Normalize a time to 'HH:MM' 24-hour, or None if it isn't a valid time."""
+    if not isinstance(value, str):
+        return None
+    parts = value.strip().split(":")
+    if len(parts) < 2:
+        return None
+    try:
+        hour, minute = int(parts[0]), int(parts[1])
+    except ValueError:
+        return None
+    if not (0 <= hour <= 23 and 0 <= minute <= 59):
+        return None
+    return f"{hour:02d}:{minute:02d}"
+
+
+def _clean_iso_date(value) -> Optional[str]:
+    if not isinstance(value, str):
+        return None
+    try:
+        return date_type.fromisoformat(value.strip()).isoformat()
+    except ValueError:
+        return None
+
+
+def _clean_byday_list(value) -> List[str]:
+    if not isinstance(value, list):
+        return []
+    seen, out = set(), []
+    for item in value:
+        if not isinstance(item, str):
+            continue
+        token = item.strip().upper()[:2]
+        if token in _BYDAY_TOKENS and token not in seen:
+            seen.add(token)
+            out.append(token)
+    return out
+
+
+def _clean_parsed_schedule(raw) -> Optional[dict]:
+    """Sanitize the `schedule` object Gemini returns. Returns None when the
+    syllabus didn't spell out any meeting times (the common case)."""
+    if not isinstance(raw, dict):
+        return None
+
+    cleaned = {
+        "lecture_days": _clean_byday_list(raw.get("lecture_days")),
+        "lecture_start": _clean_hhmm(raw.get("lecture_start")),
+        "lecture_end": _clean_hhmm(raw.get("lecture_end")),
+        "section_days": _clean_byday_list(raw.get("section_days")),
+        "section_start": _clean_hhmm(raw.get("section_start")),
+        "section_end": _clean_hhmm(raw.get("section_end")),
+        "final_date": _clean_iso_date(raw.get("final_date")),
+        "final_start": _clean_hhmm(raw.get("final_start")),
+        "final_end": _clean_hhmm(raw.get("final_end")),
+    }
+
+    # Drop a component that can't be used: days without a start time, or a start
+    # time without days; a final time without a date.
+    if not (cleaned["lecture_days"] and cleaned["lecture_start"]):
+        cleaned["lecture_days"], cleaned["lecture_start"], cleaned["lecture_end"] = [], None, None
+    if not (cleaned["section_days"] and cleaned["section_start"]):
+        cleaned["section_days"], cleaned["section_start"], cleaned["section_end"] = [], None, None
+    if not cleaned["final_date"]:
+        cleaned["final_start"], cleaned["final_end"] = None, None
+
+    has_lecture = bool(cleaned["lecture_days"])
+    has_section = bool(cleaned["section_days"])
+    has_final = bool(cleaned["final_date"])
+    if not (has_lecture or has_section or has_final):
+        return None
+    return cleaned
 
 
 def _find_or_create_calendar(service, class_name: str, background_color: Optional[str] = None, foreground_color: Optional[str] = None) -> str:

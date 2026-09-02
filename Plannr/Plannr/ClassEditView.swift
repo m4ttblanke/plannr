@@ -121,6 +121,11 @@ struct ClassEditView: View {
                     // Reload class from classManager to pick up new events + status
                     if let updated = classManager.classes.first(where: { $0.id == editableClass.id }) {
                         editableClass = updated
+                        // Adopt a schedule the parser auto-filled, but never stomp
+                        // a schedule the user was already editing.
+                        if scheduleDraft.isEmpty, let parsed = updated.structuredSchedule {
+                            scheduleDraft = parsed
+                        }
                     }
                     // Pop SyllabusUploadView + CalendarPreviewView back to ClassEditView
                     navigateToUpload = false
