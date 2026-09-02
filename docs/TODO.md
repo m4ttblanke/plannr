@@ -19,8 +19,6 @@ Working list of known problems and planned features. Last updated: September 3, 
 
 ### Low priority / cleanup
 
-- `EventEditView` "type" is a free-text field — no dropdown, so values
-  (homework/exam/quiz/lab/other) are not standardized.
 - `WeeklyDashboardView.statCard` has a dead ternary
   (`isPercentage ? "\(count)" : "\(count)"`).
 - `WeeklyDashboardView.getWeekendEvents()` is unused; `dayColumn` has an empty
@@ -76,6 +74,9 @@ Working list of known problems and planned features. Last updated: September 3, 
   class-creation paths, folder-level settings (term dates/system + the
   meeting-sync default), an "Archive term" bulk-INACTIVE action, and scoping
   Calendar / Week at a Glance to the active term.
+  It would be better with Start date and Term length, students who need help planning
+  won't know the exact end date of the term, but will know it lasts 10 weeks or 14 weeks
+  or 16 weeks.
 - Haptics on accept / decline / sync success.
 - App icon and launch screen pass (currently generated defaults).
 - Backend `/health` endpoint + an uptime monitor (also keeps the free dyno warm,

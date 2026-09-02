@@ -385,6 +385,20 @@ enum EventStatus: String, Codable {
     case declined
 }
 
+/// The standard event categories. `CalendarEvent.type` is stored as its raw
+/// string (so parser output and older data still decode); this normalizes any
+/// value to one of the known cases and drives the edit-screen picker.
+enum EventType: String, CaseIterable, Identifiable {
+    case homework, exam, quiz, lab, other
+
+    var id: String { rawValue }
+    var label: String { rawValue.capitalized }
+
+    init(_ raw: String) {
+        self = EventType(rawValue: raw.lowercased().trimmingCharacters(in: .whitespaces)) ?? .other
+    }
+}
+
 struct CalendarEvent: Codable, Identifiable {
     let id: UUID
     var title: String

@@ -759,11 +759,18 @@ struct EventEditView: View {
                             Text("Type")
                                 .font(.headline)
                                 .foregroundColor(.white)
-                            TextField("Event type", text: $editedEvent.type)
-                                .padding()
-                                .background(Color.gray.opacity(0.2))
-                                .foregroundColor(.white)
-                                .cornerRadius(8)
+                            Picker("Type", selection: Binding(
+                                get: { EventType(editedEvent.type) },
+                                set: { editedEvent.type = $0.rawValue }
+                            )) {
+                                ForEach(EventType.allCases) { Text($0.label).tag($0) }
+                            }
+                            .pickerStyle(.menu)
+                            .tint(.white)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding()
+                            .background(Color.gray.opacity(0.2))
+                            .cornerRadius(8)
                         }
                         
                         // Description field
@@ -783,6 +790,7 @@ struct EventEditView: View {
                         // Save button
                         Button(action: {
                             editedEvent.date = Self.dateFormatter.string(from: selectedDate)
+                            editedEvent.type = EventType(editedEvent.type).rawValue  // normalize legacy free-text
                             onSave(editedEvent)
                         }) {
                             Text("Save Changes")

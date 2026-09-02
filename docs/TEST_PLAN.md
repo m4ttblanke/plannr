@@ -99,8 +99,11 @@ Calendar at [calendar.google.com](https://calendar.google.com).
   are preview-only — they never appear in the accept/decline list and aren't part
   of Sync. With the setting off (default) they don't show.
 - [ ] On one event tap **Edit** → change the **Title** and **Description**,
-  spin the **Date** wheel forward a day, **Save Changes**.
-  **Expect:** the card reflects the new title/date/description.
+  spin the **Date** wheel forward a day, and open the **Type** menu (it's a
+  picker now, not a text field — Homework / Exam / Quiz / Lab / Other) and pick
+  a different one. **Save Changes**.
+  **Expect:** the card reflects the new title/date/description/type, and the
+  type chip / colour + any Week-at-a-Glance filter match the picked category.
 - [ ] Tap **Decline** on one event (badge → "Declined"), then **Accept** it
   back.
 - [ ] Toolbar **share icon** (top-right) → **Export as .ics (Calendar)**.
@@ -469,7 +472,8 @@ Needs a second Google account you can sign into.
   per-account scoping + legacy migration, `AuthManagerDeleteAccountTests`
   retry + probe, `AuthManagerSendTests` 401 choke point,
   `NotificationManagerTests` nearest-60 selection, `TermSettingsTests`
-  quarter/semester end date + auto label) and `PlannrUITests/GuestFlowUITests`.
+  quarter/semester end date + auto label, `EventTypeTests` category
+  normalization) and `PlannrUITests/GuestFlowUITests`.
 
 ---
 
