@@ -81,18 +81,16 @@ struct CalendarPreviewView: View {
 
                         // Events list
                         VStack(spacing: 12) {
-                            ForEach(events.indices, id: \.self) { index in
+                            ForEach($events) { $event in
                                 EventCard(
-                                    event: events[index],
+                                    event: event,
                                     colorOverride: sharedEventColor,
-                                    onEdit: {
-                                        editingEvent = events[index]
-                                    },
+                                    onEdit: { editingEvent = event },
                                     onAccept: {
-                                        events[index].status = events[index].status == .accepted ? .pending : .accepted
+                                        event.status = event.status == .accepted ? .pending : .accepted
                                     },
                                     onDecline: {
-                                        events[index].status = events[index].status == .declined ? .pending : .declined
+                                        event.status = event.status == .declined ? .pending : .declined
                                     }
                                 )
                             }
@@ -836,16 +834,7 @@ struct CalendarGridView: View {
             }
             .pickerStyle(.segmented)
             .padding()
-            .onAppear {
-                UISegmentedControl.appearance().setTitleTextAttributes(
-                    [.foregroundColor: UIColor.white],
-                    for: .normal)
-                UISegmentedControl.appearance().setTitleTextAttributes(
-                    [.foregroundColor: UIColor.darkGray],
-                    for: .selected)
-                UISegmentedControl.appearance().backgroundColor = UIColor.darkGray
-            }
-            
+
             if isWeekly {
                 WeeklyCalendarView(events: events, meetingEvents: meetingEvents, sharedEventColor: sharedEventColor)
             } else {

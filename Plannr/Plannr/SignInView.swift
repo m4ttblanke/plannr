@@ -17,7 +17,7 @@ struct SignInView: View {
     var body: some View {
         if showPDFUpload {
             PDFUploadView(isGuest: authManager.isGuest, accountEmail: authManager.userEmail)
-                .onChange(of: authManager.isAuthenticated) { isAuthenticated in
+                .onChange(of: authManager.isAuthenticated) { _, isAuthenticated in
                     if !isAuthenticated {
                         showPDFUpload = false
                     }

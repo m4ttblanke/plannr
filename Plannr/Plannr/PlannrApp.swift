@@ -11,6 +11,10 @@ import SwiftUI
 struct PlannrApp: App {
     @StateObject private var authManager = AuthManager()
 
+    init() {
+        AppAppearance.configure()
+    }
+
     var body: some Scene {
         WindowGroup {
             SignInView()

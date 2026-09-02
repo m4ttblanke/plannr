@@ -78,6 +78,10 @@
     const MIN_VELOCITY = 0.02;
     const MAX_VELOCITY = 3;
 
+    // Respect the OS "reduce motion" setting: no idle auto-scroll. The ticker
+    // stays put and remains fully draggable / touch-scrollable.
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
     let loopWidth = track.scrollWidth / 2;
     let rafId = null;
     let resumeTimer = null;
@@ -106,7 +110,7 @@
     }
 
     function playIdle() {
-      if (rafId) return;
+      if (reduceMotion || rafId) return;
       rafId = requestAnimationFrame(idleTick);
     }
 

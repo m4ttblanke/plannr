@@ -178,12 +178,12 @@ struct PDFUploadView: View {
                 }
                 syncNotifications()
             }
-            .onChange(of: classManager.classes) { _ in syncNotifications() }
-            .onChange(of: settingsManager.notificationsEnabled) { _ in syncNotifications() }
-            .onChange(of: settingsManager.reminderLeadTimeDays) { _ in syncNotifications() }
+            .onChange(of: classManager.classes) { _, _ in syncNotifications() }
+            .onChange(of: settingsManager.notificationsEnabled) { _, _ in syncNotifications() }
+            .onChange(of: settingsManager.reminderLeadTimeDays) { _, _ in syncNotifications() }
             // Re-sync on every foreground so the "nearest 60" reminder window
             // rolls forward as earlier ones fire (iOS caps pending reminders at 64).
-            .onChange(of: scenePhase) { newPhase in
+            .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active { syncNotifications() }
             }
             .navigationDestination(for: Class.self) { cls in
@@ -451,7 +451,7 @@ struct CalendarEvent: Codable, Identifiable {
         // isSyllabus is occasionally emitted by the LLM as a string ("true"/"True") rather
         // than a JSON boolean, so fall back to parsing a string before defaulting.
         if let boolValue = try? container.decodeIfPresent(Bool.self, forKey: .isSyllabus) {
-            isSyllabus = boolValue ?? true
+            isSyllabus = boolValue
         } else {
             let stringValue = try container.decodeIfPresent(String.self, forKey: .isSyllabus)
             isSyllabus = stringValue.map { $0.lowercased() == "true" } ?? true

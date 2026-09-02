@@ -150,13 +150,6 @@ struct UnifiedCalendarView: View {
                     }
                     .pickerStyle(.segmented)
                     .padding()
-                    .onAppear {
-                        UISegmentedControl.appearance().setTitleTextAttributes(
-                            [.foregroundColor: UIColor.white], for: .normal)
-                        UISegmentedControl.appearance().setTitleTextAttributes(
-                            [.foregroundColor: UIColor.darkGray], for: .selected)
-                        UISegmentedControl.appearance().backgroundColor = UIColor.darkGray
-                    }
 
                     if isWeekly {
                         UnifiedWeeklyCalendarView(events: allEvents, selectedDate: $selectedDate) { selectedEvent = $0 }

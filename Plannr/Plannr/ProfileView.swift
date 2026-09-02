@@ -121,7 +121,7 @@ struct ProfileView: View {
                             .background(Circle().fill(Color.yellow))
                     }
             }
-            .onChange(of: selectedPhotoItem) { newItem in
+            .onChange(of: selectedPhotoItem) { _, newItem in
                 Task {
                     if let data = try? await newItem?.loadTransferable(type: Data.self) {
                         authManager.setLocalProfilePhoto(data)

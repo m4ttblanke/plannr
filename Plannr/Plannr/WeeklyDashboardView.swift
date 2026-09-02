@@ -196,7 +196,7 @@ struct WeeklyDashboardView: View {
            statCard(
                title: "Completion",
                count: completionPercentage,
-               subtitle: "% this week",
+               subtitle: "this week",
                color: .green,
                isPercentage: true
            )
@@ -212,7 +212,7 @@ struct WeeklyDashboardView: View {
                .font(.caption2)
                .foregroundColor(.gray)
           
-           Text(isPercentage ? "\(count)" : "\(count)")
+           Text(isPercentage ? "\(count)%" : "\(count)")
                .font(.title2)
                .fontWeight(.bold)
                .foregroundColor(color)
@@ -289,11 +289,8 @@ struct WeeklyDashboardView: View {
            }
        }
        .frame(maxWidth: .infinity)
-       .onTapGesture {
-           // Could navigate to day detail view
-       }
    }
-  
+
    // MARK: - Weekend Preview Section
    private var weekendPreviewSection: some View {
        VStack(alignment: .leading, spacing: 8) {
@@ -533,17 +530,6 @@ struct WeeklyDashboardView: View {
        let tuesdayEvents = eventsForDate(nextTuesday).filter { !$0.isCompleted }
       
        return mondayEvents + tuesdayEvents
-   }
-  
-   private func getWeekendEvents() -> [CalendarEvent] {
-       let startOfWeek = Calendar.current.dateInterval(of: .weekOfYear, for: currentWeek)?.start ?? currentWeek
-       let saturday = Calendar.current.date(byAdding: .day, value: 5, to: startOfWeek) ?? currentWeek
-       let sunday = Calendar.current.date(byAdding: .day, value: 6, to: startOfWeek) ?? currentWeek
-      
-       let satEvents = eventsForDate(saturday)
-       let sunEvents = eventsForDate(sunday)
-      
-       return (satEvents + sunEvents).filter { !$0.isCompleted }
    }
   
    private func getNextMondayEvents() -> [CalendarEvent] {

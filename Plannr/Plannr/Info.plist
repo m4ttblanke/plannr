@@ -8,13 +8,12 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>com.plannr.app</string>
+			<string>com.matthewblanke.plannr</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>plannr</string>
 			</array>
 		</dict>
-		<dict/>
 	</array>
 </dict>
 </plist>

@@ -401,7 +401,8 @@ visit `localhost:8000`).
 - [ ] Sections **fade/rise in** as they enter view.
 - [ ] The **features** and **FAQ** accordions expand/collapse.
 - [ ] The **"What's next"** ticker auto-scrolls, can be **dragged**, and
-  includes a **"Canvas integration"** card.
+  includes a **"Canvas integration"** card. With the OS **Reduce Motion**
+  setting on, it does **not** auto-scroll but is still draggable / scrollable.
 - [ ] The **demo phone mockups** render crisply (no fuzzy text).
 - [ ] **Privacy** and **Terms** links open; both show **"Last updated:
   August 30, 2026"** and contact **mattheweblanke@gmail.com**.

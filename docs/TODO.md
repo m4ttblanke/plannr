@@ -19,22 +19,9 @@ Working list of known problems and planned features. Last updated: September 3, 
 
 ### Low priority / cleanup
 
-- `WeeklyDashboardView.statCard` has a dead ternary
-  (`isPercentage ? "\(count)" : "\(count)"`).
-- `WeeklyDashboardView.getWeekendEvents()` is unused; `dayColumn` has an empty
-  `.onTapGesture {}`.
-- `Info.plist` has a stray empty `<dict/>` in `CFBundleURLTypes`.
-- `UISegmentedControl.appearance()` is mutated globally inside `.onAppear` in two
-  views — an app-wide side effect.
-- `CalendarPreviewView` main event list uses `ForEach(events.indices, id: \.self)`
-  — fragile if the list length ever changes.
-- Bundle-ID mismatch: app target is `com.matthewblanke.plannr`; the test targets
-  and `Info.plist` `CFBundleURLName` say `com.plannr.app`. Confirm intentional.
-- Deprecated `onChange(of:perform:)` (iOS 17) warnings in ~4 views.
-- `SyllabusUploadView.swift` — `var parsedEv` is never mutated (compiler warning).
-- The iOS test suite covers almost nothing real — no tests for the reconcile /
-  sync-body / color-hex / date-math logic.
-- Landing-page "What's next" ticker ignores `prefers-reduced-motion`.
+- The inline `/calendar/sync` request-body builder in `CalendarPreviewView`
+  and `ClassEditView` still isn't unit-tested (it's constructed inside the
+  views). The reconcile step that feeds it is covered by `EventReconcilerTests`.
 
 ---
 
