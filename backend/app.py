@@ -22,6 +22,7 @@ from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
 from google.auth.exceptions import RefreshError
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 from pydantic import BaseModel
 from typing import List, Optional
 from pdf2image import convert_from_bytes
@@ -718,10 +719,13 @@ async def sync_class_calendar(request: Request, email: str = Query(...), body: C
     Idempotent sync of a class's events to a dedicated secondary Google Calendar.
 
     - Creates the secondary calendar if it doesn't exist yet (find-or-create by name).
-    - Updates events that already have a google_event_id.
+    - Patches events that already have a google_event_id (patch, not update, so
+      anything the user added to the event directly in Google Calendar — location,
+      attendees, notes — survives a re-sync). A patch that 404s (event deleted in
+      Google, or a stale id) recreates just that event.
     - Inserts new events that have no google_event_id.
     - Deletes events marked is_deleted=True (if they have a google_event_id).
-    - Falls back to a full rebuild if incremental sync fails.
+    - Falls back to a full rebuild only if incremental sync fails outright.
 
     Returns the google_calendar_id and per-event mappings {local_id, google_event_id}.
     """
@@ -761,13 +765,24 @@ async def sync_class_calendar(request: Request, email: str = Query(...), body: C
                             pass  # already deleted — that's fine
                     # deleted events are not returned in synced_events
                 elif event.google_event_id:
-                    # Update existing event
-                    updated = service.events().update(
-                        calendarId=cal_id,
-                        eventId=event.google_event_id,
-                        body=_build_google_event_body(event, body.reminder_minutes)
-                    ).execute()
-                    synced_events.append({"local_id": event.local_id, "google_event_id": updated['id']})
+                    # Patch the existing event — only the fields we send are
+                    # touched, so the user's own additions in Google Calendar are
+                    # kept. If the event is gone (404/410), recreate just this one.
+                    event_body = _build_google_event_body(event, body.reminder_minutes)
+                    try:
+                        result = service.events().patch(
+                            calendarId=cal_id,
+                            eventId=event.google_event_id,
+                            body=event_body
+                        ).execute()
+                    except HttpError as patch_err:
+                        if patch_err.resp.status in (404, 410):
+                            result = service.events().insert(
+                                calendarId=cal_id, body=event_body
+                            ).execute()
+                        else:
+                            raise
+                    synced_events.append({"local_id": event.local_id, "google_event_id": result['id']})
                 else:
                     # Insert new event
                     created = service.events().insert(

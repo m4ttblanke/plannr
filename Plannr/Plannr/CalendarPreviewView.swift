@@ -147,33 +147,37 @@ struct CalendarPreviewView: View {
             .alert(syncSuccess == true ? "Successfully added all events to your Google Calendar" : "Failed to add to your Google Calendar", isPresented: $showSyncAlert) {
                 Button("OK", role: .cancel) {
                     if syncSuccess == true, let syncResp = pendingSyncResponse {
-                        // Build lookup: localId → googleEventId
+                        // localId → googleEventId returned by the backend
                         let idMap = Dictionary(
                             uniqueKeysWithValues: syncResp.syncedEvents.map { ($0.localId, $0.googleEventId) }
                         )
-                        // Apply google event IDs to accepted events
-                        var acceptedEvents = events.filter { $0.status == .accepted }
-                        for i in acceptedEvents.indices {
-                            acceptedEvents[i].googleEventId = idMap[acceptedEvents[i].id.uuidString]
+                        // The events now in Google Calendar are the accepted ones
+                        // (reconciled deletions are gone). Record their Google IDs
+                        // and clear the "edited" flag now that Google reflects them.
+                        var syncedEvents = events.filter { $0.status == .accepted }
+                        for i in syncedEvents.indices {
+                            if let gid = idMap[syncedEvents[i].id.uuidString] {
+                                syncedEvents[i].googleEventId = gid
+                            }
+                            syncedEvents[i].isEdited = false
                         }
-                        // Fetch existing class to preserve its id-based identity
+                        // Preserve the existing class's identity and metadata.
                         let existingClass = classManager.classes.first(where: { $0.id == existingClassID })
-                        let existingColorHex = classManager.classes
-                            .first(where: { $0.id == existingClassID })?.colorHex
-                            ?? sharedEventColor.toHex()
+                        let existingColorHex = existingClass?.colorHex ?? sharedEventColor.toHex()
                         let existingSyncHistory = existingClass?.syncHistory ?? []
-                        
+
                         classManager.removeClassByID(existingClassID)
                         classManager.addClass(Class(
                             id: existingClassID,
                             name: className,
                             schedule: classSchedule,
                             colorHex: existingColorHex,
-                            events: acceptedEvents,
+                            events: syncedEvents,
                             status: .active,
                             googleCalendarId: syncResp.googleCalendarId,
                             lastSynced: Date(),
-                            syncHistory: existingSyncHistory + [SyncSession(events: acceptedEvents)],
+                            endDate: existingClass?.endDate,
+                            syncHistory: existingSyncHistory + [SyncSession(events: syncedEvents)],
                             hasUnsyncedChanges: false
                         ))
                         pendingSyncResponse = nil
@@ -320,8 +324,10 @@ struct CalendarPreviewView: View {
 
     func syncToCalendar() {
         let acceptedEvents = events.filter { $0.status == .accepted }
+        // Events dropped from a re-uploaded syllabus that already exist in Google.
+        let deletions = eventsToDelete.filter { $0.googleEventId != nil }
 
-        if acceptedEvents.isEmpty {
+        if acceptedEvents.isEmpty && deletions.isEmpty {
             syncMessage = "No accepted events to sync. Please accept events before syncing."
             syncSuccess = false
             showSyncAlert = true
@@ -340,7 +346,6 @@ struct CalendarPreviewView: View {
         isSyncing = true
 
         let existingClass = classManager.classes.first(where: { $0.id == existingClassID })
-        let oldCalendarId = existingClass?.googleCalendarId
 
         struct SyncEventBody: Encodable {
             let localId: String
@@ -377,23 +382,37 @@ struct CalendarPreviewView: View {
             }
         }
 
-        // Send only accepted events — no googleEventId needed since we're recreating the calendar
-        let eventBodies = acceptedEvents.map { ev in
+        // Incremental sync: send each accepted event with its googleEventId when
+        // it has one (backend updates in place) or nil (backend inserts), plus
+        // reconciled deletions. Never recreate the calendar.
+        var eventBodies = acceptedEvents.map { ev in
             SyncEventBody(
                 localId: ev.id.uuidString,
                 title: ev.title,
                 date: ev.date,
                 description: ev.description,
                 type: ev.type,
-                googleEventId: nil,
+                googleEventId: ev.googleEventId,
                 isDeleted: false
             )
         }
+        eventBodies += deletions.map { ev in
+            SyncEventBody(
+                localId: ev.id.uuidString,
+                title: ev.title,
+                date: ev.date,
+                description: ev.description,
+                type: ev.type,
+                googleEventId: ev.googleEventId,
+                isDeleted: true
+            )
+        }
 
-        // Pass nil so the backend creates a fresh calendar
+        // Reuse the class's existing calendar (nil only for a class that has
+        // never synced — the backend then find-or-creates by name).
         let body = SyncRequestBody(
             className: className,
-            googleCalendarId: nil,
+            googleCalendarId: existingClass?.googleCalendarId,
             events: eventBodies,
             backgroundColor: (existingClass?.colorHex.hasPrefix("#") == true) ? existingClass?.colorHex : "#\(existingClass?.colorHex ?? "007AFF")",
             foregroundColor: "#FFFFFF",
@@ -415,15 +434,6 @@ struct CalendarPreviewView: View {
         }
 
         Task {
-            // Delete the old calendar first so we start fresh
-            if let calId = oldCalendarId,
-               let encodedCalId = calId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-               let deleteURL = URL(string: "\(BACKEND_URL)calendar?email=\(encodedEmail)&google_calendar_id=\(encodedCalId)") {
-                var deleteRequest = URLRequest(url: deleteURL)
-                deleteRequest.httpMethod = "DELETE"
-                _ = try? await URLSession.shared.data(for: deleteRequest)
-            }
-
             do {
                 let (data, http) = try await authManager.send(syncRequest)
                 await MainActor.run {

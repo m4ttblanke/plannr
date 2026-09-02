@@ -318,41 +318,6 @@ struct SyllabusUploadView: View {
     }
 
     
-    // MARK: - Reconcile parsed events with existing local events
-    /// Merges newly parsed events with the class's existing events.
-    /// - Matching key: lowercased title + date.
-    /// - Matched + locally edited → keep the local (edited) version, carry over googleEventId.
-    /// - Matched + not edited → use the freshly parsed version, carry over googleEventId.
-    /// - Only in new parse → add as new event.
-    /// - Only in existing (no match) → returned in toDelete for removal from Google Calendar.
-    /// Returns (result: merged events, toDelete: old events to remove from GCal).
-    func reconcileEvents(parsed: [CalendarEvent], existing: [CalendarEvent]) -> [CalendarEvent] {
-        guard !existing.isEmpty else { return parsed }
-
-        func matchKey(_ ev: CalendarEvent) -> String {
-            ev.title.lowercased().trimmingCharacters(in: .whitespaces) + "_" + ev.date
-        }
-
-        var existingByKey: [String: CalendarEvent] = [:]
-        for ev in existing where !ev.isDeletedLocally {
-            existingByKey[matchKey(ev)] = ev
-        }
-
-        var result: [CalendarEvent] = []
-
-        for var parsedEv in parsed {
-            let key = matchKey(parsedEv)
-            if let existingEv = existingByKey[key], existingEv.isEdited {
-                // Preserve local edits
-                result.append(existingEv)
-            } else {
-                result.append(parsedEv)
-            }
-        }
-
-        return result
-    }
-
     // MARK: - Upload PDF
     func uploadPDF(url: URL) {
         isUploading = true
@@ -411,11 +376,15 @@ struct SyllabusUploadView: View {
                             let acceptedParsed = jsonResponse.events.map { ev -> CalendarEvent in
                                 var e = ev; e.status = .accepted; return e
                             }
-                            // Reconcile with existing events (preserves local edits)
-                            self.parsedEvents = self.reconcileEvents(
+                            // Reconcile with existing events: preserves local edits,
+                            // carries googleEventId forward for in-place updates, and
+                            // surfaces events dropped from the new syllabus for deletion.
+                            let reconciled = EventReconciler.reconcile(
                                 parsed: acceptedParsed,
                                 existing: self.existingEvents
                             )
+                            self.parsedEvents = reconciled.merged
+                            self.eventsToDelete = reconciled.toDelete
                             self.isUploading = false
                             self.navigateToPreview = true
                         }

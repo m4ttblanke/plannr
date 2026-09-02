@@ -8,23 +8,6 @@ Working list of known problems and planned features. Last updated: September 1, 
 
 ### High priority
 
-- **First sync destroys and recreates the Google calendar.**
-  `CalendarPreviewView.syncToCalendar` always sends `googleCalendarId: nil` and
-  deletes the old calendar before rebuilding, so every sync wipes any edits the
-  user made directly in Google Calendar (moved events, custom reminders,
-  attendees) and leaves a window where a failed sync = no calendar at all.
-  "Re-upload a syllabus" runs through this same path. Converge it with
-  `ClassEditView.resyncChanges`: pass the existing calendar id + per-event
-  `googleEventId`, insert/update/delete the diff, no pre-delete.
-
-- **`reconcileEvents` is half-implemented** (`SyllabusUploadView`).
-  It does not carry `googleEventId` from a matched existing event onto the parsed
-  one, and never computes "in old, not in new parse" deletions. `eventsToDelete`
-  is dead code threaded through two views, and the docstring describes behavior
-  that does not exist. This is currently masked by the full-rebuild in the bug
-  above — **must be fixed together with it**, or re-upload will duplicate every
-  unchanged event and orphan removed ones in Google Calendar.
-
 - **Confirm the Gemini model name on the live backend.**
   `backend/app.py` calls `model='gemini-3.7-flash'`. Verify a real syllabus
   parses end-to-end against production after each deploy — a wrong model id
@@ -100,8 +83,9 @@ Working list of known problems and planned features. Last updated: September 1, 
   whole flow without hunting for a PDF.
 - **Phased progress during parsing** — "Waking server… → Reading PDF… →
   Extracting events…" instead of one spinner (the cold start looks like a hang).
-- **Sync resilience** — retry with backoff; build the new calendar before
-  deleting the old one (ties into the High-priority sync bug).
+- **Sync resilience** — retry with backoff on transient failures. (The
+  delete-and-recreate behavior is fixed: sync is now an incremental
+  patch/insert/delete diff against the existing calendar.)
 - **Editable schedule after creation** (see Medium-priority bug).
 - Haptics on accept / decline / sync success.
 - App icon and launch screen pass (currently generated defaults).
