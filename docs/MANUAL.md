@@ -25,6 +25,10 @@ If Google access is later revoked (for example, by removing the app from your Go
 
 Users can add multiple classes and view their full class list on the home page. Each class can be assigned a custom color for easy visual identification across the calendar.
 
+When adding or editing a class, users can set a **structured weekly schedule** — pick the lecture days and a start/end time, and optionally a separate section/lab meeting on its own day and time. The schedule can also carry a first-meeting date, a "repeat for X weeks" limit, and a final-exam date and time.
+
+Each class has a status shown as a tappable badge on its edit screen: **ACTIVE**, **INACTIVE**, or **NO SYLLABUS** (read-only, until events are added). Switching a class to **INACTIVE** — manually, or automatically once its end date passes — turns off its class-meeting sync, removes its recurring meeting events from Google Calendar, and unchecks (hides) its dedicated calendar in the Google Calendar sidebar without deleting it. Switching back to **ACTIVE** re-checks that calendar.
+
 <img src="MANUAL_IMAGES/classes.png" alt="alt text" width="300">
 
 
@@ -65,12 +69,14 @@ Users can edit any event after it has been parsed or synced. Changes made locall
 
 Plannr provides a weekly/monthly grid calendar showing all events from every class, color-coded by class for quick identification. Events can be filtered by type (homework, exam, quiz, lab, or all).
 
+The list below the grid is scoped to whichever week or month the grid is currently showing (not every future event), and — when the setting is on (see Profile & Settings) — recurring class meetings and final exams appear in a separate "Class Meetings" group beneath the assignments.
+
 <img src="MANUAL_IMAGES/calendar.png" alt="alt text" width="300">
 
 
 ### Week at a Glance
 
-The Week at a Glance view gives users a focused look at their upcoming week, surfacing all deadlines and events across classes in a single compact view. This makes it easy to anticipate heavy workload periods and plan accordingly.
+The Week at a Glance view gives users a focused look at their upcoming week, surfacing all deadlines and events across classes in a single compact view. This makes it easy to anticipate heavy workload periods and plan accordingly. When the "Show in Week at a Glance" setting is on, recurring class meetings for the week appear in a separate group under the "All" filter.
 
 <img src="MANUAL_IMAGES/week_at_a_glance.png" alt="alt text" width="300">
 
@@ -78,6 +84,10 @@ The Week at a Glance view gives users a focused look at their upcoming week, sur
 ### Sync to Google Calendar
 
 Users can push all parsed events to their Google Calendar with one tap. Plannr creates a dedicated secondary calendar for each class with a matching color. Re-syncing handles updates and deletions automatically.
+
+### Class Meeting Sync
+
+On a class with a structured schedule, signed-in users can turn on **Add class meetings to Google Calendar**. Plannr writes the weekly lecture and section times to that class's calendar as recurring events, plus a one-off event for the final exam. The recurrence runs until the "repeat for X weeks" limit, the class end date, or the term end date — whichever applies — and is open-ended if none is set. Turning the toggle off (or setting the class to INACTIVE) removes those recurring events again. Class meetings are kept out of the in-app Calendar and Week at a Glance views unless the corresponding display setting is enabled.
 
 ### Export Events
 
@@ -91,8 +101,9 @@ Events can be exported as an iCal (.ics) file compatible with most calendar apps
 The profile screen (tap the avatar in the top-right of the home screen) collects account and preference options in one place:
 
 - **Profile photo** — use your Google account photo, or pick a custom one from your photo library.
-- **Current Term** — record a term label and start/end dates. This is informational only; it is not yet used to constrain parsing or auto-set class end dates.
+- **Current Term** — record a term label and start/end dates. The start/end dates are used as a fallback recurrence window for class-meeting sync when a class has no first-meeting date or end date of its own. The term *label* is informational, and the dates are not yet used to constrain syllabus parsing or auto-set a class's end date.
 - **Deadline Reminders** — choose how far ahead of a due date to be reminded (same day up to 7 days before, or leave it to Google Calendar's default). When events are synced, this reminder lead time is applied to the Google Calendar entries.
+- **Class Meetings** — two toggles, both off by default: *Show in Calendar* and *Show in Week at a Glance*. They control whether recurring lecture/section times and final exams appear in those two in-app views. They do not affect Google Calendar sync, which is enabled per class.
 - **Notifications** — opt in to local reminder notifications on this device, scheduled from the reminder lead time above. These are separate from Google Calendar's own notifications and are limited to this device.
 - **Sync** — enable *Auto-sync* to push edits to Google Calendar immediately instead of waiting for a manual re-sync. Not available in guest mode.
 - **Sign Out** and **Delete Account**. Deleting an account removes the on-device data and asks the backend to delete the stored Google credentials.
@@ -103,5 +114,6 @@ The profile screen (tap the avatar in the top-right of the home screen) collects
 - The event type field (e.g. Homework, Exam, Lab, Quiz) is a free-text input rather than a dropdown menu, so values are not standardized.
 - Very large syllabi with many deadlines can exceed what the parser handles in a single pass; the app will suggest splitting the document into smaller uploads.
 - OCR of scanned or photographed syllabi depends on image quality — faint, skewed, or low-contrast scans may yield incomplete results. OCR is also not currently enabled on the production backend, so scanned-only PDFs may need to be uploaded as text-layer PDFs or pasted as text.
-- The "Current Term" dates in Profile & Settings are recorded but not yet wired into parsing or class end dates.
+- The "Current Term" *label* and parsing/end-date use are not yet wired up; only the term start/end dates are used, as a fallback window for class-meeting recurrence.
+- Classes are stored on the device, not per Google account. Signing out and into a different account on the same device carries the first account's classes over, and their stored calendar/event references still point at the first account. Deleting and re-adding the class on the new account fixes it.
 - Local reminder notifications are capped by iOS at 64 pending notifications per app; students with a very large number of upcoming deadlines may not receive reminders for all of them.

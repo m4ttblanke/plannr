@@ -149,9 +149,9 @@ This is the important one — sync must change only what changed.
   **Expect (if already synced):** 🔎 the `CS 101` calendar's color changes in
   Google Calendar within a few seconds (silent, no alert).
 - [ ] **End date** row → **Set** → pick a date **in the past** → back out and
-  reopen the class. **Expect:** status auto-flips to **INACTIVE**. Set the end
-  date back to the future (or clear it with the ✕) and set status back to
-  **ACTIVE** via the badge menu.
+  reopen the class. **Expect:** status auto-flips to **INACTIVE** (this also runs
+  the INACTIVE side effects below). Set the end date back to the future (or clear
+  it with the ✕) and set status back to **ACTIVE** via the badge menu.
 - [ ] Tap **View Sync Sessions**. **Expect:** a list of "Session 1", "Session
   2"… each with a date and event count; tap one to expand its events.
 
@@ -175,17 +175,33 @@ This is the important one — sync must change only what changed.
 - [ ] Toggle it **ON** again, then edit the schedule (remove the section).
   **Expect:** 🔎 the section recurring event is removed; the lecture one stays
   and reflects the change.
+- [ ] With meeting sync **ON**, tap the **ACTIVE** badge → choose **INACTIVE**.
+  **Expect:** the "Add class meetings to Google Calendar" toggle flips off.
+  🔎 In Google Calendar: the recurring `CS 101` / `CS 101 (Section)` events are
+  **gone**, and the **`CS 101` calendar is unchecked** (hidden) in the left
+  sidebar — but still present under "Other calendars", not deleted. The one-off
+  assignment events are untouched.
+- [ ] Tap the badge again → **ACTIVE**. **Expect:** 🔎 the `CS 101` calendar is
+  **re-checked** in the sidebar. (Meeting sync stays off — re-enable it manually
+  with the toggle if you want the recurring events back.)
 
 ### I. Unified Calendar view
 
 - [ ] Hamburger → **Calendar**.
 - [ ] **Expect:** a horizontal **color legend** of your classes; a **Week/Month**
   grid with color-coded dots per class; tapping a day lists that day's events.
-- [ ] Scroll to **Upcoming Events** — future events sorted by date. Tap one →
-  an **Event Details** sheet (Date, Type, Description). **Done** to close.
+- [ ] Scroll to the list below the grid. **Expect:** its heading is **"This
+  Week"** (or **"This Month"** in Month view), and it lists only events in the
+  week/month the grid is currently showing — **not** every future event. Move the
+  grid with the **‹ ›** arrows. **Expect:** the list follows the grid.
+- [ ] Tap an event → an **Event Details** sheet (Date, Type, Description).
+  **Done** to close.
 - [ ] Back in a class, **Delete** (queue) an event without re-syncing, then
   return here. **Expect:** that queued-for-deletion event does **not** appear
-  in the calendar or Upcoming list. (Undo it afterward.)
+  in the calendar or the list. (Undo it afterward.)
+- [ ] (After §K turns on "Show in Calendar":) **Expect:** class meetings and the
+  final exam for the visible week/month appear in a **separate "Class Meetings"
+  group** below the assignments, and as extra dots on the grid.
 
 ### J. Week at a Glance
 
@@ -218,12 +234,17 @@ Open the profile avatar (top-right of any tab).
   **End date**. (These feed the class-meeting recurrence window — re-toggle a
   class's meetings after setting them to see the recurrence end change.)
 - [ ] **Deadline Reminders → Remind me:** pick "2 days before".
-- [ ] **Week at a Glance → Show class meetings:** turn it **ON**. Go back to
+- [ ] **Class Meetings → Show in Week at a Glance:** turn it **ON**. Go back to
   **Week at a Glance**.
   **Expect:** under the **"All"** filter, a **"Class Meetings"** group lists this
   week's `CS 101` lecture(s)/section with day + time, a "Class" chip, and **no
   completion circle**. Switch to a specific filter (e.g. Exams) — the meetings
-  **disappear**. Turn the setting back off if you prefer the default.
+  **disappear**.
+- [ ] **Class Meetings → Show in Calendar:** turn it **ON**. Go to
+  **Calendar** (§I).
+  **Expect:** the visible week/month's meetings and any final exam show in a
+  **"Class Meetings"** group below the assignments, plus extra grid dots. Turn
+  both toggles back off if you prefer the default.
 - [ ] **Sync → Auto-sync changes:** turn ON. Go to a class, edit an event.
   **Expect:** it syncs immediately (no "Re-sync" button appears / it clears on
   its own). Turn auto-sync back off.
@@ -363,6 +384,11 @@ Follow the "Testing without real money" steps in `README.md`. Then:
 - [ ] Hammer `POST /syllabus` >10×/min from one IP → **429** (rate limited).
 - [ ] `DELETE /calendar?...&google_calendar_id=...` for a real calendar → 200
   and it's gone.
+- [ ] `POST /calendar/visibility?email=...` with
+  `{"google_calendar_id": "<real id>", "selected": false}` → 200
+  `{"selected": false}` and 🔎 that calendar is unchecked in the sidebar; repeat
+  with `true` to re-check it. A bogus calendar id → 200 `{"selected": ...,
+  "skipped": true}` (not an error).
 
 ---
 
@@ -373,14 +399,16 @@ Follow the "Testing without real money" steps in `README.md`. Then:
   cd backend && source venv/bin/activate && python -m pytest -q
   ```
   **Expect:** all pass (OAuth signed-state, export, syllabus retry,
-  `/calendar/sync` patch-not-recreate, `/calendar/meetings` RRULE).
+  `/calendar/sync` patch-not-recreate, `/calendar/meetings` RRULE,
+  `/calendar/visibility` check/uncheck).
 - [ ] **iOS:** in Xcode press **Cmd+U**, or:
   ```bash
   xcodebuild test -project Plannr/Plannr.xcodeproj -scheme Plannr \
     -destination 'platform=iOS Simulator,name=iPhone 16'
   ```
   **Expect:** `PlannrTests` all pass (`EventReconcilerTests`,
-  `ClassScheduleTests`, `CalendarPreviewViewTests`).
+  `ClassScheduleTests`, `CalendarPreviewViewTests`, `UnifiedEventMeetingTests`)
+  and `PlannrUITests/GuestFlowUITests`.
 
 ---
 
@@ -429,12 +457,14 @@ Follow the "Testing without real money" steps in `README.md`. Then:
 | ClassEditView: edit / delete / undo / re-sync | §1G |
 | Color change → live calendar re-color | §1G |
 | End date + auto-INACTIVE | §1G |
+| INACTIVE (auto & manual) → meetings pulled + calendar unchecked; ACTIVE re-checks | §1G, §1H |
 | Sync Sessions history | §1G |
 | Class meetings → recurring Google Calendar events (+ off / edit) | §1H |
-| Unified Calendar (legend, grid, upcoming, detail sheet, deleted hidden) | §1I |
+| Unified Calendar (legend, grid, list scoped to visible week/month, detail sheet, deleted hidden) | §1I |
+| Class meetings + final exam shown in Calendar list/grid (setting) | §1I, §1K |
 | Week at a Glance (nav, filters, stats, overview, weekend preview) | §1J |
 | Task completion + **persistence across relaunch** | §1J |
-| "Show class meetings" setting + filter behavior | §1K |
+| "Class Meetings" display settings (Calendar + Week at a Glance toggles) + filter behavior | §1K |
 | Profile photo (custom + remove) | §1K |
 | Current Term settings (feeds meeting recurrence) | §1K, §1H |
 | Deadline reminder lead time | §1K, §2d |
@@ -443,5 +473,5 @@ Follow the "Testing without real money" steps in `README.md`. Then:
 | Delete Account (success + backend-failure guard) | §4 |
 | Landing page (nav, reveal, accordion, ticker, policies) | §2e |
 | TestFlight / Stripe success + error pages + webhook | §2f |
-| Rate limiting / backend endpoints | §2g |
+| Rate limiting / backend endpoints (incl. `/calendar/visibility`) | §2g |
 | Automated test suites | §3 |
