@@ -23,7 +23,6 @@ Working list of known problems and planned features. Last updated: September 2, 
 
 ### Pre-launch polish
 
-- **End Date per class** Check if the end date in the Edit Class view is even used
 - **Crash reporting** (Sentry or Firebase Crashlytics) — highest-value beta add;
   testers will report "it crashed" with no stack trace otherwise.
 - **First-run onboarding** — 3 cards: upload → review & edit → sync.

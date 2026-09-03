@@ -38,7 +38,7 @@ Classes can be grouped into **term folders**. The header under "My Classes" is a
 
 - New classes are **unfiled by default**; the Add-Class screen and the class edit screen both have a **Term** picker to file one, including a **New Term…** option to create a term right there.
 - Selecting a term in the switcher makes it the **active term**. So does **syncing a class** to Google Calendar — the class's term becomes the current one. The **Calendar** and **Week at a Glance** views then show only that term's classes (plus any unfiled ones).
-- A new class filed into a term inherits the term's end date, and — if the term has "Auto-sync class meetings" on — starts with meeting sync enabled.
+- A new class filed into a term inherits the term's end date, and — if the term has "Auto-sync class meetings" on — starts with meeting sync enabled. The **End date** on the class's edit screen can override it (e.g. a summer session) or be cleared for an open-ended class; it's what stops meeting recurrence and auto-switches the class to INACTIVE once it passes.
 - **Archive term** (in the term editor) sets every class in it to INACTIVE in one step.
 - **Deleting a term** doesn't delete its classes — they just become unfiled.
 - Upgrading from a build with the old single "Current Term": your term becomes a folder and your existing classes are filed into it once, automatically.

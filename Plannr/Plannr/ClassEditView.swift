@@ -271,7 +271,7 @@ struct ClassEditView: View {
                     DatePicker(
                         "",
                         selection: Binding(
-                            get: { editableClass.endDate ?? Calendar.current.date(byAdding: .month, value: 3, to: Date())! },
+                            get: { editableClass.endDate ?? suggestedEndDate },
                             set: { newDate in
                                 editableClass.endDate = newDate
                                 persistClass()
@@ -284,6 +284,12 @@ struct ClassEditView: View {
                     .colorScheme(.dark)
                     .labelsHidden()
                 }
+
+                Text(editableClass.endDate == nil
+                     ? "No end date — meetings recur to the term's end and the class stays ACTIVE."
+                     : "Recurring meetings stop here, and the class auto-switches to INACTIVE once it passes.")
+                    .font(.caption2)
+                    .foregroundColor(.gray)
             }
 
             // Last synced
@@ -294,6 +300,14 @@ struct ClassEditView: View {
             }
         }
         .padding(.horizontal)
+    }
+
+    /// What the "Set" end-date picker opens on: the class's term end if it has
+    /// one, otherwise three months out.
+    private var suggestedEndDate: Date {
+        termStore.term(id: editableClass.termID)?.resolvedEndDate()
+            ?? Calendar.current.date(byAdding: .month, value: 3, to: Date())
+            ?? Date()
     }
 
     // MARK: - Schedule + class meetings
