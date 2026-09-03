@@ -23,22 +23,14 @@ Working list of known problems and planned features. Last updated: September 2, 
 
 ### Pre-launch polish
 
-- ~~**Crash reporting**~~ — done. Sentry (`sentry-cocoa` SPM) wrapped in
-  `CrashReporting.swift`, started from `PlannrApp.init`, no-op until a DSN is set
-  in `Info.plist` `SENTRY_DSN`. Sets the signed-in email as the Sentry user;
-  Debug builds get a "Force a test crash" button in the profile sheet. Setup +
-  dSYM notes in `docs/CRASH_REPORTING.md`. **Remaining:** create the Sentry
-  project and paste in the DSN.
-- ~~**"Try a sample syllabus"** button on the empty state~~ — done, as a guided
-  walkthrough. The empty-state button creates a throwaway `isSample` class and
-  runs `SampleTour`: anchored coach-mark bubbles across upload → preview →
-  (simulated) sync → edit, with the parse faked (`SampleSyllabus.events()`, no
-  Gemini) and no Google Calendar write. Finishing or skipping deletes the sample
-  class. First-run onboarding (`OnboardingView`, gated by `onboarding.hasSeen`)
-  is also done.
-- **Sync resilience** — retry with backoff on transient failures. (The
-  delete-and-recreate behavior is fixed: sync is now an incremental
-  patch/insert/delete diff against the existing calendar.)
+- ~~**Sync resilience** — retry with backoff on transient failures.~~ — done.
+  `AuthManager.send` (the one network choke point, so this covers sync, meeting
+  sync, syllabus parse, export, visibility) now retries up to 3 attempts on
+  HTTP 5xx / 429 or a connection-level `URLError` (timeout, connection lost,
+  host unreachable — e.g. a Render dyno waking), with exponential backoff +
+  jitter and `Retry-After` support. 401 / other 4xx / non-`URLError` throws are
+  not retried. (The delete-and-recreate behavior was already fixed: sync is an
+  incremental patch/insert/delete diff.)
 - **Restore a sync session.** `SyncSessionsView` already lists every past sync
   with its full event snapshot (`Class.syncHistory: [SyncSession]`), but it's
   read-only. Add a "Restore this version" action that replaces the class's

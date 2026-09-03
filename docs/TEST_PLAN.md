@@ -154,6 +154,10 @@ Calendar at [calendar.google.com](https://calendar.google.com).
 - [ ] 🔎 In Google Calendar: a **new secondary calendar named `CS 101`** in your
   chosen **color**, containing all the accepted events as **all-day** entries on
   the right dates (including the one you edited).
+- [ ] **Transient-failure retry (optional).** Turn Airplane Mode **on**, tap
+  **Sync!**, wait ~2 s, turn it **off** again. **Expect:** the sync recovers by
+  itself (no error alert) — `send` retries with a growing delay. A sync against
+  a cold backend (idle for a while) exercises the same path via a 502/503.
 
 ### F. Re-upload an updated syllabus (incremental reconcile)
 
@@ -529,7 +533,8 @@ Needs a second Google account you can sign into.
   `ClassScheduleTests`, `CalendarPreviewViewTests`, `UnifiedEventMeetingTests`,
   `ParsedScheduleTests`, `ClassMeetingSyncTests`, `ClassManagerTests`
   per-account scoping + legacy migration, `AuthManagerDeleteAccountTests`
-  retry + probe, `AuthManagerSendTests` 401 choke point,
+  retry + probe, `AuthManagerSendTests` 401 choke point + transient-failure
+  retry/backoff,
   `NotificationManagerTests` nearest-60 selection, `TermSettingsTests`
   quarter/semester end date + auto label, `EventTypeTests` category
   normalization, `ClassSyncRequestTests` /calendar/sync body + response,

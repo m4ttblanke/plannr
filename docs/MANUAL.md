@@ -103,7 +103,9 @@ The Week at a Glance view gives users a focused look at their upcoming week, sur
 
 ### Sync to Google Calendar
 
-Users can push all parsed events to their Google Calendar with one tap. Plannr creates a dedicated secondary calendar for each class with a matching color. Re-syncing handles updates and deletions automatically.
+Users can push all parsed events to their Google Calendar with one tap. Plannr creates a dedicated secondary calendar for each class with a matching color. Re-syncing handles updates and deletions automatically as an incremental diff — it patches, inserts, and deletes individual events rather than rebuilding the calendar, so manual edits made in Google Calendar survive a re-sync.
+
+A flaky connection or a server still waking up no longer fails the sync outright: every request is retried a few times with a growing delay before an error is shown, so a brief blip recovers on its own.
 
 ### Class Meeting Sync
 

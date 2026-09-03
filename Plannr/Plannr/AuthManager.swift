@@ -116,23 +116,87 @@ class AuthManager: ObservableObject {
         try await URLSession.shared.data(for: $0)
     }
 
+    /// Total attempts `send` makes for one request before giving up on a
+    /// *transient* failure (5xx / 429 / a connection-level error). 1 disables retry.
+    var maxSendAttempts = 3
+
+    /// Backoff wait between attempts. Replaced in tests so they don't actually sleep.
+    var retrySleep: (TimeInterval) async throws -> Void = { seconds in
+        try await Task.sleep(nanoseconds: UInt64(max(0, seconds) * 1_000_000_000))
+    }
+
     /// The single choke point for **every** backend request. Any 401 response —
     /// from any endpoint — triggers the global session-expired sign-out. Callers
     /// still handle their own non-401 status codes, and should bail out early
     /// (without showing their own error UI) when `http.statusCode == 401`.
     ///
+    /// Transient failures — HTTP 5xx / 429, or a connection-level `URLError`
+    /// (timeout, connection lost, host unreachable — e.g. a Render dyno waking) —
+    /// are retried up to `maxSendAttempts` times with exponential backoff + jitter,
+    /// honouring `Retry-After` when present. A 401, any other 4xx, and a
+    /// non-`URLError` throw are returned/propagated immediately.
+    ///
     /// The one deliberate bypass is `deleteAccount`, which calls
     /// `httpDataProvider` directly: there a 401 means "the account is already
     /// gone", not "session expired". Every other network call goes through here.
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
-        let (data, response) = try await httpDataProvider(request)
-        guard let http = response as? HTTPURLResponse else {
-            throw URLError(.badServerResponse)
+        var attempt = 0
+        while true {
+            attempt += 1
+            let canRetry = attempt < maxSendAttempts
+            do {
+                let (data, response) = try await httpDataProvider(request)
+                guard let http = response as? HTTPURLResponse else {
+                    throw URLError(.badServerResponse)
+                }
+                if http.statusCode == 401 {
+                    handleSessionExpired()
+                    return (data, http)
+                }
+                if canRetry, Self.isRetryable(status: http.statusCode) {
+                    let hint = http.value(forHTTPHeaderField: "Retry-After")
+                    CrashReporting.breadcrumb(
+                        "send: HTTP \(http.statusCode) on \(request.url?.path ?? "?"), retrying (attempt \(attempt))",
+                        category: "network")
+                    try await retrySleep(Self.backoffDelay(attempt: attempt, retryAfter: hint))
+                    continue
+                }
+                return (data, http)
+            } catch let error as URLError where canRetry && Self.isRetryable(error) {
+                CrashReporting.breadcrumb(
+                    "send: \(error.code.rawValue) on \(request.url?.path ?? "?"), retrying (attempt \(attempt))",
+                    category: "network")
+                try await retrySleep(Self.backoffDelay(attempt: attempt, retryAfter: nil))
+                continue
+            }
         }
-        if http.statusCode == 401 {
-            handleSessionExpired()
+    }
+
+    // MARK: - Retry policy
+
+    private static let retryableStatuses: Set<Int> = [429, 500, 502, 503, 504]
+
+    private static let retryableURLErrorCodes: Set<URLError.Code> = [
+        .timedOut, .networkConnectionLost, .cannotConnectToHost,
+        .cannotFindHost, .dnsLookupFailed, .secureConnectionFailed,
+        .resourceUnavailable
+    ]
+
+    static func isRetryable(status: Int) -> Bool { retryableStatuses.contains(status) }
+
+    static func isRetryable(_ error: URLError) -> Bool {
+        retryableURLErrorCodes.contains(error.code)
+    }
+
+    /// Exponential backoff (base 0.6s, doubling, capped at 8s) plus up to 0.4s of
+    /// jitter. A numeric `Retry-After` header wins, clamped to the same cap.
+    static func backoffDelay(attempt: Int, retryAfter: String?) -> TimeInterval {
+        let cap: TimeInterval = 8
+        if let retryAfter, let seconds = TimeInterval(retryAfter.trimmingCharacters(in: .whitespaces)) {
+            return min(max(0, seconds), cap)
         }
-        return (data, http)
+        let exponential = min(cap, 0.6 * pow(2, Double(max(0, attempt - 1))))
+        return exponential + Double.random(in: 0...0.4)
     }
 
     /// Returns the Google OAuth URL from the backend
