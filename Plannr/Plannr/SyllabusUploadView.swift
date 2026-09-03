@@ -25,7 +25,11 @@ struct SyllabusUploadView: View {
     /// Events already stored for this class — used for reconciliation on re-upload.
     var existingEvents: [CalendarEvent] = []
     var onSyncComplete: (() -> Void)? = nil
-    
+    /// When set, the view parses this text automatically on appear — used by the
+    /// "Try a sample syllabus" button so the flow starts without any file picking.
+    var autoParseText: String? = nil
+
+    @State private var didAutoParse = false
     @State private var showActionSheet = false
     @State private var showDocumentPicker = false
     @State private var showCameraScanner = false
@@ -218,8 +222,13 @@ struct SyllabusUploadView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            guard let autoParseText, !didAutoParse else { return }
+            didAutoParse = true
+            convertTextToPDFAndUpload(text: autoParseText)
+        }
     }
-    
+
     // MARK: - Convert scanned images to PDF and upload
     func convertImagesToPDFAndUpload(images: [UIImage]) {
         let pdfDocument = PDFDocument()

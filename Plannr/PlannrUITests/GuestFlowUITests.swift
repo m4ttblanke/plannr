@@ -58,6 +58,39 @@ final class GuestFlowUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["tabTitle"].exists || app.staticTexts["My Classes"].exists)
     }
 
+    // MARK: - Sample syllabus (empty state)
+
+    func testTrySampleSyllabusStartsTheParseFlow() {
+        enterGuestMode()
+
+        let sample = app.buttons["trySampleSyllabus"]
+        XCTAssertTrue(sample.waitForExistence(timeout: 5), "empty state should offer the sample")
+        sample.tap()
+
+        // Lands on the upload screen for the auto-created sample class and starts
+        // parsing straight away (no file picker). Backend may be unreachable in
+        // CI — we only assert the flow begins, not that it finishes.
+        XCTAssertTrue(app.staticTexts["Upload Syllabus"].waitForExistence(timeout: 5),
+                      "should push into the syllabus upload view")
+        XCTAssertTrue(app.staticTexts["for Sample Syllabus"].exists)
+
+        let started = app.staticTexts["Waking the server…"].waitForExistence(timeout: 5)
+            || app.staticTexts["Reading your syllabus…"].waitForExistence(timeout: 5)
+            || app.staticTexts["Extracting events…"].waitForExistence(timeout: 5)
+        XCTAssertTrue(started, "the phased parse progress should appear without any file picking")
+    }
+
+    func testSampleSyllabusButtonHiddenOnceAClassExists() {
+        enterGuestMode()
+        XCTAssertTrue(app.buttons["trySampleSyllabus"].waitForExistence(timeout: 5))
+
+        addClass(named: "Physics 1A")
+
+        // Back on My Classes with a class present, the sample offer is gone.
+        XCTAssertFalse(app.buttons["trySampleSyllabus"].exists,
+                       "the sample offer is empty-state only")
+    }
+
     // MARK: - Add class + validation + schedule picker
 
     func testAddClassButtonDisabledUntilNameEntered() {

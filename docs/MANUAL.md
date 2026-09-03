@@ -29,6 +29,8 @@ If Google access is later revoked (for example, by removing the app from your Go
 
 Users can add multiple classes and view their full class list on the home page. Each class can be assigned a custom color for easy visual identification across the calendar.
 
+Before any classes exist, the home screen also offers **Try a sample syllabus** — one tap creates a throwaway "Sample Syllabus" class and runs the built-in example straight through the parse → review → sync flow, so a first-time user can see how it works without finding a real PDF. Delete the sample class afterwards like any other.
+
 When adding or editing a class, users can set a **structured weekly schedule** — pick the lecture days and a start/end time, and optionally a separate section/lab meeting on its own day and time. The schedule can also carry a first-meeting date and a final-exam date and time. How long the class runs is set separately, as a **Length** in weeks on the class's edit screen (see Term Folders). Uploading a syllabus that states these times fills them in automatically (see AI-Powered Event Extraction).
 
 Each class has a status shown as a tappable badge on its edit screen: **ACTIVE**, **INACTIVE**, or **NO SYLLABUS** (read-only, until events are added). Switching a class to **INACTIVE** — manually, or automatically once its end date passes — turns off its class-meeting sync, removes its recurring meeting events from Google Calendar, and unchecks (hides) its dedicated calendar in the Google Calendar sidebar without deleting it. Switching back to **ACTIVE** re-checks that calendar.

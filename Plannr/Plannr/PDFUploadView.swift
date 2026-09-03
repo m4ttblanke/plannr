@@ -26,6 +26,7 @@ struct PDFUploadView: View {
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.scenePhase) private var scenePhase
     @State private var showAddClass = false
+    @State private var sampleUploadClass: Class?
     @State private var navigationPath = NavigationPath()
     @State private var selectedTab: AppTab = .myClasses
     @State private var showProfileSheet = false
@@ -126,6 +127,15 @@ struct PDFUploadView: View {
         // Consume the legacy settings so this never runs twice.
         settingsManager.term = TermSettings()
         classScope = .term(term.id)
+    }
+
+    /// Create a throwaway "Sample Syllabus" class and push straight into the
+    /// upload view, which parses the built-in sample text on appear.
+    private func startSampleSyllabus() {
+        let cls = Class(name: SampleSyllabus.className, colorHex: SampleSyllabus.classColorHex)
+        classManager.addClass(cls)
+        classScope = .all
+        sampleUploadClass = cls
     }
 
     var body: some View {
@@ -247,6 +257,35 @@ struct PDFUploadView: View {
                                 }
                                 .padding(.horizontal)
                                 .padding(.top, 8)
+
+                                // First-time users: a one-tap sample so they can
+                                // see parse → review → sync without finding a PDF.
+                                if classManager.classes.isEmpty {
+                                    VStack(spacing: 6) {
+                                        Button {
+                                            startSampleSyllabus()
+                                        } label: {
+                                            HStack {
+                                                Image(systemName: "sparkles")
+                                                Text("Try a sample syllabus")
+                                            }
+                                            .font(.subheadline.weight(.medium))
+                                            .foregroundColor(.blue)
+                                            .frame(maxWidth: .infinity)
+                                            .padding()
+                                            .background(Color.blue.opacity(0.12))
+                                            .cornerRadius(12)
+                                        }
+                                        .accessibilityIdentifier("trySampleSyllabus")
+
+                                        Text("Loads a short example course so you can see the whole flow.")
+                                            .font(.caption2)
+                                            .foregroundColor(.gray)
+                                            .multilineTextAlignment(.center)
+                                    }
+                                    .padding(.horizontal)
+                                    .padding(.top, 4)
+                                }
                             }
                             .padding(.bottom, 40)
                         }
@@ -286,6 +325,23 @@ struct PDFUploadView: View {
                     .environmentObject(authManager)
                     .environmentObject(settingsManager)
                     .environmentObject(termStore)
+            }
+            .navigationDestination(item: $sampleUploadClass) { cls in
+                SyllabusUploadView(
+                    className: cls.name,
+                    classSchedule: cls.schedule,
+                    classColor: cls.color,
+                    existingClassID: cls.id,
+                    onSyncComplete: {
+                        sampleUploadClass = nil
+                        navigationPath = NavigationPath()
+                    },
+                    autoParseText: SampleSyllabus.text()
+                )
+                .environmentObject(classManager)
+                .environmentObject(authManager)
+                .environmentObject(settingsManager)
+                .environmentObject(termStore)
             }
             .navigationDestination(isPresented: $showManageTerms) {
                 ManageTermsView()

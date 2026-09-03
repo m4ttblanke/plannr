@@ -73,6 +73,15 @@ Calendar at [calendar.google.com](https://calendar.google.com).
 
 ### B. Add a class (with a structured schedule)
 
+- [ ] On the empty **My Classes** screen (no classes yet) tap **Try a sample
+  syllabus**. **Expect:** a "Sample Syllabus" class is created and you're pushed
+  straight to the upload screen, which begins parsing on its own (phased
+  "Waking the server… → …" caption, no file picker). It lands on the Calendar
+  Preview with ~10 events (problem sets, two observation reports, a midterm, a
+  research paper draft + final, a final exam) on dates a week or two out. Back
+  out to My Classes and **delete** the sample class (swipe / long-press) so the
+  rest of the run starts clean. The **Try a sample syllabus** button is gone now
+  that a class has existed.
 - [ ] Hamburger (≡, top-left) → **My Classes**. Tap **Add New Class**.
 - [ ] Leave the name blank. **Expect:** "Add Class" is greyed out / disabled.
 - [ ] Name it `CS 101`.
