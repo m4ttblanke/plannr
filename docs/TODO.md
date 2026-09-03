@@ -38,17 +38,17 @@ Working list of known problems and planned features. Last updated: September 2, 
   And a sync that still fails all its retries no longer waits for the user:
   `NetworkMonitor` + a foreground hook re-fire `ClassAutoResync` for any class
   with `hasUnsyncedChanges` when connectivity returns (silent, no UI).
-- **Restore a sync session.** `SyncSessionsView` already lists every past sync
-  with its full event snapshot (`Class.syncHistory: [SyncSession]`), but it's
-  read-only. Add a "Restore this version" action that replaces the class's
-  current `events` with the chosen session's snapshot and pushes the diff to
-  Google Calendar (reuse `EventReconciler` + the incremental sync path so it's
-  an insert/patch/delete, not a rebuild). Considerations: confirm before
-  overwriting local edits; carry `googleEventId`s forward where events still
-  match so calendar entries are updated in place rather than churned; append the
-  restore itself as a new session so it's also undoable; decide whether class
-  meetings / status / color are part of the snapshot or stay as-is (probably
-  events only for v1).
+- ~~**Restore a sync session.**~~ — done (events only, per the v1 note).
+  `SyncSessionsView` gained a **Restore this version** action per session
+  (confirm dialog; disabled on the session that matches the current state).
+  `ClassRestore.plan` reconciles the snapshot against the current events
+  (`EventReconciler` with a new `preferParsedOverEdited` flag — the snapshot
+  wins over a local edit but keeps the Google event id for a patch), then the
+  push reuses the normal `/calendar/sync` full-sync path (patch / insert /
+  delete, no rebuild). The restore is stored locally first (so a sync failure
+  just leaves it pending for the reconnect auto-resync) and appended to
+  `syncHistory`, so it's itself undoable. Status / color / schedule / meetings
+  are untouched.
 - Haptics on accept / decline / sync success.
 - App icon and launch screen pass (currently generated defaults).
 - Backend `/health` endpoint + an uptime monitor (also keeps the free dyno warm,

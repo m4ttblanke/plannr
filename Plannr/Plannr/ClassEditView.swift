@@ -103,7 +103,14 @@ struct ClassEditView: View {
             }
         }
         .navigationDestination(isPresented: $showSyncSessions) {
-            SyncSessionsView(sessions: editableClass.syncHistory)
+            SyncSessionsView(
+                sessions: editableClass.syncHistory,
+                currentEvents: editableClass.events,
+                onRestore: { session in
+                    showSyncSessions = false
+                    Task { await restore(session) }
+                }
+            )
         }
         .navigationDestination(isPresented: $navigateToUpload) {
             SyllabusUploadView(
@@ -731,6 +738,74 @@ struct ClassEditView: View {
         editableClass = ClassSyncRequest.apply(response, to: editableClass)
         persistClass()
         showSyncSuccess = true
+    }
+
+    // MARK: - Restore a past sync session
+
+    /// Roll the class's events back to `session`, then push the diff to Google
+    /// Calendar (patch / insert / delete — never a rebuild). The restore is
+    /// stored locally first, so a sync failure just leaves it pending (the
+    /// reconnect auto-resync picks it up), and it's appended to the sync history
+    /// so it's itself undoable.
+    private func restore(_ session: SyncSession) async {
+        let plan = ClassRestore.plan(snapshot: session.events, current: editableClass.events)
+
+        await MainActor.run {
+            editableClass.events = plan.restored
+            editableClass.hasUnsyncedChanges = true
+            persistClass()
+        }
+
+        guard !authManager.isGuest else {
+            await MainActor.run {
+                editableClass.hasUnsyncedChanges = false
+                editableClass.syncHistory.append(SyncSession(events: editableClass.events))
+                persistClass()
+                showSyncSuccess = true
+            }
+            return
+        }
+
+        let events = ClassSyncRequest.fullSyncEvents(accepted: plan.restored, deletions: plan.deletions)
+        guard let request = try? ClassSyncRequest.makeRequest(
+            email: UserDefaults.standard.string(forKey: "userEmail"),
+            className: editableClass.name,
+            googleCalendarId: editableClass.googleCalendarId,
+            classColorHex: editableClass.colorHex,
+            reminderMinutes: settingsManager.reminderMinutes,
+            events: events
+        ) else {
+            await MainActor.run {
+                syncErrorMessage = "Restore saved on this device, but the account email couldn't be resolved to sync it."
+                showSyncError = true
+            }
+            return
+        }
+
+        await MainActor.run { isSyncing = true }
+
+        do {
+            let (data, http) = try await authManager.send(request)
+            await MainActor.run {
+                isSyncing = false
+                if http.statusCode == 401 { return }
+                if http.statusCode == 200,
+                   let response = try? JSONDecoder().decode(ClassSyncRequest.Response.self, from: data) {
+                    editableClass = ClassSyncRequest.apply(response, to: editableClass)
+                    persistClass()
+                    showSyncSuccess = true
+                } else {
+                    syncErrorMessage = "Restore saved on this device. Google Calendar didn't update — Plannr will retry."
+                    showSyncError = true
+                }
+            }
+        } catch {
+            await MainActor.run {
+                isSyncing = false
+                syncErrorMessage = "Restore saved on this device. Google Calendar will update when you're back online."
+                showSyncError = true
+            }
+        }
     }
 }
 

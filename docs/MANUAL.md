@@ -107,6 +107,8 @@ Users can push all parsed events to their Google Calendar with one tap. Plannr c
 
 A flaky connection or a server still waking up no longer fails the sync outright: every request is retried a few times with a growing delay before an error is shown. If a sync still fails, its changes stay pending and Plannr retries them on its own the next time it's opened or the connection returns — retries can't create duplicate events. You can also always re-sync manually from a class's edit screen.
 
+**Sync history & restore.** Every successful sync is recorded with a full snapshot of the class's events. **View Sync Sessions** (on the class's edit screen) lists them; expanding a session and tapping **Restore this version** rolls the class's events back to that snapshot and updates Google Calendar to match (an incremental patch/insert/delete, not a rebuild). Restoring discards any unsynced edits, and is itself saved as a new session so it can be undone.
+
 ### Class Meeting Sync
 
 On a class with a structured schedule, signed-in users can turn on **Add class meetings to Google Calendar**. Plannr writes the weekly lecture and section times to that class's calendar as recurring events, plus a one-off event for the final exam. The recurrence runs until the class's end date — set by its **Length** in weeks, or falling back to the term end when the class is open-ended — and is fully open-ended if neither is set. Turning the toggle off (or setting the class to INACTIVE) removes those recurring events again. Class meetings are kept out of the in-app Calendar and Week at a Glance views unless the corresponding display setting is enabled.

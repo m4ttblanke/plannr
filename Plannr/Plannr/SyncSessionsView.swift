@@ -2,6 +2,11 @@ import SwiftUI
 
 struct SyncSessionsView: View {
     let sessions: [SyncSession]
+    /// The class's events right now — used to tell which session is the current
+    /// one (its "Restore" button is disabled).
+    var currentEvents: [CalendarEvent] = []
+    /// Invoked (after the user confirms) to roll the class back to a session.
+    var onRestore: ((SyncSession) -> Void)? = nil
 
     private var sortedSessions: [SyncSession] {
         sessions.sorted { $0.date > $1.date }
@@ -20,7 +25,9 @@ struct SyncSessionsView: View {
                         ForEach(Array(sortedSessions.enumerated()), id: \.element.id) { index, session in
                             SessionRow(
                                 sessionNumber: sortedSessions.count - index,
-                                session: session
+                                session: session,
+                                isCurrentVersion: ClassRestore.isNoOp(snapshot: session.events, current: currentEvents),
+                                onRestore: onRestore == nil ? nil : { onRestore?(session) }
                             )
                             .padding(.horizontal)
                         }
@@ -40,7 +47,11 @@ struct SyncSessionsView: View {
 struct SessionRow: View {
     let sessionNumber: Int
     let session: SyncSession
+    var isCurrentVersion = false
+    var onRestore: (() -> Void)? = nil
+
     @State private var isExpanded = false
+    @State private var showRestoreConfirm = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -83,6 +94,37 @@ struct SessionRow: View {
                 VStack(spacing: 10) {
                     ForEach(session.events) { event in
                         SyncEventRow(event: event)
+                    }
+
+                    if let onRestore {
+                        Button {
+                            showRestoreConfirm = true
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "arrow.uturn.backward")
+                                Text(isCurrentVersion ? "Current version" : "Restore this version")
+                            }
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(isCurrentVersion ? .gray : .blue)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background((isCurrentVersion ? Color.gray : Color.blue).opacity(0.15))
+                            .cornerRadius(8)
+                        }
+                        .disabled(isCurrentVersion)
+                        .padding(.top, 4)
+                        .confirmationDialog(
+                            "Restore to Session \(sessionNumber)?",
+                            isPresented: $showRestoreConfirm,
+                            titleVisibility: .visible
+                        ) {
+                            Button("Restore \(session.events.count) event\(session.events.count == 1 ? "" : "s")", role: .destructive) {
+                                onRestore()
+                            }
+                            Button("Cancel", role: .cancel) {}
+                        } message: {
+                            Text("Replaces this class's current events with the \(session.events.count) from \(session.date.formatted(date: .abbreviated, time: .shortened)) and updates Google Calendar. Any unsynced changes are lost.")
+                        }
                     }
                 }
                 .padding()

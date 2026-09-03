@@ -61,6 +61,24 @@ final class EventReconcilerTests: XCTestCase {
         XCTAssertTrue(result.toDelete.isEmpty)
     }
 
+    func testPreferParsedOverEditedReplacesTheLocalEditButKeepsTheGoogleLink() {
+        // Restoring a sync session: the snapshot's copy must win over a local edit.
+        let existing = makeEvent(title: "HW1", date: "2026-03-01",
+                                 description: "user's later edit",
+                                 googleEventId: "g-hw1",
+                                 isEdited: true,
+                                 isTaskCompleted: true)
+        let snapshot = makeEvent(title: "HW1", date: "2026-03-01",
+                                 description: "wording at sync time")
+
+        let result = EventReconciler.reconcile(parsed: [snapshot], existing: [existing],
+                                               preferParsedOverEdited: true)
+
+        XCTAssertEqual(result.merged[0].description, "wording at sync time", "the snapshot wins")
+        XCTAssertEqual(result.merged[0].googleEventId, "g-hw1", "but it patches the same Google event")
+        XCTAssertTrue(result.merged[0].isTaskCompleted, "completion state is kept")
+    }
+
     func testMatchIsCaseAndWhitespaceInsensitive() {
         let existing = makeEvent(title: "hw1", date: "2026-03-01", googleEventId: "g-hw1")
         let parsed = makeEvent(title: "  HW1 ", date: "2026-03-01")

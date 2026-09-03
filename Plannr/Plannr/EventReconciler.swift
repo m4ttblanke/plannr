@@ -30,7 +30,12 @@ enum EventReconciler {
         event.title.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) + "|" + event.date
     }
 
-    static func reconcile(parsed: [CalendarEvent], existing: [CalendarEvent]) -> Result {
+    /// - Parameter preferParsedOverEdited: normally a local edit wins over the
+    ///   incoming copy of the same event. Restoring a past sync session passes
+    ///   `true` so the snapshot's version replaces the current (possibly edited)
+    ///   one — while still carrying the Google event id forward for a patch.
+    static func reconcile(parsed: [CalendarEvent], existing: [CalendarEvent],
+                          preferParsedOverEdited: Bool = false) -> Result {
         // Only reconcile against events the user still wants (not queued for deletion).
         let live = existing.filter { !$0.isDeletedLocally }
         guard !live.isEmpty else { return Result(merged: parsed, toDelete: []) }
@@ -52,7 +57,7 @@ enum EventReconciler {
                 continue
             }
 
-            if old.isEdited {
+            if old.isEdited && !preferParsedOverEdited {
                 // The user changed this one in the app. Keep their version; it
                 // already carries its googleEventId. The new syllabus's copy of
                 // this event is intentionally ignored (local edit wins).

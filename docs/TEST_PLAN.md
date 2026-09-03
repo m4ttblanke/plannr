@@ -217,6 +217,13 @@ This is the important one — sync must change only what changed.
   end date itself only moves when you use the stepper).
 - [ ] Tap **View Sync Sessions**. **Expect:** a list of "Session 1", "Session
   2"… each with a date and event count; tap one to expand its events.
+- [ ] **Restore.** Edit an event (change its title), then in **View Sync
+  Sessions** expand an *earlier* session and tap **Restore this version** →
+  confirm. **Expect:** you pop back to the class; the events match that session
+  (your edit is gone); a "Sync Successful" alert; 🔎 Google Calendar matches the
+  restored set (the removed event deleted, the others patched — no churn), and
+  the restore shows up as a new session at the top of the list. The most-recent
+  session's button reads **Current version** and is disabled.
 
 ### H. Class meetings on the calendar (new)
 
@@ -544,7 +551,8 @@ Needs a second Google account you can sign into.
   `NotificationManagerTests` nearest-60 selection, `TermSettingsTests`
   quarter/semester end date + auto label, `EventTypeTests` category
   normalization, `ClassSyncRequestTests` /calendar/sync body + response +
-  `apply`, `ClassAutoResyncTests` reconnect resync,
+  `apply`, `ClassAutoResyncTests` reconnect resync, `ClassRestoreTests`
+  restore-a-session plan,
   `ParsePhaseTests` upload-phase timeline, `TermTests` + `TermStoreTests`
   term folders) and `PlannrUITests/GuestFlowUITests` +
   `PlannrUITests/OnboardingUITests`.
