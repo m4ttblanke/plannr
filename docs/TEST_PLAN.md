@@ -164,13 +164,13 @@ This is the important one — sync must change only what changed.
   **Expect (if already synced):** 🔎 the `CS 101` calendar's color changes in
   Google Calendar within a few seconds (silent, no alert).
 - [ ] In the class-meetings card (below the "Add class meetings…" toggle), the
-  **Length** row → **Set length** → a stepper appears ("10 weeks", or the term's
+  **Class Length** row → **Set length** → a stepper appears ("10 weeks", or the term's
   length). Step it **down to 1 week** so the derived end date is in the past →
   back out and reopen the class. **Expect:** status auto-flips to **INACTIVE**
   (this also runs the INACTIVE side effects below), and the caption reads
   "Ends <date> …". Step the length back up (or tap **Open-ended**) and set status
   back to **ACTIVE** via the badge menu.
-- [ ] On a class with **no schedule, no term, and no end date**, the **Length**
+- [ ] On a class with **no schedule, no term, and no end date**, the **Class Length**
   row is not shown. Add a schedule (or file it in a term) → the row appears.
 - [ ] With a term assigned and a schedule with a first-class date set, confirm
   the **Length** week count is measured from that first-class date (change the
@@ -280,7 +280,7 @@ Open the profile avatar (top-right of any tab).
   **active term** (its name shows under the My Classes title; Calendar / Week
   at a Glance switch to it).
 - [ ] Open the class's edit screen. **Expect:** a **Term** picker in the header,
-  and in the class-meetings card a **Length** row whose stepper defaults to the
+  and in the class-meetings card a **Class Length** row whose stepper defaults to the
   term's length in weeks, with the caption showing the derived end date (≈ the
   term's end).
 - [ ] Open a term in Manage Terms → **Archive term**. **Expect:** every class in

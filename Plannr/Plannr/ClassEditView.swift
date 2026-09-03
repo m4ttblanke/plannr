@@ -268,13 +268,6 @@ struct ClassEditView: View {
         termStore.term(id: editableClass.termID)?.weeks ?? 10
     }
 
-    private var lengthCaption: String {
-        guard let end = editableClass.endDate else {
-            return "Open-ended — meetings recur to the term's end and the class stays ACTIVE."
-        }
-        return "Ends \(end.formatted(date: .abbreviated, time: .omitted)) — meetings stop then and the class switches to INACTIVE once it passes."
-    }
-
     private func setLength(weeks: Int) {
         let w = min(max(weeks, 1), 52)
         editableClass.endDate = Calendar.current.date(byAdding: .day, value: w * 7, to: lengthAnchor)
@@ -295,7 +288,7 @@ struct ClassEditView: View {
                 Image(systemName: "calendar.badge.clock")
                     .font(.caption)
                     .foregroundColor(.gray)
-                Text("Length")
+                Text("Class Length")
                     .font(.caption)
                     .foregroundColor(.gray)
                 Spacer()
@@ -322,9 +315,11 @@ struct ClassEditView: View {
                 }
             }
 
-            Text(lengthCaption)
-                .font(.caption2)
-                .foregroundColor(.gray)
+            if let end = editableClass.endDate {
+                Text("Ends \(end.formatted(date: .abbreviated, time: .omitted))")
+                    .font(.caption2)
+                    .foregroundColor(.gray)
+            }
         }
     }
 
@@ -368,11 +363,11 @@ struct ClassEditView: View {
                 .tint(.blue)
                 .disabled(isSyncingMeetings || !scheduleHasContent)
 
-                Text(scheduleHasContent
-                     ? "Adds your weekly lecture/section times to this class's calendar as recurring events. They don't show in Week at a Glance or Calendar views unless enabled in Settings."
-                     : "Set a schedule above first.")
-                    .font(.caption2)
-                    .foregroundColor(.gray)
+                if !scheduleHasContent {
+                    Text("Set a schedule above first.")
+                        .font(.caption2)
+                        .foregroundColor(.gray)
+                }
 
                 if showsLengthRow {
                     Divider().background(Color.gray.opacity(0.3))
