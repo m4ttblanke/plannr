@@ -19,6 +19,7 @@ struct AddClassView: View {
     @State private var selectedColor: Color = .blue
     @State private var selectedTermID: UUID?
     @State private var didSetInitialTerm = false
+    @State private var newTermDraft: Term?
 
     var body: some View {
         NavigationStack {
@@ -64,20 +65,30 @@ struct AddClassView: View {
                                         .labelsHidden()
                                 }
 
-                                if !termStore.terms.isEmpty {
-                                    HStack {
-                                        Text("Term")
-                                            .font(.headline)
-                                            .foregroundColor(.white)
-                                        Spacer()
+                                HStack {
+                                    Text("Term")
+                                        .font(.headline)
+                                        .foregroundColor(.white)
+                                    Spacer()
+                                    Menu {
                                         Picker("Term", selection: $selectedTermID) {
                                             Text("None").tag(UUID?.none)
                                             ForEach(termStore.terms) { term in
                                                 Text(term.displayName()).tag(Optional(term.id))
                                             }
                                         }
-                                        .pickerStyle(.menu)
-                                        .tint(.white)
+                                        Divider()
+                                        Button {
+                                            newTermDraft = Term(system: .quarter)
+                                        } label: {
+                                            Label("New Term…", systemImage: "plus")
+                                        }
+                                    } label: {
+                                        HStack(spacing: 4) {
+                                            Text(selectedTermName)
+                                            Image(systemName: "chevron.up.chevron.down").font(.caption2)
+                                        }
+                                        .foregroundColor(.white)
                                     }
                                 }
                             }
@@ -120,7 +131,18 @@ struct AddClassView: View {
                     selectedTermID = termStore.activeTerm?.id
                 }
             }
+            .sheet(item: $newTermDraft) { draft in
+                TermEditView(term: draft, isNew: true, onSaved: { selectedTermID = $0.id })
+                    .environmentObject(classManager)
+                    .environmentObject(termStore)
+                    .environmentObject(authManager)
+                    .environmentObject(settingsManager)
+            }
         }
+    }
+
+    private var selectedTermName: String {
+        termStore.term(id: selectedTermID)?.displayName() ?? "None"
     }
 
     private func addClass() {

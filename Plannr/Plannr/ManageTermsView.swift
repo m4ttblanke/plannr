@@ -44,9 +44,7 @@ struct ManageTermsView: View {
                     }
 
                     Button {
-                        let new = Term(system: .quarter)
-                        termStore.add(new)
-                        editingTerm = new
+                        editingTerm = Term(system: .quarter)   // added on Save, not now
                     } label: {
                         HStack {
                             Image(systemName: "plus.circle.fill")
@@ -67,7 +65,7 @@ struct ManageTermsView: View {
         .navigationTitle("Terms")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $editingTerm) { term in
-            TermEditView(term: term)
+            TermEditView(term: term, isNew: !termStore.terms.contains { $0.id == term.id })
                 .environmentObject(classManager)
                 .environmentObject(termStore)
                 .environmentObject(authManager)
@@ -123,11 +121,16 @@ struct TermEditView: View {
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var settingsManager: SettingsManager
 
+    let isNew: Bool
+    var onSaved: ((Term) -> Void)?
+
     @State private var draft: Term
     @State private var showDeleteConfirm = false
     @State private var showArchiveConfirm = false
 
-    init(term: Term) {
+    init(term: Term, isNew: Bool = false, onSaved: ((Term) -> Void)? = nil) {
+        self.isNew = isNew
+        self.onSaved = onSaved
         _draft = State(initialValue: term)
     }
 
@@ -192,36 +195,38 @@ struct TermEditView: View {
                             .disabled(authManager.isGuest)
                         }
 
-                        if termStore.activeTerm?.id != draft.id {
-                            Button("Make Active Term") {
-                                save()
-                                termStore.activeTermID = draft.id
-                                dismiss()
+                        if !isNew {
+                            if termStore.activeTerm?.id != draft.id {
+                                Button("Make Active Term") {
+                                    save()
+                                    termStore.activeTermID = draft.id
+                                    dismiss()
+                                }
+                                .font(.subheadline)
+                                .foregroundColor(.blue)
+                            }
+
+                            Button(role: .destructive) {
+                                showArchiveConfirm = true
+                            } label: {
+                                Text("Archive term (\(classCount) class\(classCount == 1 ? "" : "es") → INACTIVE)")
                             }
                             .font(.subheadline)
-                            .foregroundColor(.blue)
-                        }
+                            .disabled(classCount == 0)
 
-                        Button(role: .destructive) {
-                            showArchiveConfirm = true
-                        } label: {
-                            Text("Archive term (\(classCount) class\(classCount == 1 ? "" : "es") → INACTIVE)")
+                            Button(role: .destructive) {
+                                showDeleteConfirm = true
+                            } label: {
+                                Text("Delete term")
+                                    .font(.headline)
+                                    .foregroundColor(.red)
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(Color.red.opacity(0.15))
+                                    .cornerRadius(12)
+                            }
+                            .padding(.top, 8)
                         }
-                        .font(.subheadline)
-                        .disabled(classCount == 0)
-
-                        Button(role: .destructive) {
-                            showDeleteConfirm = true
-                        } label: {
-                            Text("Delete term")
-                                .font(.headline)
-                                .foregroundColor(.red)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.red.opacity(0.15))
-                                .cornerRadius(12)
-                        }
-                        .padding(.top, 8)
                     }
                     .padding()
                 }
@@ -284,7 +289,12 @@ struct TermEditView: View {
     }
 
     private func save() {
-        termStore.update(draft)
+        if termStore.term(id: draft.id) == nil {
+            termStore.add(draft)
+        } else {
+            termStore.update(draft)
+        }
+        onSaved?(draft)
     }
 
     /// Mark every class in this term INACTIVE and, for a signed-in user, pull its

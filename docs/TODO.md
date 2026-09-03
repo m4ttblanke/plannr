@@ -1,6 +1,6 @@
 # Plannr — TODO
 
-Working list of known problems and planned features. Last updated: September 3, 2026.
+Working list of known problems and planned features. Last updated: September 2, 2026.
 
 ---
 

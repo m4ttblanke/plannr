@@ -262,12 +262,16 @@ Open the profile avatar (top-right of any tab).
 - [ ] Go to **My Classes**. The header under the title is a switcher — pick
   **All classes**, the term, **Unfiled**. **Expect:** the list filters, and the
   header shows the current scope.
-- [ ] **Add New Class** while terms exist. **Expect:** a **Term** picker
-  (default = the active term, or "None"). Create one filed into a term.
-  **Expect:** on its edit screen the **Term** picker and an **End date**
-  pre-filled to the term's end; the class shows only when that term (or "All")
-  is selected in the switcher, and in **Calendar** / **Week at a Glance** only
-  when that term is the active one.
+- [ ] **Add New Class.** The **Term** row is always shown; its menu lists the
+  terms plus **New Term…**. Tap **New Term…**, fill it in, **Save** → the new
+  term is selected for this class. (Delete a term you created this way from
+  Manage Terms afterwards to tidy up.)
+- [ ] Create a class filed into a term that is **not** currently active, then
+  **Sync!** it. **Expect:** after the sync completes, that term is now the
+  **active term** (its name shows under the My Classes title; Calendar / Week
+  at a Glance switch to it).
+- [ ] Open the class's edit screen. **Expect:** a **Term** picker and an
+  **End date** pre-filled to the term's end.
 - [ ] Open a term in Manage Terms → **Archive term**. **Expect:** every class in
   it flips to **INACTIVE** (🔎 its recurring meetings leave Google Calendar and
   its calendar is unchecked).

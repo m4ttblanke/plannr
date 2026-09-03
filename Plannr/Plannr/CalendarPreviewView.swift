@@ -195,8 +195,14 @@ struct CalendarPreviewView: View {
                             hasUnsyncedChanges: false,
                             structuredSchedule: mergedSchedule,
                             meetingSyncEnabled: meetingSyncOn(existing: existingClass),
-                            meetingEventIds: existingClass?.meetingEventIds ?? []
+                            meetingEventIds: existingClass?.meetingEventIds ?? [],
+                            termID: existingClass?.termID
                         ))
+                        // Syncing a class to Google Calendar makes its term the
+                        // current one.
+                        if let termID = existingClass?.termID {
+                            termStore.activeTermID = termID
+                        }
                         pendingSyncResponse = nil
                         DispatchQueue.main.async {
                             onSyncComplete?()
@@ -339,7 +345,8 @@ struct CalendarPreviewView: View {
             hasUnsyncedChanges: false,
             structuredSchedule: mergedSchedule,
             meetingSyncEnabled: meetingSyncOn(existing: existingClass),
-            meetingEventIds: existingClass?.meetingEventIds ?? []
+            meetingEventIds: existingClass?.meetingEventIds ?? [],
+            termID: existingClass?.termID
         ))
         DispatchQueue.main.async {
             onSyncComplete?()

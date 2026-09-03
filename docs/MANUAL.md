@@ -36,8 +36,8 @@ Each class has a status shown as a tappable badge on its edit screen: **ACTIVE**
 
 Classes can be grouped into **term folders**. The header under "My Classes" is a switcher — pick **All classes**, a specific term, **Unfiled**, or **Manage terms…** to create and edit terms. A term has a name (typed or derived like "Fall 2026"), a start date, and a length in weeks (Quarter = 10, Semester = 16, or Custom); the end date follows from the length.
 
-- New classes are **unfiled by default**; the Add-Class screen and the class edit screen both have a **Term** picker to file one.
-- Selecting a term in the switcher makes it the **active term** — the **Calendar** and **Week at a Glance** views then show only that term's classes (plus any unfiled ones).
+- New classes are **unfiled by default**; the Add-Class screen and the class edit screen both have a **Term** picker to file one, including a **New Term…** option to create a term right there.
+- Selecting a term in the switcher makes it the **active term**. So does **syncing a class** to Google Calendar — the class's term becomes the current one. The **Calendar** and **Week at a Glance** views then show only that term's classes (plus any unfiled ones).
 - A new class filed into a term inherits the term's end date, and — if the term has "Auto-sync class meetings" on — starts with meeting sync enabled.
 - **Archive term** (in the term editor) sets every class in it to INACTIVE in one step.
 - **Deleting a term** doesn't delete its classes — they just become unfiled.
