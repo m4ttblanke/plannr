@@ -137,7 +137,9 @@ Calendar at [calendar.google.com](https://calendar.google.com).
   **Expect:** the card reflects the new title/date/description/type, and the
   type chip / colour + any Week-at-a-Glance filter match the picked category.
 - [ ] Tap **Decline** on one event (badge → "Declined"), then **Accept** it
-  back.
+  back. **On a physical device:** each tap gives a light haptic tick, and a
+  completed Sync / local save gives a success buzz (a failed sync buzzes
+  differently). Simulator has no haptics.
 - [ ] Toolbar **share icon** (top-right) → **Export as .ics (Calendar)**.
   **Expect:** a share sheet with an `events.ics` file. Save/AirDrop it and open
   it — it should import into a calendar app with all accepted events.

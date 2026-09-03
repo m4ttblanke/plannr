@@ -23,7 +23,6 @@ Working list of known problems and planned features. Last updated: September 3, 
 
 ### Pre-launch polish
 
-- Haptics on accept / decline / sync success.
 - App icon and launch screen pass (currently generated defaults).
 - Backend `/health` endpoint + an uptime monitor (also keeps the free dyno warm,
   which improves cold-start and OAuth reliability).

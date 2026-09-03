@@ -149,6 +149,9 @@ struct ClassEditView: View {
         } message: {
             Text(authManager.isGuest ? "Your changes have been saved." : "Your changes have been synced to Google Calendar.")
         }
+        .onChange(of: showSyncSuccess) { _, shown in if shown { Haptics.success() } }
+        .onChange(of: showSyncError) { _, shown in if shown { Haptics.error() } }
+        .onChange(of: showMeetingSyncError) { _, shown in if shown { Haptics.error() } }
         .onAppear {
             // Refresh from classManager in case another view updated it
             if let latest = classManager.classes.first(where: { $0.id == editableClass.id }) {
@@ -565,6 +568,7 @@ struct ClassEditView: View {
         editableClass.events[idx].isDeletedLocally.toggle()
         editableClass.hasUnsyncedChanges = editableClass.events.contains { $0.isEdited || $0.isDeletedLocally }
         persistClass()
+        Haptics.selection()
         autoSyncIfEnabled()
     }
 

@@ -101,9 +101,11 @@ struct CalendarPreviewView: View {
                                     onEdit: { editingEvent = event },
                                     onAccept: {
                                         event.status = event.status == .accepted ? .pending : .accepted
+                                        Haptics.selection()
                                     },
                                     onDecline: {
                                         event.status = event.status == .declined ? .pending : .declined
+                                        Haptics.selection()
                                     }
                                 )
                             }
@@ -290,6 +292,10 @@ struct CalendarPreviewView: View {
         } message: {
             Text(exportErrorMessage ?? "An unknown error occurred.")
         }
+        .onChange(of: showSyncAlert) { _, shown in
+            guard shown else { return }
+            syncSuccess == true ? Haptics.success() : Haptics.error()
+        }
     }
 
     func exportEvents(format: String) {
@@ -418,6 +424,7 @@ struct CalendarPreviewView: View {
             meetingEventIds: existingClass?.meetingEventIds ?? [],
             termID: existingClass?.termID
         ))
+        Haptics.success()
         DispatchQueue.main.async {
             onSyncComplete?()
         }
