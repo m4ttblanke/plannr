@@ -141,6 +141,10 @@ The hamburger menu (top-left of the home screen) has **Report an Issue** and **S
 
 Beta builds send automatic crash reports (via Sentry) so a "it crashed" report comes with a stack trace. A report includes the app version, the device/OS, a short trail of recent in-app actions, and — if you're signed in — your account email, so the report can be matched to your feedback. It does **not** include syllabus contents, event text, or your Google credentials. Guest sessions are reported without any identifier. Crash reporting is only active in builds configured with a reporting key; a development build with none sends nothing.
 
+### Accessibility
+
+Text follows the system **Dynamic Type** setting (Settings → Display & Brightness → Text Size, or the accessibility text sizes), and the large action buttons shrink their label to fit rather than truncate. Icon-only controls — calendar navigation arrows, the class delete button, the export and profile-photo buttons — carry **VoiceOver** labels. Secondary/caption text uses a lighter gray for better contrast on the dark background.
+
 
 ## **Known Problems**
 

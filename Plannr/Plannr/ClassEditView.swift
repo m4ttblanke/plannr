@@ -243,10 +243,10 @@ struct ClassEditView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "folder")
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondaryText)
                     Text("Term")
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondaryText)
                     Spacer()
                     Picker("Term", selection: Binding(
                         get: { editableClass.termID },
@@ -269,7 +269,7 @@ struct ClassEditView: View {
             if let lastSynced = editableClass.lastSynced {
                 Text("Last synced: \(lastSynced.formatted(date: .abbreviated, time: .shortened))")
                     .font(.caption2)
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondaryText)
             }
         }
         .padding(.horizontal)
@@ -317,10 +317,10 @@ struct ClassEditView: View {
             HStack(spacing: 6) {
                 Image(systemName: "calendar.badge.clock")
                     .font(.caption)
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondaryText)
                 Text("Class Length")
                     .font(.caption)
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondaryText)
                 Spacer()
                 if lengthInWeeks == nil {
                     Button("Set length") { setLength(weeks: defaultLengthWeeks) }
@@ -348,7 +348,7 @@ struct ClassEditView: View {
             if let end = editableClass.endDate {
                 Text("Ends \(end.formatted(date: .abbreviated, time: .omitted))")
                     .font(.caption2)
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondaryText)
             }
         }
     }
@@ -362,7 +362,7 @@ struct ClassEditView: View {
             HStack(spacing: 6) {
                 Image(systemName: "calendar")
                     .font(.caption)
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondaryText)
                 Text(editableClass.schedule.isEmpty ? "No schedule set" : editableClass.schedule)
                     .font(.caption)
                     .foregroundColor(editableClass.schedule.isEmpty ? .gray : .white)
@@ -396,7 +396,7 @@ struct ClassEditView: View {
                 if !scheduleHasContent {
                     Text("Set a schedule above first.")
                         .font(.caption2)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondaryText)
                 }
 
                 if showsLengthRow {
@@ -477,7 +477,7 @@ struct ClassEditView: View {
             if visibleEvents.isEmpty {
                 Text("No events yet. Upload a PDF to get started.")
                     .font(.subheadline)
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondaryText)
                     .padding(.horizontal)
             } else {
                 ForEach(visibleEvents) { event in
@@ -501,6 +501,8 @@ struct ClassEditView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "checkmark.circle.fill")
                         Text("Save Changes")
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                             .font(.headline)
                     }
                     .foregroundColor(.white)
@@ -519,6 +521,8 @@ struct ClassEditView: View {
                             ProgressView().tint(.white)
                         }
                         Text(isSyncing ? "Syncing..." : "Re-sync (\(unsyncedCount)) \(unsyncedCount == 1 ? "Change" : "Changes")")
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                             .font(.headline)
                             .foregroundColor(.white)
                     }
@@ -536,6 +540,8 @@ struct ClassEditView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "arrow.up.doc.fill")
                         Text("Upload New Syllabus")
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                             .font(.headline)
                     }
                     .foregroundColor(.white)
@@ -870,16 +876,16 @@ struct ClassEventRow: View {
                 HStack(spacing: 4) {
                     Image(systemName: "calendar")
                         .font(.caption2)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondaryText)
                     Text(event.date)
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondaryText)
                 }
 
                 if !event.description.isEmpty {
                     Text(event.description)
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondaryText)
                         .lineLimit(2)
                 }
 

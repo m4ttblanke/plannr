@@ -62,7 +62,7 @@ struct SyllabusUploadView: View {
                     
                     Text("for \(className)")
                         .font(.subheadline)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondaryText)
                 }
                 .padding(.top, 20)
                 
@@ -92,7 +92,7 @@ struct SyllabusUploadView: View {
                             
                             Text("BROWSE FILES")
                                 .font(.caption)
-                                .foregroundColor(.gray)
+                                .foregroundColor(.secondaryText)
                                 .padding(.top, 4)
                         }
                         .frame(maxWidth: .infinity)
@@ -126,7 +126,7 @@ struct SyllabusUploadView: View {
                     // Helper text
                     Text("We'll automatically extract deadlines, exam dates, and important events")
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondaryText)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 32)
                 }

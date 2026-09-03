@@ -90,6 +90,7 @@ struct WeeklyDashboardView: View {
                    .foregroundColor(.blue)
                    .font(.title2)
            }
+           .accessibilityLabel("Previous week")
           
            Spacer()
           
@@ -120,6 +121,7 @@ struct WeeklyDashboardView: View {
                    .foregroundColor(.blue)
                    .font(.title2)
            }
+           .accessibilityLabel("Next week")
        }
        .padding(.horizontal)
        .padding(.vertical, 12)
@@ -147,7 +149,7 @@ struct WeeklyDashboardView: View {
                        Text(showCompletedItems ? "Hide Completed" : "Show Completed")
                    }
                    .font(.caption)
-                   .foregroundColor(.gray)
+                   .foregroundColor(.secondaryText)
                    .padding(.horizontal, 12)
                    .padding(.vertical, 6)
                    .background(Color.gray.opacity(0.2))
@@ -211,7 +213,7 @@ struct WeeklyDashboardView: View {
        VStack(spacing: 4) {
            Text(title)
                .font(.caption2)
-               .foregroundColor(.gray)
+               .foregroundColor(.secondaryText)
           
            Text(isPercentage ? "\(count)%" : "\(count)")
                .font(.title2)
@@ -220,7 +222,7 @@ struct WeeklyDashboardView: View {
           
            Text(subtitle)
                .font(.caption2)
-               .foregroundColor(.gray)
+               .foregroundColor(.secondaryText)
                .multilineTextAlignment(.center)
        }
        .frame(maxWidth: .infinity)
@@ -255,11 +257,11 @@ struct WeeklyDashboardView: View {
            Text(dayName(for: date))
                .font(.caption2)
                .fontWeight(.medium)
-               .foregroundColor(.gray)
+               .foregroundColor(.secondaryText)
           
            // Day number with workload color
            Text("\(Calendar.current.component(.day, from: date))")
-               .font(.system(size: 14, weight: .semibold))
+               .font(.subheadline.weight(.semibold))
                .foregroundColor(workload.textColor)
                .frame(width: 32, height: 32)
                .background(workload.backgroundColor)
@@ -372,7 +374,7 @@ struct WeeklyDashboardView: View {
                    Text("Class Meetings")
                        .font(.subheadline)
                        .fontWeight(.semibold)
-                       .foregroundColor(.gray)
+                       .foregroundColor(.secondaryText)
                        .frame(maxWidth: .infinity, alignment: .leading)
                        .padding(.top, 4)
                    ForEach(classMeetingsThisWeek) { meeting in
@@ -589,6 +591,7 @@ struct EventRowView: View {
                    .foregroundColor(event.isCompleted ? .green : .gray)
                    .font(.title3)
            }
+           .accessibilityLabel(event.isCompleted ? "Mark as not done" : "Mark as done")
           
            VStack(alignment: .leading, spacing: 4) {
                HStack {
@@ -612,12 +615,12 @@ struct EventRowView: View {
               
                HStack {
                    Image(systemName: "calendar")
-                       .foregroundColor(.gray)
+                       .foregroundColor(.secondaryText)
                        .font(.caption)
                   
                    Text(formatDate(event.date))
                        .font(.caption)
-                       .foregroundColor(.gray)
+                       .foregroundColor(.secondaryText)
                    
                    Spacer()
                    
@@ -698,11 +701,11 @@ struct ClassMeetingRowView: View {
                }
                HStack(spacing: 4) {
                    Image(systemName: "clock")
-                       .foregroundColor(.gray)
+                       .foregroundColor(.secondaryText)
                        .font(.caption)
                    Text(timeText)
                        .font(.caption)
-                       .foregroundColor(.gray)
+                       .foregroundColor(.secondaryText)
                }
            }
        }

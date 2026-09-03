@@ -30,6 +30,8 @@ struct AddClassView: View {
                     ScrollView {
                         VStack(spacing: 24) {
                             Text("Add New Class")
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
                                 .font(.title2)
                                 .fontWeight(.bold)
                                 .foregroundColor(.white)
@@ -103,6 +105,8 @@ struct AddClassView: View {
                         dismiss()
                     } label: {
                         Text("Add Class")
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                             .font(.headline)
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)

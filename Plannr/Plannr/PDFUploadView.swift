@@ -108,7 +108,7 @@ struct PDFUploadView: View {
                 Image(systemName: "chevron.down").font(.caption2)
             }
             .font(.subheadline)
-            .foregroundColor(.gray)
+            .foregroundColor(.secondaryText)
         }
         .onChange(of: classScope) { _, newValue in
             if case .term(let id) = newValue { termStore.activeTermID = id }
@@ -377,7 +377,7 @@ struct PDFUploadView: View {
                 } else if !classManager.classes.isEmpty {
                     Text(classScope == .unfiled ? "No unfiled classes." : "No classes in this term yet.")
                         .font(.subheadline)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondaryText)
                         .padding(.top, 8)
                 }
 
@@ -387,6 +387,8 @@ struct PDFUploadView: View {
                     HStack {
                         Image(systemName: "plus.circle.fill")
                         Text("Add New Class")
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                     }
                     .font(.headline)
                     .foregroundColor(.white)
@@ -416,6 +418,8 @@ struct PDFUploadView: View {
                 HStack {
                     Image(systemName: "sparkles")
                     Text("Try a sample syllabus")
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                 }
                 .font(.subheadline.weight(.medium))
                 .foregroundColor(.blue)
@@ -428,7 +432,7 @@ struct PDFUploadView: View {
 
             Text("A quick guided walkthrough — no PDF needed, nothing synced.")
                 .font(.caption2)
-                .foregroundColor(.gray)
+                .foregroundColor(.secondaryText)
                 .multilineTextAlignment(.center)
         }
         .padding(.horizontal)
@@ -506,7 +510,7 @@ struct ClassCard: View {
                             Text(classItem.schedule)
                                 .font(.caption)
                         }
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondaryText)
                     }
                 }
                 
@@ -547,7 +551,7 @@ struct ClassCard: View {
                     Text("INACTIVE")
                         .font(.caption2)
                         .fontWeight(.bold)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondaryText)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(Color.gray.opacity(0.2))
@@ -562,6 +566,7 @@ struct ClassCard: View {
                         .foregroundColor(.red)
                         .font(.caption)
                 }
+                .accessibilityLabel("Delete \(classItem.name)")
                 .padding(.leading, 8)
             }
             
@@ -579,12 +584,12 @@ struct ClassCard: View {
                 let visibleCount = classItem.events.filter { !$0.isDeletedLocally }.count
                 Text("\(visibleCount) events synced")
                     .font(.caption)
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondaryText)
             case .inactive:
                 let visibleCount = classItem.events.filter { !$0.isDeletedLocally }.count
                 Text("\(visibleCount) events")
                     .font(.caption)
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondaryText)
             }
         }
         .padding()

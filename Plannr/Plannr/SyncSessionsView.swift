@@ -18,7 +18,7 @@ struct SyncSessionsView: View {
 
             if sessions.isEmpty {
                 Text("No sync sessions yet.")
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondaryText)
             } else {
                 ScrollView {
                     VStack(spacing: 12) {
@@ -69,18 +69,18 @@ struct SessionRow: View {
                             .foregroundColor(.white)
                         Text(session.date.formatted(date: .abbreviated, time: .shortened))
                             .font(.caption2)
-                            .foregroundColor(.gray)
+                            .foregroundColor(.secondaryText)
                     }
 
                     Spacer()
 
                     Text("\(session.events.count) events")
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondaryText)
 
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondaryText)
                         .padding(.leading, 6)
                 }
                 .padding()
@@ -167,16 +167,16 @@ struct SyncEventRow: View {
                 HStack(spacing: 4) {
                     Image(systemName: "calendar")
                         .font(.caption2)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondaryText)
                     Text(event.date)
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondaryText)
                 }
 
                 if !event.description.isEmpty {
                     Text(event.description)
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondaryText)
                         .lineLimit(2)
                 }
             }

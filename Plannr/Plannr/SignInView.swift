@@ -49,11 +49,11 @@ struct SignInView: View {
                         StorkeTowerLineArt()
 
                         Text("Plannr")
-                            .font(.system(size: 34, weight: .bold, design: .serif))
+                            .font(.system(.largeTitle, design: .serif).weight(.bold))
                             .foregroundColor(.white)
 
                         Text("Syllabus to Schedule")
-                            .font(.system(size: 14, weight: .medium))
+                            .font(.system(.subheadline).weight(.medium))
                             .foregroundColor(.white.opacity(0.9))
                     }
                     .padding(.top, 36)
@@ -86,7 +86,9 @@ struct SignInView: View {
                                         .foregroundColor(.black)
                                 }
                                 Text(isAuthenticating ? "Signing in..." : "Sign in with Google")
-                                    .font(.system(size: 18, weight: .bold, design: .serif))
+                                    .font(.system(.headline, design: .serif).weight(.bold))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.6)
                             }
                             .foregroundColor(.black)
                             .frame(maxWidth: .infinity)
@@ -108,7 +110,7 @@ struct SignInView: View {
                             showPDFUpload = true
                         }) {
                             Text("Continue as Guest")
-                                .font(.system(size: 16, weight: .medium, design: .serif))
+                                .font(.system(.callout, design: .serif).weight(.medium))
                                 .foregroundColor(.white.opacity(0.75))
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 48)

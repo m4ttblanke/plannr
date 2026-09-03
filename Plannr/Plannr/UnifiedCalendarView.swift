@@ -143,7 +143,7 @@ struct UnifiedCalendarView: View {
                                         .frame(width: 10, height: 10)
                                     Text(cls.name)
                                         .font(.caption)
-                                        .foregroundColor(.gray)
+                                        .foregroundColor(.secondaryText)
                                 }
                             }
                         }
@@ -200,7 +200,7 @@ struct UnifiedCalendarView: View {
                     Text("Class Meetings")
                         .font(.headline)
                         .fontWeight(.semibold)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondaryText)
                         .padding(.horizontal)
                         .padding(.top, 4)
 
@@ -218,10 +218,10 @@ struct UnifiedCalendarView: View {
         VStack(spacing: 12) {
             Image(systemName: "calendar.badge.exclamationmark")
                 .font(.system(size: 48))
-                .foregroundColor(.gray)
+                .foregroundColor(.secondaryText)
             Text(isWeekly ? "Nothing this week" : "Nothing this month")
                 .font(.headline)
-                .foregroundColor(.gray)
+                .foregroundColor(.secondaryText)
             Text("Upload syllabi to your classes to see events here.")
                 .font(.caption)
                 .foregroundColor(.gray.opacity(0.7))
@@ -277,7 +277,7 @@ struct EventDetailSheet: View {
                                 Text("Description")
                                     .font(.subheadline)
                                     .fontWeight(.semibold)
-                                    .foregroundColor(.gray)
+                                    .foregroundColor(.secondaryText)
                                 Text(unifiedEvent.event.description)
                                     .font(.body)
                                     .foregroundColor(.white)
@@ -320,12 +320,12 @@ struct DetailRow: View {
     var body: some View {
         HStack(spacing: 14) {
             Image(systemName: icon)
-                .foregroundColor(.gray)
+                .foregroundColor(.secondaryText)
                 .frame(width: 20)
             VStack(alignment: .leading, spacing: 2) {
                 Text(label)
                     .font(.caption)
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondaryText)
                 Text(value)
                     .font(.body)
                     .foregroundColor(valueColor)
@@ -354,6 +354,7 @@ struct UnifiedWeeklyCalendarView: View {
                 Button(action: { moveWeek(-1) }) {
                     Image(systemName: "chevron.left").foregroundColor(.white)
                 }
+                .accessibilityLabel("Previous week")
                 Spacer()
                 Text(weekRangeText())
                     .font(.headline)
@@ -362,6 +363,7 @@ struct UnifiedWeeklyCalendarView: View {
                 Button(action: { moveWeek(1) }) {
                     Image(systemName: "chevron.right").foregroundColor(.white)
                 }
+                .accessibilityLabel("Next week")
             }
             .padding(.horizontal)
 
@@ -438,6 +440,7 @@ struct UnifiedMonthlyCalendarView: View {
                 Button(action: { moveMonth(-1) }) {
                     Image(systemName: "chevron.left").foregroundColor(.white)
                 }
+                .accessibilityLabel("Previous month")
                 Spacer()
                 Text(monthYearText())
                     .font(.headline)
@@ -446,6 +449,7 @@ struct UnifiedMonthlyCalendarView: View {
                 Button(action: { moveMonth(1) }) {
                     Image(systemName: "chevron.right").foregroundColor(.white)
                 }
+                .accessibilityLabel("Next month")
             }
             .padding(.horizontal)
 
@@ -453,7 +457,7 @@ struct UnifiedMonthlyCalendarView: View {
                 ForEach(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"], id: \.self) { day in
                     Text(day)
                         .font(.caption2)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondaryText)
                         .frame(maxWidth: .infinity)
                 }
             }
@@ -533,7 +537,7 @@ struct UnifiedDayColumn: View {
         VStack(spacing: 6) {
             Text(dayName())
                 .font(.caption2)
-                .foregroundColor(.gray)
+                .foregroundColor(.secondaryText)
 
             Text("\(calendar.component(.day, from: date))")
                 .font(.system(size: 16, weight: isSelected ? .bold : .regular))
@@ -630,7 +634,7 @@ struct UnifiedEventCard: View {
 
                     Image(systemName: "chevron.right")
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondaryText)
 
                     Text(unifiedEvent.event.type.capitalized)
                         .font(.caption)
@@ -645,16 +649,16 @@ struct UnifiedEventCard: View {
                 HStack(spacing: 6) {
                     Image(systemName: "calendar")
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondaryText)
                     Text(formattedDate(unifiedEvent.event.date))
                         .font(.subheadline)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondaryText)
                 }
 
                 if !unifiedEvent.event.description.isEmpty {
                     Text(unifiedEvent.event.description)
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondaryText)
                         .lineLimit(2)
                 }
             }

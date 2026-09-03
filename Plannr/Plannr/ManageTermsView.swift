@@ -28,7 +28,7 @@ struct ManageTermsView: View {
                     if termStore.terms.isEmpty {
                         Text("No terms yet. Add one to group your classes by quarter or semester.")
                             .font(.subheadline)
-                            .foregroundColor(.gray)
+                            .foregroundColor(.secondaryText)
                             .multilineTextAlignment(.center)
                             .padding(.top, 24)
                             .padding(.horizontal, 32)
@@ -89,14 +89,14 @@ struct ManageTermsView: View {
                 }
                 Spacer()
                 Image(systemName: "chevron.right")
-                    .font(.caption).foregroundColor(.gray)
+                    .font(.caption).foregroundColor(.secondaryText)
             }
             Text(dateRangeText(term))
                 .font(.caption)
-                .foregroundColor(.gray)
+                .foregroundColor(.secondaryText)
             Text("\(classCount(term)) class\(classCount(term) == 1 ? "" : "es")")
                 .font(.caption)
-                .foregroundColor(.gray)
+                .foregroundColor(.secondaryText)
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -168,7 +168,7 @@ struct TermEditView: View {
                             } else {
                                 Text("\(draft.weeks) weeks")
                                     .font(.caption)
-                                    .foregroundColor(.gray)
+                                    .foregroundColor(.secondaryText)
                             }
                         }
 
@@ -183,7 +183,7 @@ struct TermEditView: View {
 
                             Text(endText)
                                 .font(.caption)
-                                .foregroundColor(.gray)
+                                .foregroundColor(.secondaryText)
                         }
 
                         field("") {

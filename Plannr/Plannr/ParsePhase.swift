@@ -88,7 +88,7 @@ struct ParseProgressView: View {
                 if !accelerated {
                     Text("The first upload after a while can take up to a minute while the server wakes up.")
                         .font(.caption2)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondaryText)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 32)
                 }

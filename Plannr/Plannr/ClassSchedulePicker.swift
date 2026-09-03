@@ -80,7 +80,7 @@ struct ClassSchedulePicker: View {
         if hasSection {
             VStack(alignment: .leading, spacing: 14) {
                 Divider().background(Color.gray.opacity(0.3))
-                Text("Section").font(.caption).fontWeight(.semibold).foregroundColor(.gray)
+                Text("Section").font(.caption).fontWeight(.semibold).foregroundColor(.secondaryText)
                 weekdayRow(selection: $sectionDays)
                 if !sectionDays.isEmpty {
                     timeRangeRow(start: $sectionStart, end: $sectionEnd)
@@ -110,7 +110,7 @@ struct ClassSchedulePicker: View {
 
             if hasFinal {
                 Text("A one-time event, usually during finals week after classes end.")
-                    .font(.caption2).foregroundColor(.gray)
+                    .font(.caption2).foregroundColor(.secondaryText)
                 HStack {
                     Text("Date").font(.subheadline).foregroundColor(.white)
                     Spacer()
@@ -230,7 +230,7 @@ struct ClassSchedulePicker: View {
                 ScrollView {
                     VStack {
                         ClassSchedulePicker(schedule: $schedule)
-                        Text("→ \"\(schedule.displayString)\"").foregroundColor(.gray).font(.caption)
+                        Text("→ \"\(schedule.displayString)\"").foregroundColor(.secondaryText).font(.caption)
                     }.padding()
                 }
             }

@@ -126,6 +126,7 @@ struct ProfileView: View {
                             .background(Circle().fill(Color.yellow))
                     }
             }
+            .accessibilityLabel("Change profile photo")
             .onChange(of: selectedPhotoItem) { _, newItem in
                 Task {
                     if let data = try? await newItem?.loadTransferable(type: Data.self) {
@@ -150,7 +151,7 @@ struct ProfileView: View {
                         .foregroundColor(.white)
                     Text("Sign in to save your data across sessions")
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondaryText)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
                 } else {
@@ -163,7 +164,7 @@ struct ProfileView: View {
                     if let email = authManager.userEmail {
                         Text(email)
                             .font(.subheadline)
-                            .foregroundColor(.gray)
+                            .foregroundColor(.secondaryText)
                     }
                 }
             }
@@ -182,12 +183,12 @@ struct ProfileView: View {
                     Spacer()
                     Text(activeTermEndText)
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondaryText)
                 }
             } else {
                 Text("Group your classes by quarter or semester so meeting recurrence and end dates fill in automatically.")
                     .font(.caption2)
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondaryText)
             }
 
             Button {
@@ -234,7 +235,7 @@ struct ProfileView: View {
 
             Text("Applied to events as they're synced to Google Calendar.")
                 .font(.caption2)
-                .foregroundColor(.gray)
+                .foregroundColor(.secondaryText)
         }
     }
 
@@ -271,7 +272,7 @@ struct ProfileView: View {
 
             Text("Whether recurring lecture/section times and final exams appear in those two views. Off by default. They still sync to your Google Calendar when enabled per class.")
                 .font(.caption2)
-                .foregroundColor(.gray)
+                .foregroundColor(.secondaryText)
         }
     }
 
@@ -293,7 +294,7 @@ struct ProfileView: View {
                  ? "Not available in guest mode."
                  : "Push edits to Google Calendar immediately instead of waiting for a manual re-sync.")
                 .font(.caption2)
-                .foregroundColor(.gray)
+                .foregroundColor(.secondaryText)
 
             Toggle(isOn: Binding(
                 get: { settingsManager.autoSyncClassMeetings },
@@ -309,7 +310,7 @@ struct ProfileView: View {
                  ? "Not available in guest mode."
                  : "New classes that have a schedule (typed in, or read from the syllabus) push their lecture/section times to Google Calendar automatically. Existing classes are left as they are.")
                 .font(.caption2)
-                .foregroundColor(.gray)
+                .foregroundColor(.secondaryText)
         }
     }
 
@@ -337,7 +338,7 @@ struct ProfileView: View {
 
             Text("Local notifications on this device, based on the reminder lead time above.")
                 .font(.caption2)
-                .foregroundColor(.gray)
+                .foregroundColor(.secondaryText)
         }
     }
 
@@ -418,7 +419,7 @@ struct ProfileView: View {
                      ? "Crash reporting is ON for this build."
                      : "Crash reporting is OFF (no SENTRY_DSN).")
                     .font(.caption)
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondaryText)
 
                 Button(role: .destructive) {
                     CrashReporting.breadcrumb("User tapped the debug test-crash button", category: "debug")

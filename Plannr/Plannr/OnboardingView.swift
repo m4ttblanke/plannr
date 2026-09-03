@@ -60,7 +60,7 @@ struct OnboardingView: View {
                 HStack {
                     Spacer()
                     Button("Skip") { onFinish() }
-                        .font(.system(size: 15, weight: .medium, design: .serif))
+                        .font(.system(.subheadline, design: .serif).weight(.medium))
                         .foregroundColor(.white.opacity(0.7))
                         .padding(.trailing, 24)
                         .padding(.top, 12)
@@ -88,7 +88,7 @@ struct OnboardingView: View {
 
                 Button(action: advance) {
                     Text(isLastPage ? "Get Started" : "Next")
-                        .font(.system(size: 18, weight: .bold, design: .serif))
+                        .font(.system(.headline, design: .serif).weight(.bold))
                         .foregroundColor(.black)
                         .frame(maxWidth: .infinity)
                         .frame(height: 56)
@@ -125,12 +125,12 @@ struct OnboardingView: View {
 
             VStack(spacing: 14) {
                 Text(page.title)
-                    .font(.system(size: 28, weight: .bold, design: .serif))
+                    .font(.system(.title, design: .serif).weight(.bold))
                     .foregroundColor(.white)
                     .multilineTextAlignment(.center)
 
                 Text(page.blurb)
-                    .font(.system(size: 16))
+                    .font(.callout)
                     .foregroundColor(.white.opacity(0.85))
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)

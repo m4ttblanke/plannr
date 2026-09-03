@@ -79,7 +79,7 @@ struct CalendarPreviewView: View {
                             if !classSchedule.isEmpty {
                                 Text(classSchedule)
                                     .font(.subheadline)
-                                    .foregroundColor(.gray)
+                                    .foregroundColor(.secondaryText)
                             }
                         }
                         .padding(.horizontal)
@@ -123,6 +123,8 @@ struct CalendarPreviewView: View {
                         HStack(spacing: 8) {
                             if isSyncing { ProgressView().tint(.white) }
                             Text(isSyncing ? "Syncing…" : "Sync!")
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
                                 .font(.headline)
                                 .foregroundColor(.white)
                         }
@@ -141,6 +143,8 @@ struct CalendarPreviewView: View {
                         HStack(spacing: 8) {
                             Image(systemName: "checkmark.circle.fill")
                             Text("Save Class")
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
                                 .font(.headline)
                         }
                         .foregroundColor(.white)
@@ -162,6 +166,8 @@ struct CalendarPreviewView: View {
                                     .tint(.white)
                             }
                             Text(isSyncing ? "Syncing..." : "Sync!")
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
                                 .font(.headline)
                                 .foregroundColor(.white)
                         }
@@ -270,6 +276,7 @@ struct CalendarPreviewView: View {
                     }
                 }
                 .disabled(isExporting || isSyncing)
+                .accessibilityLabel("Export events")
             }
         }
         .confirmationDialog("Export Events", isPresented: $showExportOptions, titleVisibility: .visible) {
@@ -614,17 +621,17 @@ struct EventCard: View {
             HStack(spacing: 6) {
                 Image(systemName: "calendar")
                     .font(.caption)
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondaryText)
                 Text(event.date)
                     .font(.subheadline)
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondaryText)
             }
             
             // Description (if not empty)
             if !event.description.isEmpty {
                 Text(event.description)
                     .font(.caption)
-                    .foregroundColor(.gray)
+                    .foregroundColor(.secondaryText)
                     .lineLimit(2)
             }
             
@@ -792,6 +799,8 @@ struct EventEditView: View {
                             onSave(editedEvent)
                         }) {
                             Text("Save Changes")
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
                                 .font(.headline)
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
@@ -866,6 +875,7 @@ struct WeeklyCalendarView: View {
                     Image(systemName: "chevron.left")
                         .foregroundColor(.white)
                 }
+                .accessibilityLabel("Previous week")
                 
                 Spacer()
                 
@@ -879,6 +889,7 @@ struct WeeklyCalendarView: View {
                     Image(systemName: "chevron.right")
                         .foregroundColor(.white)
                 }
+                .accessibilityLabel("Next week")
             }
             .padding(.horizontal)
             
@@ -956,7 +967,7 @@ struct DayColumn: View {
             // Day name
             Text(dayName())
                 .font(.caption2)
-                .foregroundColor(.gray)
+                .foregroundColor(.secondaryText)
             
             // Day number
             Text("\(calendar.component(.day, from: date))")
@@ -1018,6 +1029,7 @@ struct MonthlyCalendarView: View {
                     Image(systemName: "chevron.left")
                         .foregroundColor(.white)
                 }
+                .accessibilityLabel("Previous month")
                 
                 Spacer()
                 
@@ -1031,6 +1043,7 @@ struct MonthlyCalendarView: View {
                     Image(systemName: "chevron.right")
                         .foregroundColor(.white)
                 }
+                .accessibilityLabel("Next month")
             }
             .padding(.horizontal)
             
@@ -1039,7 +1052,7 @@ struct MonthlyCalendarView: View {
                 ForEach(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"], id: \.self) { day in
                     Text(day)
                         .font(.caption2)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondaryText)
                         .frame(maxWidth: .infinity)
                 }
             }
