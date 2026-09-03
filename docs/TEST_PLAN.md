@@ -47,10 +47,18 @@ Calendar at [calendar.google.com](https://calendar.google.com).
 
 ## 1. The continuous run
 
-### A. Sign in with Google
+### A. First launch — onboarding, then sign in
 
-- [ ] Launch the app. **Expect:** the sign-in screen (star, tower art, "Plannr",
-  "Syllabus to Schedule", "Sign in with Google", "Continue as Guest").
+- [ ] On a **fresh install** (delete the app first, or Simulator → Device →
+  Erase All Content), launch. **Expect:** a three-card walkthrough on the blue
+  gradient — "Upload your syllabus", "Review & edit", "Sync to Google Calendar"
+  — with page dots, a **Skip** link, and a **Next** button. Swipe between cards;
+  the dots track. On the last card the button reads **Get Started**.
+- [ ] Tap **Get Started** (or **Skip** on an earlier card). **Expect:** the
+  sign-in screen. Force-quit and relaunch → straight to sign-in; the walkthrough
+  does **not** return (re-installing brings it back).
+- [ ] Now at the sign-in screen. **Expect:** star, tower art, "Plannr",
+  "Syllabus to Schedule", "Sign in with Google", "Continue as Guest".
 - [ ] Tap **Sign in with Google** → the system web sheet opens.
 - [ ] **Cancel** it (swipe down / Cancel). **Expect:** back to sign-in, **no
   error message**, button not stuck on "Signing in...".

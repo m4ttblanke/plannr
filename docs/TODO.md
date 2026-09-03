@@ -25,9 +25,10 @@ Working list of known problems and planned features. Last updated: September 2, 
 
 - **Crash reporting** (Sentry or Firebase Crashlytics) — highest-value beta add;
   testers will report "it crashed" with no stack trace otherwise.
-- **First-run onboarding** — 3 cards: upload → review & edit → sync.
 - **"Try a sample syllabus"** button on the empty state so a new user sees the
-  whole flow without hunting for a PDF.
+  whole flow without hunting for a PDF. (First-run onboarding itself — the 3
+  cards upload → review & edit → sync — is done: `OnboardingView`, shown once
+  before sign-in, gated by the `onboarding.hasSeen` flag.)
 - **Sync resilience** — retry with backoff on transient failures. (The
   delete-and-recreate behavior is fixed: sync is now an incremental
   patch/insert/delete diff against the existing calendar.)

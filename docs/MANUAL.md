@@ -12,6 +12,10 @@ Plannr is built for students who want to stay organized without spending hours s
 
 ## **Features**
 
+### First-Run Onboarding
+
+The very first time the app is opened, a three-card walkthrough introduces the flow — **upload your syllabus → review & edit → sync to Google Calendar**. Swipe or tap **Next** through the cards, or **Skip** at any point; **Get Started** on the last card leads to the sign-in screen. It's shown once and doesn't return on later launches.
+
 ### Sign In / Guest Mode
 
 Users can sign in with their Google account to enable full calendar sync and persistent data storage. A Guest Mode is also available for users who want to try the app without signing in; classes and events created in guest mode are not saved between sessions, and Google Calendar sync is unavailable. Guests can still parse syllabi, review events, and export them as `.ics` or `.csv`.
