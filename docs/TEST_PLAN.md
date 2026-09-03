@@ -57,8 +57,10 @@ Calendar at [calendar.google.com](https://calendar.google.com).
 - [ ] Tap **Get Started** (or **Skip** on an earlier card). **Expect:** the
   sign-in screen. Force-quit and relaunch → straight to sign-in; the walkthrough
   does **not** return (re-installing brings it back).
-- [ ] Now at the sign-in screen. **Expect:** star, tower art, "Plannr",
-  "Syllabus to Schedule", "Sign in with Google", "Continue as Guest".
+- [ ] Now at the sign-in screen. **Expect:** the blue background, star, tower
+  art, "Plannr", "Syllabus to Schedule" and the bottom waves are there from the
+  first frame (continuous with the launch screen); the **Sign in with Google**
+  and **Continue as Guest** buttons fade/slide in a beat later.
 - [ ] Tap **Sign in with Google** → the system web sheet opens.
 - [ ] **Cancel** it (swipe down / Cancel). **Expect:** back to sign-in, **no
   error message**, button not stuck on "Signing in...".

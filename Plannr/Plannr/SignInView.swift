@@ -13,6 +13,10 @@ struct SignInView: View {
     @State private var isAuthenticating: Bool = false
     @State private var authError: String?
     @State private var showPDFUpload: Bool = false
+    /// The brand (star, tower, "Plannr", waves) is on screen from the first
+    /// frame — matching the launch screen — and the sign-in controls fade in
+    /// a beat later.
+    @State private var showControls: Bool = false
 
     var body: some View {
         if showPDFUpload {
@@ -56,65 +60,70 @@ struct SignInView: View {
 
                     Spacer()
 
-                    if let error = authError {
-                        Text(error)
-                            .font(.subheadline)
-                            .foregroundColor(.red)
-                            .padding(.vertical, 10)
-                            .padding(.horizontal, 16)
-                            .background(Color.red.opacity(0.08))
-                            .cornerRadius(10)
-                            .padding(.horizontal, 32)
-                            .padding(.bottom, 6)
-                    }
-
-                    Button(action: {
-                        startGoogleSignIn()
-                    }) {
-                        HStack(spacing: 12) {
-                            if isAuthenticating {
-                                ProgressView()
-                                    .tint(.white)
-                            } else {
-                                Image(systemName: "globe")
-                                    .font(.system(size: 20, weight: .medium))
-                                    .foregroundColor(.black)
-                            }
-                            Text(isAuthenticating ? "Signing in..." : "Sign in with Google")
-                                .font(.system(size: 18, weight: .bold, design: .serif))
+                    VStack(spacing: 0) {
+                        if let error = authError {
+                            Text(error)
+                                .font(.subheadline)
+                                .foregroundColor(.red)
+                                .padding(.vertical, 10)
+                                .padding(.horizontal, 16)
+                                .background(Color.red.opacity(0.08))
+                                .cornerRadius(10)
+                                .padding(.horizontal, 32)
+                                .padding(.bottom, 6)
                         }
-                        .foregroundColor(.black)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 56)
-                        .background(Color(red: 1, green: 0.72, blue: 0.11))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14)
-                                .stroke(Color.clear, lineWidth: 0)
-                        )
-                        .cornerRadius(14)
-                        .shadow(color: Color.black.opacity(0.05), radius: 6, x: 0, y: 3)
-                    }
-                    .disabled(isAuthenticating)
-                    .padding(.horizontal, 32)
-                    .padding(.bottom, 12)
 
-                    Button(action: {
-                        authManager.signInAsGuest()
-                        showPDFUpload = true
-                    }) {
-                        Text("Continue as Guest")
-                            .font(.system(size: 16, weight: .medium, design: .serif))
-                            .foregroundColor(.white.opacity(0.75))
+                        Button(action: {
+                            startGoogleSignIn()
+                        }) {
+                            HStack(spacing: 12) {
+                                if isAuthenticating {
+                                    ProgressView()
+                                        .tint(.white)
+                                } else {
+                                    Image(systemName: "globe")
+                                        .font(.system(size: 20, weight: .medium))
+                                        .foregroundColor(.black)
+                                }
+                                Text(isAuthenticating ? "Signing in..." : "Sign in with Google")
+                                    .font(.system(size: 18, weight: .bold, design: .serif))
+                            }
+                            .foregroundColor(.black)
                             .frame(maxWidth: .infinity)
-                            .frame(height: 48)
+                            .frame(height: 56)
+                            .background(Color(red: 1, green: 0.72, blue: 0.11))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 14)
-                                    .stroke(Color.white.opacity(0.35), lineWidth: 1.5)
+                                    .stroke(Color.clear, lineWidth: 0)
                             )
+                            .cornerRadius(14)
+                            .shadow(color: Color.black.opacity(0.05), radius: 6, x: 0, y: 3)
+                        }
+                        .disabled(isAuthenticating)
+                        .padding(.horizontal, 32)
+                        .padding(.bottom, 12)
+
+                        Button(action: {
+                            authManager.signInAsGuest()
+                            showPDFUpload = true
+                        }) {
+                            Text("Continue as Guest")
+                                .font(.system(size: 16, weight: .medium, design: .serif))
+                                .foregroundColor(.white.opacity(0.75))
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 48)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .stroke(Color.white.opacity(0.35), lineWidth: 1.5)
+                                )
+                        }
+                        .disabled(isAuthenticating)
+                        .padding(.horizontal, 32)
+                        .padding(.bottom, 40)
                     }
-                    .disabled(isAuthenticating)
-                    .padding(.horizontal, 32)
-                    .padding(.bottom, 40)
+                    .opacity(showControls ? 1 : 0)
+                    .offset(y: showControls ? 0 : 14)
+                    .allowsHitTesting(showControls)
                 }
 
                 BottomWave()
@@ -123,6 +132,12 @@ struct SignInView: View {
                     .ignoresSafeArea(edges: .bottom)
             }
             .navigationBarHidden(true)
+            .onAppear {
+                showControls = false
+                withAnimation(.easeOut(duration: 0.5).delay(0.35)) {
+                    showControls = true
+                }
+            }
         }
     }
 
