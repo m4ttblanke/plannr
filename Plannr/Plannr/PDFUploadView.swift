@@ -19,6 +19,12 @@ enum ClassScope: Hashable {
     case unfiled
 }
 
+/// Nav route for the "Try a sample syllabus" walkthrough — pushes the upload
+/// screen in sample mode for the throwaway class with this id.
+struct SampleUploadRoute: Hashable {
+    let classID: UUID
+}
+
 struct PDFUploadView: View {
     @StateObject private var classManager: ClassManager
     @StateObject private var termStore: TermStore
@@ -26,7 +32,7 @@ struct PDFUploadView: View {
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.scenePhase) private var scenePhase
     @State private var showAddClass = false
-    @State private var sampleUploadClass: Class?
+    @StateObject private var sampleTour = SampleTour()
     @State private var navigationPath = NavigationPath()
     @State private var selectedTab: AppTab = .myClasses
     @State private var showProfileSheet = false
@@ -129,13 +135,21 @@ struct PDFUploadView: View {
         classScope = .term(term.id)
     }
 
-    /// Create a throwaway "Sample Syllabus" class and push straight into the
-    /// upload view, which parses the built-in sample text on appear.
+    /// Create a throwaway sample class and start the guided walkthrough on the
+    /// upload screen. `SampleTour` carries it through parse → preview → sync →
+    /// edit (all simulated), then deletes the class.
     private func startSampleSyllabus() {
-        let cls = Class(name: SampleSyllabus.className, colorHex: SampleSyllabus.classColorHex)
+        let cls = Class(name: SampleSyllabus.className,
+                        colorHex: SampleSyllabus.classColorHex,
+                        isSample: true)
         classManager.addClass(cls)
         classScope = .all
-        sampleUploadClass = cls
+        sampleTour.onFinish = { id in
+            classManager.removeClassByID(id)
+            navigationPath = NavigationPath()
+        }
+        sampleTour.start(classID: cls.id)
+        navigationPath.append(SampleUploadRoute(classID: cls.id))
     }
 
     var body: some View {
@@ -144,151 +158,14 @@ struct PDFUploadView: View {
                 Color.black.ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    // Guest mode banner
                     if authManager.isGuest {
-                        HStack(spacing: 8) {
-                            Image(systemName: "person.slash.fill")
-                                .font(.caption)
-                            Text("Guest Mode - data won't be saved between sessions")
-                                .font(.caption)
-                                .fontWeight(.medium)
-                        }
-                        .foregroundColor(.black)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .padding(.horizontal, 16)
-                        .background(Color(red: 1, green: 0.72, blue: 0.11))
+                        guestBanner
                     }
 
-                    // Header
-                    HStack {
-                        Menu {
-                            Button(action: { selectedTab = .myClasses }) {
-                                Label("My Classes", systemImage: "list.bullet")
-                            }
-                            Button(action: { selectedTab = .calendar }) {
-                                Label("Calendar", systemImage: "calendar")
-                            }
-                            Button(action: { selectedTab = .weeklyDashboard }) {
-                                Label("Week at a Glance", systemImage: "chart.bar.doc.horizontal")
-                            }
-
-                            Divider()
-
-                            Button(action: { sendFeedback(.issue) }) {
-                                Label("Report an Issue", systemImage: "exclamationmark.bubble")
-                            }
-                            Button(action: { sendFeedback(.feature) }) {
-                                Label("Suggest a Feature", systemImage: "lightbulb")
-                            }
-                        } label: {
-                            Image(systemName: "line.3.horizontal")
-                                .font(.title2)
-                                .foregroundColor(.white)
-                        }
-                        .accessibilityLabel("Menu")
-                        .accessibilityIdentifier("menuButton")
-
-                        VStack(alignment: .leading, spacing: 0) {
-                            Text(selectedTab == .myClasses ? "My Classes" : selectedTab == .calendar ? "Calendar" : "Week at a Glance")
-                                .font(.largeTitle)
-                                .fontWeight(.bold)
-                                .foregroundColor(.white)
-                                .accessibilityIdentifier("tabTitle")
-
-                            if selectedTab == .myClasses {
-                                termScopeMenu
-                            }
-                        }
-                        .padding(.leading, 8)
-
-                        Spacer()
-
-                        // User profile button
-                        Button {
-                            showProfileSheet = true
-                        } label: {
-                            ProfileAvatarView(size: 44)
-                                .environmentObject(authManager)
-                        }
-                        .accessibilityLabel("Profile")
-                        .accessibilityIdentifier("profileButton")
-                    }
-                    .padding(.horizontal)
-                    .padding(.top, 20)
-                    .padding(.bottom, 16)
+                    homeHeader
 
                     if selectedTab == .myClasses {
-                        ScrollView {
-                            VStack(spacing: 16) {
-                                // Existing classes (filtered by the term scope)
-                                if !scopedClasses.isEmpty {
-                                    ForEach(scopedClasses) { classItem in
-                                        NavigationLink(value: classItem) {
-                                            ClassCard(classItem: classItem)
-                                                .environmentObject(classManager)
-                                                .environmentObject(authManager)
-                                                .environmentObject(termStore)
-                                        }
-                                        .buttonStyle(.plain)
-                                        .padding(.horizontal)
-                                    }
-                                } else if !classManager.classes.isEmpty {
-                                    Text(classScope == .unfiled ? "No unfiled classes." : "No classes in this term yet.")
-                                        .font(.subheadline)
-                                        .foregroundColor(.gray)
-                                        .padding(.top, 8)
-                                }
-
-                                // Add New Class Button
-                                Button {
-                                    showAddClass = true
-                                } label: {
-                                    HStack {
-                                        Image(systemName: "plus.circle.fill")
-                                        Text("Add New Class")
-                                    }
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                                    .background(Color.blue)
-                                    .cornerRadius(12)
-                                }
-                                .padding(.horizontal)
-                                .padding(.top, 8)
-
-                                // First-time users: a one-tap sample so they can
-                                // see parse → review → sync without finding a PDF.
-                                if classManager.classes.isEmpty {
-                                    VStack(spacing: 6) {
-                                        Button {
-                                            startSampleSyllabus()
-                                        } label: {
-                                            HStack {
-                                                Image(systemName: "sparkles")
-                                                Text("Try a sample syllabus")
-                                            }
-                                            .font(.subheadline.weight(.medium))
-                                            .foregroundColor(.blue)
-                                            .frame(maxWidth: .infinity)
-                                            .padding()
-                                            .background(Color.blue.opacity(0.12))
-                                            .cornerRadius(12)
-                                        }
-                                        .accessibilityIdentifier("trySampleSyllabus")
-
-                                        Text("Loads a short example course so you can see the whole flow.")
-                                            .font(.caption2)
-                                            .foregroundColor(.gray)
-                                            .multilineTextAlignment(.center)
-                                    }
-                                    .padding(.horizontal)
-                                    .padding(.top, 4)
-                                }
-                            }
-                            .padding(.bottom, 40)
-                        }
+                        myClassesTab
                     } else if selectedTab == .calendar {
                         UnifiedCalendarView()
                             .environmentObject(classManager)
@@ -320,28 +197,10 @@ struct PDFUploadView: View {
                 if newPhase == .active { syncNotifications() }
             }
             .navigationDestination(for: Class.self) { cls in
-                ClassEditView(cls: cls, onSyncComplete: { navigationPath = NavigationPath() })
-                    .environmentObject(classManager)
-                    .environmentObject(authManager)
-                    .environmentObject(settingsManager)
-                    .environmentObject(termStore)
+                classEditDestination(cls)
             }
-            .navigationDestination(item: $sampleUploadClass) { cls in
-                SyllabusUploadView(
-                    className: cls.name,
-                    classSchedule: cls.schedule,
-                    classColor: cls.color,
-                    existingClassID: cls.id,
-                    onSyncComplete: {
-                        sampleUploadClass = nil
-                        navigationPath = NavigationPath()
-                    },
-                    autoParseText: SampleSyllabus.text()
-                )
-                .environmentObject(classManager)
-                .environmentObject(authManager)
-                .environmentObject(settingsManager)
-                .environmentObject(termStore)
+            .navigationDestination(for: SampleUploadRoute.self) { route in
+                sampleUploadDestination(route)
             }
             .navigationDestination(isPresented: $showManageTerms) {
                 ManageTermsView()
@@ -383,6 +242,189 @@ struct PDFUploadView: View {
 
     private var accountDescription: String {
         authManager.isGuest ? "Guest" : (authManager.userEmail ?? "Signed in")
+    }
+
+    @ViewBuilder
+    private func classEditDestination(_ cls: Class) -> some View {
+        ClassEditView(cls: cls, onSyncComplete: { navigationPath = NavigationPath() })
+            .environmentObject(classManager)
+            .environmentObject(authManager)
+            .environmentObject(settingsManager)
+            .environmentObject(termStore)
+            .environmentObject(sampleTour)
+    }
+
+    @ViewBuilder
+    private func sampleUploadDestination(_ route: SampleUploadRoute) -> some View {
+        SyllabusUploadView(
+            className: SampleSyllabus.className,
+            classSchedule: "",
+            classColor: Color(hex: SampleSyllabus.classColorHex),
+            existingClassID: route.classID,
+            onSyncComplete: {
+                // The simulated sync finished — swap the parse subtree for the
+                // class editor and let the tour resume there.
+                if !navigationPath.isEmpty { navigationPath.removeLast() }
+                if let cls = classManager.classes.first(where: { $0.id == route.classID }) {
+                    navigationPath.append(cls)
+                }
+                sampleTour.enter(.editIntro)
+            },
+            sampleMode: true
+        )
+        .environmentObject(classManager)
+        .environmentObject(authManager)
+        .environmentObject(settingsManager)
+        .environmentObject(termStore)
+        .environmentObject(sampleTour)
+    }
+
+    private var guestBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "person.slash.fill")
+                .font(.caption)
+            Text("Guest Mode - data won't be saved between sessions")
+                .font(.caption)
+                .fontWeight(.medium)
+        }
+        .foregroundColor(.black)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .padding(.horizontal, 16)
+        .background(Color(red: 1, green: 0.72, blue: 0.11))
+    }
+
+    private var homeHeader: some View {
+        HStack {
+            Menu {
+                Button(action: { selectedTab = .myClasses }) {
+                    Label("My Classes", systemImage: "list.bullet")
+                }
+                Button(action: { selectedTab = .calendar }) {
+                    Label("Calendar", systemImage: "calendar")
+                }
+                Button(action: { selectedTab = .weeklyDashboard }) {
+                    Label("Week at a Glance", systemImage: "chart.bar.doc.horizontal")
+                }
+                Divider()
+                Button(action: { sendFeedback(.issue) }) {
+                    Label("Report an Issue", systemImage: "exclamationmark.bubble")
+                }
+                Button(action: { sendFeedback(.feature) }) {
+                    Label("Suggest a Feature", systemImage: "lightbulb")
+                }
+            } label: {
+                Image(systemName: "line.3.horizontal")
+                    .font(.title2)
+                    .foregroundColor(.white)
+            }
+            .accessibilityLabel("Menu")
+            .accessibilityIdentifier("menuButton")
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text(selectedTab == .myClasses ? "My Classes" : selectedTab == .calendar ? "Calendar" : "Week at a Glance")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                    .accessibilityIdentifier("tabTitle")
+
+                if selectedTab == .myClasses {
+                    termScopeMenu
+                }
+            }
+            .padding(.leading, 8)
+
+            Spacer()
+
+            Button {
+                showProfileSheet = true
+            } label: {
+                ProfileAvatarView(size: 44)
+                    .environmentObject(authManager)
+            }
+            .accessibilityLabel("Profile")
+            .accessibilityIdentifier("profileButton")
+        }
+        .padding(.horizontal)
+        .padding(.top, 20)
+        .padding(.bottom, 16)
+    }
+
+    @ViewBuilder
+    private var myClassesTab: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                // Existing classes (filtered by the term scope)
+                if !scopedClasses.isEmpty {
+                    ForEach(scopedClasses) { classItem in
+                        NavigationLink(value: classItem) {
+                            ClassCard(classItem: classItem)
+                                .environmentObject(classManager)
+                                .environmentObject(authManager)
+                                .environmentObject(termStore)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal)
+                    }
+                } else if !classManager.classes.isEmpty {
+                    Text(classScope == .unfiled ? "No unfiled classes." : "No classes in this term yet.")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                        .padding(.top, 8)
+                }
+
+                Button {
+                    showAddClass = true
+                } label: {
+                    HStack {
+                        Image(systemName: "plus.circle.fill")
+                        Text("Add New Class")
+                    }
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.blue)
+                    .cornerRadius(12)
+                }
+                .padding(.horizontal)
+                .padding(.top, 8)
+
+                // First-time users: a one-tap guided sample.
+                if classManager.classes.isEmpty {
+                    sampleSyllabusOffer
+                }
+            }
+            .padding(.bottom, 40)
+        }
+    }
+
+    @ViewBuilder
+    private var sampleSyllabusOffer: some View {
+        VStack(spacing: 6) {
+            Button {
+                startSampleSyllabus()
+            } label: {
+                HStack {
+                    Image(systemName: "sparkles")
+                    Text("Try a sample syllabus")
+                }
+                .font(.subheadline.weight(.medium))
+                .foregroundColor(.blue)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.blue.opacity(0.12))
+                .cornerRadius(12)
+            }
+            .accessibilityIdentifier("trySampleSyllabus")
+
+            Text("A quick guided walkthrough — no PDF needed, nothing synced.")
+                .font(.caption2)
+                .foregroundColor(.gray)
+                .multilineTextAlignment(.center)
+        }
+        .padding(.horizontal)
+        .padding(.top, 4)
     }
 
     /// Opens the in-app mail composer for the given feedback kind, falling back to
@@ -436,7 +478,18 @@ struct ClassCard: View {
                 }
                 
                 Spacer()
-                
+
+                if classItem.isSample {
+                    Text("SAMPLE")
+                        .font(.caption2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.purple)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.purple.opacity(0.2))
+                        .cornerRadius(8)
+                }
+
                 // Status badge
                 switch classItem.status {
                 case .noSyllabus:

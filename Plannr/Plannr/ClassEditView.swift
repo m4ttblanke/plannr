@@ -12,6 +12,7 @@ struct ClassEditView: View {
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var settingsManager: SettingsManager
     @EnvironmentObject var termStore: TermStore
+    @EnvironmentObject var sampleTour: SampleTour
     @Environment(\.dismiss) private var dismiss
 
     // Local mutable copy of the class
@@ -59,25 +60,42 @@ struct ClassEditView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
 
+                        if editableClass.isSample {
+                            Text("This is a sample class — nothing here syncs to Google Calendar.")
+                                .font(.caption)
+                                .foregroundColor(.purple)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(10)
+                                .background(Color.purple.opacity(0.15))
+                                .cornerRadius(10)
+                                .padding(.horizontal)
+                        }
+
                         // ── Header ────────────────────────────────────────
                         classHeader
+                            .coachAnchor(.editDone)
 
                         // ── Weekly schedule + class-meeting sync ──────────
                         scheduleSection
 
                         // ── Events list ───────────────────────────────────
                         eventsSection
+                            .coachAnchor(.editIntro)
                     }
                     .padding(.top, 20)
                     .padding(.bottom, 100) // leave room for the sticky button
                 }
 
                 // ── Sticky bottom button ───────────────────────────────
-                bottomButton
+                if !editableClass.isSample {
+                    bottomButton
+                }
             }
         }
         .navigationTitle(editableClass.name)
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(editableClass.isSample && sampleTour.isActive)
+        .coachMarks(sampleTour)
         .sheet(item: $editingEvent) { event in
             EventEditView(event: event) { updatedEvent in
                 applyEventEdit(updatedEvent)
@@ -112,6 +130,7 @@ struct ClassEditView: View {
             .environmentObject(authManager)
             .environmentObject(settingsManager)
             .environmentObject(termStore)
+            .environmentObject(sampleTour)
         }
         .alert("Sync Failed", isPresented: $showSyncError) {
             Button("OK", role: .cancel) {}
@@ -137,6 +156,7 @@ struct ClassEditView: View {
             // the syllabus parser) while the setting was on has meetingSyncEnabled
             // set but was never pushed — or an earlier auto-push failed. Do it now.
             if !authManager.isGuest,
+               !editableClass.isSample,
                editableClass.status != .inactive,
                editableClass.meetingSyncEnabled,
                scheduleHasContent,
@@ -342,7 +362,7 @@ struct ClassEditView: View {
                     .foregroundColor(.blue)
             }
 
-            if !authManager.isGuest {
+            if !authManager.isGuest && !editableClass.isSample {
                 Toggle(isOn: Binding(
                     get: { editableClass.meetingSyncEnabled },
                     set: { newValue in
@@ -868,5 +888,6 @@ struct ClassEventRow: View {
         .environmentObject(AuthManager())
         .environmentObject(SettingsManager.shared)
         .environmentObject(TermStore())
+        .environmentObject(SampleTour())
     }
 }

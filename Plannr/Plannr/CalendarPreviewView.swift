@@ -13,6 +13,7 @@ struct CalendarPreviewView: View {
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var settingsManager: SettingsManager
     @EnvironmentObject var termStore: TermStore
+    @EnvironmentObject var sampleTour: SampleTour
 
     /// The term folder of the class being previewed (for the fallback
     /// recurrence window / default end date).
@@ -28,6 +29,9 @@ struct CalendarPreviewView: View {
     /// Meeting schedule the parser pulled from the syllabus, applied only if the
     /// class doesn't already have one the user set up.
     let parsedSchedule: ClassSchedule?
+    /// The "Try a sample syllabus" walkthrough — the Sync button is simulated and
+    /// never touches Google Calendar.
+    var sampleMode: Bool = false
     var onSyncComplete: (() -> Void)? = nil
 
     @State private var events: [CalendarEvent]
@@ -44,13 +48,14 @@ struct CalendarPreviewView: View {
     @State private var sharedEventColor: Color
     @State private var pendingSyncResponse: ClassSyncRequest.Response?
     
-    init(className: String, classSchedule: String, classColor: Color, existingClassID: UUID, events: [CalendarEvent], eventsToDelete: [CalendarEvent] = [], parsedSchedule: ClassSchedule? = nil, onSyncComplete: (() -> Void)? = nil) {
+    init(className: String, classSchedule: String, classColor: Color, existingClassID: UUID, events: [CalendarEvent], eventsToDelete: [CalendarEvent] = [], parsedSchedule: ClassSchedule? = nil, sampleMode: Bool = false, onSyncComplete: (() -> Void)? = nil) {
         self.className = className
         self.classSchedule = classSchedule
         self.classColor = classColor
         self.existingClassID = existingClassID
         self.eventsToDelete = eventsToDelete
         self.parsedSchedule = parsedSchedule
+        self.sampleMode = sampleMode
         self.onSyncComplete = onSyncComplete
         _events = State(initialValue: events)
         _sharedEventColor = State(initialValue: classColor)
@@ -85,6 +90,7 @@ struct CalendarPreviewView: View {
                             sharedEventColor: sharedEventColor
                         )
                         .padding(.horizontal)
+                        .coachAnchor(.previewGrid)
 
                         // Events list
                         VStack(spacing: 12) {
@@ -103,13 +109,32 @@ struct CalendarPreviewView: View {
                             }
                         }
                         .padding(.horizontal)
+                        .coachAnchor(.previewList)
                     }
                     .padding(.top)
                     .padding(.bottom, 16)
                 }
 
                 // Sticky Sync button
-                if authManager.isGuest {
+                if sampleMode {
+                    Button(action: { runSampleSync() }) {
+                        HStack(spacing: 8) {
+                            if isSyncing { ProgressView().tint(.white) }
+                            Text(isSyncing ? "Syncing…" : "Sync!")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(isSyncing ? Color.gray : Color.blue)
+                        .cornerRadius(12)
+                    }
+                    .disabled(isSyncing)
+                    .coachAnchor(.previewSync)
+                    .padding(.horizontal)
+                    .padding(.vertical, 12)
+                    .background(Color.black)
+                } else if authManager.isGuest {
                     Button(action: { saveGuestClass() }) {
                         HStack(spacing: 8) {
                             Image(systemName: "checkmark.circle.fill")
@@ -157,8 +182,15 @@ struct CalendarPreviewView: View {
                     editingEvent = nil
                 }
             }
-            .alert(syncSuccess == true ? "Successfully added all events to your Google Calendar" : "Failed to add to your Google Calendar", isPresented: $showSyncAlert) {
+            .alert(sampleMode ? "Sample “synced”"
+                   : (syncSuccess == true ? "Successfully added all events to your Google Calendar"
+                                          : "Failed to add to your Google Calendar"),
+                   isPresented: $showSyncAlert) {
                 Button("OK", role: .cancel) {
+                    if sampleMode {
+                        DispatchQueue.main.async { onSyncComplete?() }
+                        return
+                    }
                     if syncSuccess == true, let syncResp = pendingSyncResponse {
                         // localId → googleEventId returned by the backend
                         let idMap = Dictionary(
@@ -214,7 +246,14 @@ struct CalendarPreviewView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(isSyncing)
+        .navigationBarBackButtonHidden(isSyncing || (sampleMode && sampleTour.isActive))
+        .coachMarks(sampleTour) { step in
+            if step == .previewSync {
+                runSampleSync()
+            } else {
+                sampleTour.advance()
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
@@ -321,6 +360,37 @@ struct CalendarPreviewView: View {
                     exportErrorMessage = "Network error: \(error.localizedDescription)"
                     showExportError = true
                 }
+            }
+        }
+    }
+
+    /// The sample walkthrough's "Sync" — a spinner, then the events are stored on
+    /// device only. No backend call, no Google Calendar.
+    private func runSampleSync() {
+        guard !isSyncing else { return }
+        isSyncing = true
+        Task {
+            try? await Task.sleep(nanoseconds: 1_400_000_000)
+            await MainActor.run {
+                let accepted = events.filter { $0.status == .accepted }
+                let existing = classManager.classes.first(where: { $0.id == existingClassID })
+                let mergedSchedule = resolvedSchedule(existing: existing)
+                classManager.removeClassByID(existingClassID)
+                classManager.addClass(Class(
+                    id: existingClassID,
+                    name: className,
+                    schedule: scheduleText(mergedSchedule),
+                    colorHex: existing?.colorHex ?? sharedEventColor.toHex(),
+                    events: accepted,
+                    status: accepted.isEmpty ? .noSyllabus : .active,
+                    structuredSchedule: mergedSchedule,
+                    termID: existing?.termID,
+                    isSample: true
+                ))
+                isSyncing = false
+                syncSuccess = true
+                syncMessage = "The sample stays on your device — your Google Calendar wasn't touched. Next: tweaking the class."
+                showSyncAlert = true
             }
         }
     }
@@ -1098,5 +1168,6 @@ struct ActivityViewController: UIViewControllerRepresentable {
         .environmentObject(AuthManager())
         .environmentObject(SettingsManager.shared)
         .environmentObject(TermStore())
+        .environmentObject(SampleTour())
     }
 }

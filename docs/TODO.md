@@ -25,11 +25,13 @@ Working list of known problems and planned features. Last updated: September 2, 
 
 - **Crash reporting** (Sentry or Firebase Crashlytics) — highest-value beta add;
   testers will report "it crashed" with no stack trace otherwise.
-- ~~**"Try a sample syllabus"** button on the empty state~~ — done. Empty-state
-  button creates a throwaway "Sample Syllabus" class and pushes straight into the
-  parse flow with built-in syllabus text (`SampleSyllabus`, dates generated
-  relative to today). First-run onboarding (`OnboardingView`, gated by
-  `onboarding.hasSeen`) is also done.
+- ~~**"Try a sample syllabus"** button on the empty state~~ — done, as a guided
+  walkthrough. The empty-state button creates a throwaway `isSample` class and
+  runs `SampleTour`: anchored coach-mark bubbles across upload → preview →
+  (simulated) sync → edit, with the parse faked (`SampleSyllabus.events()`, no
+  Gemini) and no Google Calendar write. Finishing or skipping deletes the sample
+  class. First-run onboarding (`OnboardingView`, gated by `onboarding.hasSeen`)
+  is also done.
 - **Sync resilience** — retry with backoff on transient failures. (The
   delete-and-recreate behavior is fixed: sync is now an incremental
   patch/insert/delete diff against the existing calendar.)

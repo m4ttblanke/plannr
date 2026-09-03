@@ -74,14 +74,26 @@ Calendar at [calendar.google.com](https://calendar.google.com).
 ### B. Add a class (with a structured schedule)
 
 - [ ] On the empty **My Classes** screen (no classes yet) tap **Try a sample
-  syllabus**. **Expect:** a "Sample Syllabus" class is created and you're pushed
-  straight to the upload screen, which begins parsing on its own (phased
-  "Waking the server… → …" caption, no file picker). It lands on the Calendar
-  Preview with ~10 events (problem sets, two observation reports, a midterm, a
-  research paper draft + final, a final exam) on dates a week or two out. Back
-  out to My Classes and **delete** the sample class (swipe / long-press) so the
-  rest of the run starts clean. The **Try a sample syllabus** button is gone now
-  that a class has existed.
+  syllabus**. **Expect:** a guided walkthrough with a dimmed backdrop and a
+  highlighted instruction bubble on each screen:
+  - **Upload screen** — bubble "Start with a syllabus". Tap **Got it** →
+    a phased spinner runs for a few seconds (faked — no network) then the
+    preview appears.
+  - **Preview** — bubbles "Review what Plannr found" → "See the whole term" →
+    "Add it to your calendar" (button reads **Run it**). ~10 events show
+    (problem sets, two observation reports, a midterm, a research paper
+    proposal + final, a final exam) on dates a week or two out.
+  - Tap **Run it** → a brief "Syncing…" then a **"Sample "synced""** alert
+    ("your Google Calendar wasn't touched"). 🔎 Confirm nothing new appears in
+    Google Calendar. Tap **OK**.
+  - **Class editor** — bubble "Adjust anytime" (shows the events + a purple
+    "sample class" banner, no Sync/meeting controls) → "That's the whole loop"
+    (button **Finish**).
+  - Tap **Finish** (or **Skip tour** at any point). **Expect:** back on the
+    empty My Classes screen — the sample class is **gone**, and the
+    **Try a sample syllabus** button is back.
+- [ ] Repeat and this time hit **Skip tour** on the first bubble. **Expect:**
+  straight back to the empty state, no sample class left behind.
 - [ ] Hamburger (≡, top-left) → **My Classes**. Tap **Add New Class**.
 - [ ] Leave the name blank. **Expect:** "Add Class" is greyed out / disabled.
 - [ ] Name it `CS 101`.

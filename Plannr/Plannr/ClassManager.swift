@@ -131,6 +131,7 @@ struct Class: Identifiable, Codable, Hashable {
             && lhs.meetingSyncEnabled == rhs.meetingSyncEnabled
             && lhs.meetingEventIds == rhs.meetingEventIds
             && lhs.termID == rhs.termID
+            && lhs.isSample == rhs.isSample
     }
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
@@ -158,6 +159,9 @@ struct Class: Identifiable, Codable, Hashable {
     var meetingEventIds: [String]
     /// The term folder this class belongs to, or nil when unfiled.
     var termID: UUID?
+    /// The throwaway class behind the "Try a sample syllabus" walkthrough. Never
+    /// touches Google Calendar and is deleted when the tour ends.
+    var isSample: Bool = false
 
     var color: Color {
         get { Color(hex: colorHex) }
@@ -167,6 +171,7 @@ struct Class: Identifiable, Codable, Hashable {
     enum CodingKeys: String, CodingKey {
         case id, name, schedule, colorHex, events, status, googleCalendarId, lastSynced, endDate
         case hasUnsyncedChanges, syncHistory, structuredSchedule, meetingSyncEnabled, meetingEventIds, termID
+        case isSample
     }
 
     init(
@@ -183,14 +188,15 @@ struct Class: Identifiable, Codable, Hashable {
         structuredSchedule: ClassSchedule? = nil,
         meetingSyncEnabled: Bool = false,
         meetingEventIds: [String] = [],
-        termID: UUID? = nil
+        termID: UUID? = nil,
+        isSample: Bool = false
     ) {
         self.init(
             id: UUID(), name: name, schedule: schedule, colorHex: colorHex, events: events,
             status: status, googleCalendarId: googleCalendarId, lastSynced: lastSynced,
             endDate: endDate, syncHistory: syncHistory, hasUnsyncedChanges: hasUnsyncedChanges,
             structuredSchedule: structuredSchedule, meetingSyncEnabled: meetingSyncEnabled,
-            meetingEventIds: meetingEventIds, termID: termID
+            meetingEventIds: meetingEventIds, termID: termID, isSample: isSample
         )
     }
 
@@ -209,7 +215,8 @@ struct Class: Identifiable, Codable, Hashable {
         structuredSchedule: ClassSchedule? = nil,
         meetingSyncEnabled: Bool = false,
         meetingEventIds: [String] = [],
-        termID: UUID? = nil
+        termID: UUID? = nil,
+        isSample: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -226,6 +233,7 @@ struct Class: Identifiable, Codable, Hashable {
         self.meetingSyncEnabled = meetingSyncEnabled
         self.meetingEventIds = meetingEventIds
         self.termID = termID
+        self.isSample = isSample
     }
 
     init(from decoder: Decoder) throws {
@@ -245,5 +253,6 @@ struct Class: Identifiable, Codable, Hashable {
         meetingSyncEnabled = try container.decodeIfPresent(Bool.self, forKey: .meetingSyncEnabled) ?? false
         meetingEventIds = try container.decodeIfPresent([String].self, forKey: .meetingEventIds) ?? []
         termID = try container.decodeIfPresent(UUID.self, forKey: .termID)
+        isSample = try container.decodeIfPresent(Bool.self, forKey: .isSample) ?? false
     }
 }

@@ -58,26 +58,54 @@ final class GuestFlowUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["tabTitle"].exists || app.staticTexts["My Classes"].exists)
     }
 
-    // MARK: - Sample syllabus (empty state)
+    // MARK: - Sample syllabus walkthrough (empty state)
 
-    func testTrySampleSyllabusStartsTheParseFlow() {
+    func testSampleTourWalksEveryStepThenRemovesTheSample() {
         enterGuestMode()
 
         let sample = app.buttons["trySampleSyllabus"]
         XCTAssertTrue(sample.waitForExistence(timeout: 5), "empty state should offer the sample")
         sample.tap()
 
-        // Lands on the upload screen for the auto-created sample class and starts
-        // parsing straight away (no file picker). Backend may be unreachable in
-        // CI — we only assert the flow begins, not that it finishes.
-        XCTAssertTrue(app.staticTexts["Upload Syllabus"].waitForExistence(timeout: 5),
-                      "should push into the syllabus upload view")
-        XCTAssertTrue(app.staticTexts["for Sample Syllabus"].exists)
+        // 1. Upload screen coach mark → runs the (faked) parse.
+        XCTAssertTrue(app.staticTexts["Start with a syllabus"].waitForExistence(timeout: 5))
+        app.buttons["Got it"].tap()
 
-        let started = app.staticTexts["Waking the server…"].waitForExistence(timeout: 5)
-            || app.staticTexts["Reading your syllabus…"].waitForExistence(timeout: 5)
-            || app.staticTexts["Extracting events…"].waitForExistence(timeout: 5)
-        XCTAssertTrue(started, "the phased parse progress should appear without any file picking")
+        // 2. Preview screen — three coach marks.
+        XCTAssertTrue(app.staticTexts["Review what Plannr found"].waitForExistence(timeout: 15),
+                      "the faked parse should land on the preview")
+        app.buttons["Got it"].tap()
+        XCTAssertTrue(app.staticTexts["See the whole term"].waitForExistence(timeout: 5))
+        app.buttons["Got it"].tap()
+        XCTAssertTrue(app.staticTexts["Add it to your calendar"].waitForExistence(timeout: 5))
+
+        // 3. Simulated sync — a spinner, then a sample-specific alert, no Google.
+        app.buttons["Run it"].tap()
+        let ok = app.alerts.buttons["OK"]
+        XCTAssertTrue(ok.waitForExistence(timeout: 8), "the simulated sync should show its alert")
+        ok.tap()
+
+        // 4. Class editor coach marks, ending in teardown.
+        XCTAssertTrue(app.staticTexts["Adjust anytime"].waitForExistence(timeout: 8))
+        app.buttons["Got it"].tap()
+        XCTAssertTrue(app.staticTexts["That's the whole loop"].waitForExistence(timeout: 5))
+        app.buttons["Finish"].tap()
+
+        // Back to the empty state — the sample class left no trace.
+        XCTAssertTrue(app.buttons["trySampleSyllabus"].waitForExistence(timeout: 6))
+        XCTAssertFalse(app.staticTexts["Astronomy 101 (Sample)"].exists)
+    }
+
+    func testSkipTourRemovesTheSample() {
+        enterGuestMode()
+        app.buttons["trySampleSyllabus"].tap()
+        XCTAssertTrue(app.staticTexts["Start with a syllabus"].waitForExistence(timeout: 5))
+
+        app.buttons["Skip tour"].tap()
+
+        XCTAssertTrue(app.buttons["trySampleSyllabus"].waitForExistence(timeout: 6),
+                      "skipping returns to the empty state")
+        XCTAssertFalse(app.staticTexts["Astronomy 101 (Sample)"].exists)
     }
 
     func testSampleSyllabusButtonHiddenOnceAClassExists() {

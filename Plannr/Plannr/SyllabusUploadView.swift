@@ -17,6 +17,7 @@ struct SyllabusUploadView: View {
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var settingsManager: SettingsManager
     @EnvironmentObject var termStore: TermStore
+    @EnvironmentObject var sampleTour: SampleTour
 
     let className: String
     let classSchedule: String
@@ -25,11 +26,11 @@ struct SyllabusUploadView: View {
     /// Events already stored for this class — used for reconciliation on re-upload.
     var existingEvents: [CalendarEvent] = []
     var onSyncComplete: (() -> Void)? = nil
-    /// When set, the view parses this text automatically on appear — used by the
-    /// "Try a sample syllabus" button so the flow starts without any file picking.
-    var autoParseText: String? = nil
+    /// The "Try a sample syllabus" walkthrough: no file picking, no Gemini — a
+    /// scripted progress spinner then built-in events.
+    var sampleMode: Bool = false
 
-    @State private var didAutoParse = false
+    @State private var didStartSampleParse = false
     @State private var showActionSheet = false
     @State private var showDocumentPicker = false
     @State private var showCameraScanner = false
@@ -104,7 +105,8 @@ struct SyllabusUploadView: View {
                                 .foregroundColor(.blue)
                         )
                     }
-                    .disabled(isUploading)
+                    .disabled(isUploading || sampleMode)
+                    .coachAnchor(.uploadIntro)
                     .padding(.horizontal)
                     
                     // File name display
@@ -133,7 +135,7 @@ struct SyllabusUploadView: View {
                 
                 // Loading indicator — phased so a cold start doesn't look frozen.
                 if isUploading, let parseStartedAt {
-                    ParseProgressView(startedAt: parseStartedAt)
+                    ParseProgressView(startedAt: parseStartedAt, accelerated: sampleMode)
                 }
                 
                 // Error message
@@ -213,19 +215,42 @@ struct SyllabusUploadView: View {
                     events: parsedEvents,
                     eventsToDelete: eventsToDelete,
                     parsedSchedule: parsedSchedule,
+                    sampleMode: sampleMode,
                     onSyncComplete: onSyncComplete
                 )
                 .environmentObject(classManager)
                 .environmentObject(authManager)
                 .environmentObject(settingsManager)
                 .environmentObject(termStore)
+                .environmentObject(sampleTour)
             }
         }
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            guard let autoParseText, !didAutoParse else { return }
-            didAutoParse = true
-            convertTextToPDFAndUpload(text: autoParseText)
+        .navigationBarBackButtonHidden(sampleMode && sampleTour.isActive)
+        .coachMarks(sampleTour)
+        .onChange(of: sampleTour.step) { _, step in
+            // The upload coach mark's "Got it" advances the tour; that's our cue
+            // to run the (faked) parse and move to the preview.
+            guard sampleMode, let step, step >= .previewList, !didStartSampleParse else { return }
+            didStartSampleParse = true
+            runSampleParse()
+        }
+    }
+
+    /// Simulate a parse: the phased spinner for a few seconds, then the built-in
+    /// events. No network, no Gemini.
+    private func runSampleParse() {
+        isUploading = true
+        parseStartedAt = Date()
+        Task {
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            await MainActor.run {
+                parsedEvents = SampleSyllabus.events()
+                parsedSchedule = SampleSyllabus.schedule()
+                isUploading = false
+                parseStartedAt = nil
+                navigateToPreview = true
+            }
         }
     }
 
@@ -630,5 +655,6 @@ struct TextEntryView: View {
         .environmentObject(AuthManager())
         .environmentObject(SettingsManager.shared)
         .environmentObject(TermStore())
+        .environmentObject(SampleTour())
     }
 }
