@@ -235,45 +235,6 @@ struct ClassEditView: View {
                 }
             }
 
-            // Length — how many weeks the class runs. Drives the end date, which
-            // stops the recurring meetings and auto-switches the class to INACTIVE.
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 6) {
-                    Image(systemName: "calendar.badge.clock")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                    Text("Length")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                    Spacer()
-                    if lengthInWeeks == nil {
-                        Button("Set length") { setLength(weeks: defaultLengthWeeks) }
-                            .font(.caption)
-                            .foregroundColor(.blue)
-                    } else {
-                        Button("Open-ended") {
-                            editableClass.endDate = nil
-                            persistClass()
-                        }
-                        .font(.caption)
-                        .foregroundColor(.blue)
-                    }
-                }
-
-                if let weeks = lengthInWeeks {
-                    Stepper(value: Binding(get: { weeks }, set: { setLength(weeks: $0) }),
-                            in: 1...52) {
-                        Text("\(weeks) \(weeks == 1 ? "week" : "weeks")")
-                            .font(.subheadline)
-                            .foregroundColor(.white)
-                    }
-                }
-
-                Text(lengthCaption)
-                    .font(.caption2)
-                    .foregroundColor(.gray)
-            }
-
             // Last synced
             if let lastSynced = editableClass.lastSynced {
                 Text("Last synced: \(lastSynced.formatted(date: .abbreviated, time: .shortened))")
@@ -318,6 +279,53 @@ struct ClassEditView: View {
         let w = min(max(weeks, 1), 52)
         editableClass.endDate = Calendar.current.date(byAdding: .day, value: w * 7, to: lengthAnchor)
         persistClass()
+    }
+
+    /// Only worth showing once the class has something the length actually bounds:
+    /// a schedule, a term it inherits an end from, or an end already set.
+    private var showsLengthRow: Bool {
+        scheduleHasContent || editableClass.termID != nil || editableClass.endDate != nil
+    }
+
+    /// How many weeks the class runs — drives the end date, which stops the
+    /// recurring meetings and auto-switches the class to INACTIVE.
+    private var lengthRow: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: "calendar.badge.clock")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                Text("Length")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                Spacer()
+                if lengthInWeeks == nil {
+                    Button("Set length") { setLength(weeks: defaultLengthWeeks) }
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                } else {
+                    Button("Open-ended") {
+                        editableClass.endDate = nil
+                        persistClass()
+                    }
+                    .font(.caption)
+                    .foregroundColor(.blue)
+                }
+            }
+
+            if let weeks = lengthInWeeks {
+                Stepper(value: Binding(get: { weeks }, set: { setLength(weeks: $0) }),
+                        in: 1...52) {
+                    Text("\(weeks) \(weeks == 1 ? "week" : "weeks")")
+                        .font(.subheadline)
+                        .foregroundColor(.white)
+                }
+            }
+
+            Text(lengthCaption)
+                .font(.caption2)
+                .foregroundColor(.gray)
+        }
     }
 
     // MARK: - Schedule + class meetings
@@ -365,6 +373,11 @@ struct ClassEditView: View {
                      : "Set a schedule above first.")
                     .font(.caption2)
                     .foregroundColor(.gray)
+
+                if showsLengthRow {
+                    Divider().background(Color.gray.opacity(0.3))
+                    lengthRow
+                }
             }
         }
         .padding()
