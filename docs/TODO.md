@@ -31,6 +31,13 @@ Working list of known problems and planned features. Last updated: September 2, 
   jitter and `Retry-After` support. 401 / other 4xx / non-`URLError` throws are
   not retried. (The delete-and-recreate behavior was already fixed: sync is an
   incremental patch/insert/delete diff.)
+  Retries are safe now that inserts are idempotent: `/calendar/sync` stamps each
+  event with the client's `local_id` (`plannrLocalId` extended property) and
+  looks it up before inserting, so a retried request patches the event it
+  already created instead of duplicating it (`test_calendar_sync.py`).
+  And a sync that still fails all its retries no longer waits for the user:
+  `NetworkMonitor` + a foreground hook re-fire `ClassAutoResync` for any class
+  with `hasUnsyncedChanges` when connectivity returns (silent, no UI).
 - **Restore a sync session.** `SyncSessionsView` already lists every past sync
   with its full event snapshot (`Class.syncHistory: [SyncSession]`), but it's
   read-only. Add a "Restore this version" action that replaces the class's

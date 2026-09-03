@@ -85,6 +85,34 @@ enum ClassSyncRequest {
         hex.hasPrefix("#") ? hex : "#\(hex)"
     }
 
+    /// Fold a successful `/calendar/sync` response back into a class: record the
+    /// new Google event ids, clear the `isEdited` flags, drop the
+    /// locally-deleted events, and mark the class synced. Pure — the caller
+    /// persists the result. Shared by the interactive re-sync and the
+    /// reconnect auto-resync.
+    static func apply(_ response: Response, to cls: Class, now: Date = Date()) -> Class {
+        var updated = cls
+        updated.googleCalendarId = response.googleCalendarId
+
+        let idMap = Dictionary(response.syncedEvents.map { ($0.localId, $0.googleEventId) },
+                               uniquingKeysWith: { _, new in new })
+        for i in updated.events.indices where !updated.events[i].isDeletedLocally {
+            if let gid = idMap[updated.events[i].id.uuidString] {
+                updated.events[i].googleEventId = gid
+            }
+            updated.events[i].isEdited = false
+        }
+        updated.events.removeAll { $0.isDeletedLocally }
+
+        updated.hasUnsyncedChanges = false
+        updated.lastSynced = now
+        if updated.status == .noSyllabus {
+            updated.status = .active
+        }
+        updated.syncHistory.append(SyncSession(events: updated.events))
+        return updated
+    }
+
     private struct Body: Encodable {
         let className: String
         let googleCalendarId: String?

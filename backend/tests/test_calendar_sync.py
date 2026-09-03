@@ -34,6 +34,7 @@ class _Events:
         self.rec = rec
         self.patch_raises = {}   # eventId -> exception raised by patch(...).execute()
         self.list_items = []     # events the full-rebuild path will find and delete
+        self.tag_lookup = {}     # "plannrLocalId=<id>" -> [event dicts] found by tag
         self.last_insert_body = None
 
     def patch(self, calendarId, eventId, body):
@@ -53,8 +54,12 @@ class _Events:
         self.rec.append(("delete", eventId))
         return _Call(result={})
 
-    def list(self, calendarId, singleEvents=None, pageToken=None):   # full rebuild only
-        self.rec.append(("events.list", None))
+    def list(self, calendarId, singleEvents=None, pageToken=None,
+             privateExtendedProperty=None, showDeleted=None, maxResults=None):
+        if privateExtendedProperty:   # idempotency lookup before an insert
+            self.rec.append(("events.list.byTag", privateExtendedProperty))
+            return _Call(result={"items": self.tag_lookup.get(privateExtendedProperty, [])})
+        self.rec.append(("events.list", None))   # full rebuild only
         return _Call(result={"items": self.list_items})
 
 
@@ -146,13 +151,31 @@ def test_existing_event_is_patched_not_recreated(synced):
 
 
 def test_new_event_is_inserted(synced):
-    client, rec, _ = synced
+    client, rec, fake = synced
     resp = _post(client, [
         {"local_id": "L2", "title": "HW2", "date": "2026-03-08", "is_deleted": False},
     ])
     assert resp.status_code == 200
     assert resp.json()["synced_events"] == [{"local_id": "L2", "google_event_id": "new-HW2"}]
     assert ("insert", "HW2") in rec
+    # It looked for an existing copy first, and tagged what it inserted.
+    assert ("events.list.byTag", "plannrLocalId=L2") in rec
+    assert fake.events().last_insert_body["extendedProperties"]["private"]["plannrLocalId"] == "L2"
+
+
+def test_retried_insert_patches_the_existing_event_instead_of_duplicating(synced):
+    client, rec, fake = synced
+    # A prior sync already created this event; its response was lost, so the
+    # client re-sends it with no google_event_id.
+    fake.events().tag_lookup["plannrLocalId=L2"] = [{"id": "G-already"}]
+
+    resp = _post(client, [
+        {"local_id": "L2", "title": "HW2", "date": "2026-03-08", "is_deleted": False},
+    ])
+    assert resp.status_code == 200
+    assert resp.json()["synced_events"] == [{"local_id": "L2", "google_event_id": "G-already"}]
+    assert ("patch", "G-already") in rec
+    assert not any(k == "insert" for k, _ in rec), "must not insert a duplicate"
 
 
 def test_deleted_event_is_removed_and_not_returned(synced):

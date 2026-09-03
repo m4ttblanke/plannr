@@ -105,7 +105,7 @@ The Week at a Glance view gives users a focused look at their upcoming week, sur
 
 Users can push all parsed events to their Google Calendar with one tap. Plannr creates a dedicated secondary calendar for each class with a matching color. Re-syncing handles updates and deletions automatically as an incremental diff — it patches, inserts, and deletes individual events rather than rebuilding the calendar, so manual edits made in Google Calendar survive a re-sync.
 
-A flaky connection or a server still waking up no longer fails the sync outright: every request is retried a few times with a growing delay before an error is shown, so a brief blip recovers on its own.
+A flaky connection or a server still waking up no longer fails the sync outright: every request is retried a few times with a growing delay before an error is shown. If a sync still fails, its changes stay pending and Plannr retries them on its own the next time it's opened or the connection returns — retries can't create duplicate events. You can also always re-sync manually from a class's edit screen.
 
 ### Class Meeting Sync
 

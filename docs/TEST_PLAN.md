@@ -158,6 +158,12 @@ Calendar at [calendar.google.com](https://calendar.google.com).
   **Sync!**, wait ~2 s, turn it **off** again. **Expect:** the sync recovers by
   itself (no error alert) — `send` retries with a growing delay. A sync against
   a cold backend (idle for a while) exercises the same path via a 502/503.
+- [ ] **Auto-resync on reconnect (optional).** Turn Airplane Mode **on**. Edit
+  an event and tap **Re-sync** — it fails (the class keeps its unsynced badge).
+  Turn Airplane Mode **off** (or background and reopen the app). **Expect:** the
+  change syncs on its own within a few seconds; 🔎 it lands in Google Calendar,
+  and 🔎 there is exactly **one** copy of any newly-inserted event (the retry is
+  idempotent — no duplicates).
 
 ### F. Re-upload an updated syllabus (incremental reconcile)
 
@@ -537,7 +543,8 @@ Needs a second Google account you can sign into.
   retry/backoff,
   `NotificationManagerTests` nearest-60 selection, `TermSettingsTests`
   quarter/semester end date + auto label, `EventTypeTests` category
-  normalization, `ClassSyncRequestTests` /calendar/sync body + response,
+  normalization, `ClassSyncRequestTests` /calendar/sync body + response +
+  `apply`, `ClassAutoResyncTests` reconnect resync,
   `ParsePhaseTests` upload-phase timeline, `TermTests` + `TermStoreTests`
   term folders) and `PlannrUITests/GuestFlowUITests` +
   `PlannrUITests/OnboardingUITests`.

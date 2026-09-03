@@ -33,6 +33,8 @@ struct PDFUploadView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var showAddClass = false
     @StateObject private var sampleTour = SampleTour()
+    @StateObject private var networkMonitor = NetworkMonitor()
+    @State private var isAutoResyncing = false
     @State private var navigationPath = NavigationPath()
     @State private var selectedTab: AppTab = .myClasses
     @State private var showProfileSheet = false
@@ -187,14 +189,20 @@ struct PDFUploadView: View {
                 }
                 runTermMigrationIfNeeded()
                 syncNotifications()
+                networkMonitor.onReconnect = { resyncPendingClasses() }
+                resyncPendingClasses()
             }
             .onChange(of: classManager.classes) { _, _ in syncNotifications() }
             .onChange(of: settingsManager.notificationsEnabled) { _, _ in syncNotifications() }
             .onChange(of: settingsManager.reminderLeadTimeDays) { _, _ in syncNotifications() }
             // Re-sync on every foreground so the "nearest 60" reminder window
-            // rolls forward as earlier ones fire (iOS caps pending reminders at 64).
+            // rolls forward as earlier ones fire (iOS caps pending reminders at 64),
+            // and push any changes a failed earlier sync left pending.
             .onChange(of: scenePhase) { _, newPhase in
-                if newPhase == .active { syncNotifications() }
+                if newPhase == .active {
+                    syncNotifications()
+                    resyncPendingClasses()
+                }
             }
             .navigationDestination(for: Class.self) { cls in
                 classEditDestination(cls)
@@ -444,6 +452,31 @@ struct PDFUploadView: View {
             notificationsEnabled: settingsManager.notificationsEnabled,
             leadDays: settingsManager.reminderLeadTimeDays
         )
+    }
+
+    /// Silently push any class whose sync failed earlier (it still has
+    /// `hasUnsyncedChanges`). Fired on launch, on foreground, and when the
+    /// network comes back.
+    private func resyncPendingClasses() {
+        guard authManager.isAuthenticated, !authManager.isGuest, !isAutoResyncing else { return }
+        let pending = classManager.classes.filter {
+            $0.hasUnsyncedChanges && $0.googleCalendarId != nil && !$0.isSample
+        }
+        guard !pending.isEmpty else { return }
+
+        isAutoResyncing = true
+        Task {
+            for cls in pending {
+                if let updated = await ClassAutoResync.run(
+                    cls,
+                    reminderMinutes: settingsManager.reminderMinutes,
+                    send: { try await authManager.send($0) }
+                ) {
+                    await MainActor.run { classManager.updateClass(updated) }
+                }
+            }
+            await MainActor.run { isAutoResyncing = false }
+        }
     }
 }
 

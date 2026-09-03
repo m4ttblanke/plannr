@@ -728,37 +728,7 @@ struct ClassEditView: View {
     }
 
     private func applySync(response: ClassSyncRequest.Response) {
-        // Update calendar ID
-        editableClass.googleCalendarId = response.googleCalendarId
-
-        // Build lookup: localId → googleEventId
-        let idMap = Dictionary(uniqueKeysWithValues: response.syncedEvents.map { ($0.localId, $0.googleEventId) })
-
-        // Apply to events
-        for i in editableClass.events.indices {
-            let ev = editableClass.events[i]
-            if ev.isDeletedLocally {
-                // Will be removed below
-                continue
-            }
-            if let gid = idMap[ev.id.uuidString] {
-                editableClass.events[i].googleEventId = gid
-            }
-            editableClass.events[i].isEdited = false
-        }
-
-        // Remove soft-deleted events from local storage
-        editableClass.events.removeAll { $0.isDeletedLocally }
-
-        // Update class metadata
-        editableClass.hasUnsyncedChanges = false
-        editableClass.lastSynced = Date()
-        if editableClass.status == .noSyllabus {
-            editableClass.status = .active
-        }
-        
-        editableClass.syncHistory.append(SyncSession(events: editableClass.events))
-
+        editableClass = ClassSyncRequest.apply(response, to: editableClass)
         persistClass()
         showSyncSuccess = true
     }

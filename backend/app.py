@@ -860,6 +860,7 @@ def _build_google_event_body(event: SyncEventRequest, reminder_minutes: Optional
         'description': event.description or '',
         'start': {'date': event.date},
         'end': {'date': event.date},
+        'extendedProperties': {'private': {ASSIGNMENT_TAG_KEY: event.local_id}},
     }
     if reminder_minutes is not None:
         body['reminders'] = {
@@ -880,7 +881,10 @@ async def sync_class_calendar(request: Request, email: str = Query(...), body: C
       anything the user added to the event directly in Google Calendar — location,
       attendees, notes — survives a re-sync). A patch that 404s (event deleted in
       Google, or a stale id) recreates just that event.
-    - Inserts new events that have no google_event_id.
+    - Inserts new events that have no google_event_id — but first looks them up by
+      the client's local_id (a private extended property on every synced event),
+      so a retried request patches the event it already created rather than
+      inserting a duplicate.
     - Deletes events marked is_deleted=True (if they have a google_event_id).
     - Falls back to a full rebuild only if incremental sync fails outright.
 
@@ -941,12 +945,21 @@ async def sync_class_calendar(request: Request, email: str = Query(...), body: C
                             raise
                     synced_events.append({"local_id": event.local_id, "google_event_id": result['id']})
                 else:
-                    # Insert new event
-                    created = service.events().insert(
-                        calendarId=cal_id,
-                        body=_build_google_event_body(event, body.reminder_minutes)
-                    ).execute()
-                    synced_events.append({"local_id": event.local_id, "google_event_id": created['id']})
+                    # New event. First check whether a previous (possibly retried)
+                    # sync already created it — match on the local_id tag — and
+                    # patch that one instead of inserting a duplicate.
+                    event_body = _build_google_event_body(event, body.reminder_minutes)
+                    existing_id = _find_assignment_event(service, cal_id, event.local_id)
+                    if existing_id:
+                        result = service.events().patch(
+                            calendarId=cal_id, eventId=existing_id, body=event_body
+                        ).execute()
+                        synced_events.append({"local_id": event.local_id, "google_event_id": result['id']})
+                    else:
+                        created = service.events().insert(
+                            calendarId=cal_id, body=event_body
+                        ).execute()
+                        synced_events.append({"local_id": event.local_id, "google_event_id": created['id']})
 
         except RefreshError:
             raise  # dead token — no point attempting a full rebuild; handled below
@@ -1082,6 +1095,27 @@ def _add_minutes_to_hhmm(hhmm: str, minutes: int) -> str:
 # so they can be found (and cleaned up / skipped) independent of any stored id.
 MEETING_TAG_KEY = "plannrMeeting"
 MEETING_TAG_VALUE = "1"
+
+# Every synced assignment event carries the client's local_id as a private
+# extended property. A retried /calendar/sync (e.g. after a lost response) can
+# then find the event it already created and patch it, instead of inserting a
+# duplicate.
+ASSIGNMENT_TAG_KEY = "plannrLocalId"
+
+
+def _find_assignment_event(service, cal_id: str, local_id: str):
+    """The id of the already-synced event for `local_id`, or None."""
+    try:
+        result = service.events().list(
+            calendarId=cal_id,
+            privateExtendedProperty=f"{ASSIGNMENT_TAG_KEY}={local_id}",
+            showDeleted=False,
+            maxResults=1,
+        ).execute()
+        items = result.get("items", [])
+        return items[0]["id"] if items else None
+    except Exception:
+        return None
 
 
 def _build_meeting_event_body(pattern: "MeetingPatternRequest", req: "ClassMeetingsRequest") -> dict:

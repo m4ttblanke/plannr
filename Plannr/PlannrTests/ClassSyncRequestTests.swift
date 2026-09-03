@@ -135,6 +135,50 @@ final class ClassSyncRequestTests: XCTestCase {
         XCTAssertEqual(body["background_color"] as? String, "#123456")
     }
 
+    // MARK: - apply(_:to:)
+
+    private func classWith(_ events: [CalendarEvent],
+                           status: ClassStatus = .active,
+                           googleCalendarId: String? = "cal-old") -> Class {
+        Class(name: "CS", colorHex: "007AFF", events: events, status: status,
+              googleCalendarId: googleCalendarId, hasUnsyncedChanges: true)
+    }
+
+    func testApplyRecordsIdsClearsEditedFlagsAndMarksSynced() {
+        let new = event("new")                                   // insert → gets an id
+        let edited = event("edited", googleEventId: "g-e", edited: true)
+        let cls = classWith([new, edited])
+
+        let response = ClassSyncRequest.Response(
+            googleCalendarId: "cal-new",
+            syncedEvents: [
+                .init(localId: new.id.uuidString, googleEventId: "g-new"),
+                .init(localId: edited.id.uuidString, googleEventId: "g-e"),
+            ])
+
+        let out = ClassSyncRequest.apply(response, to: cls, now: Date(timeIntervalSince1970: 1000))
+
+        XCTAssertEqual(out.googleCalendarId, "cal-new")
+        XCTAssertEqual(out.events.first(where: { $0.title == "new" })?.googleEventId, "g-new")
+        XCTAssertTrue(out.events.allSatisfy { !$0.isEdited })
+        XCTAssertFalse(out.hasUnsyncedChanges)
+        XCTAssertEqual(out.lastSynced, Date(timeIntervalSince1970: 1000))
+        XCTAssertEqual(out.syncHistory.count, 1)
+    }
+
+    func testApplyDropsLocallyDeletedEventsAndActivatesANoSyllabusClass() {
+        let kept = event("kept", googleEventId: "g-k")
+        let dropped = event("dropped", googleEventId: "g-d", deleted: true)
+        let cls = classWith([kept, dropped], status: .noSyllabus)
+
+        let out = ClassSyncRequest.apply(
+            ClassSyncRequest.Response(googleCalendarId: "cal", syncedEvents: []),
+            to: cls)
+
+        XCTAssertEqual(out.events.map(\.title), ["kept"])
+        XCTAssertEqual(out.status, .active)
+    }
+
     // MARK: - Response
 
     func testResponseDecodesTheBackendShape() throws {
