@@ -93,6 +93,9 @@ struct ProfileView: View {
                     syncSection
                     notificationSection
                     accountSection
+                    #if DEBUG
+                    debugSection
+                    #endif
                 }
                 .padding(.bottom, 40)
             }
@@ -404,6 +407,32 @@ struct ProfileView: View {
             Text("This permanently deletes your account, stored Google credentials, and all synced data. This cannot be undone.")
         }
     }
+
+    #if DEBUG
+    // MARK: Debug (never shipped)
+
+    private var debugSection: some View {
+        SettingsSection(title: "Debug", icon: "ladybug.fill") {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(CrashReporting.isEnabled
+                     ? "Crash reporting is ON for this build."
+                     : "Crash reporting is OFF (no SENTRY_DSN).")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+
+                Button(role: .destructive) {
+                    CrashReporting.breadcrumb("User tapped the debug test-crash button", category: "debug")
+                    CrashReporting.triggerTestCrash()
+                } label: {
+                    Text("Force a test crash")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.red)
+                }
+                .disabled(!CrashReporting.isEnabled)
+            }
+        }
+    }
+    #endif
 }
 
 // MARK: - Settings section container

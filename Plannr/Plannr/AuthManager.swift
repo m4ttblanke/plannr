@@ -55,6 +55,7 @@ class AuthManager: ObservableObject {
             self.userName = UserDefaults.standard.string(forKey: "userName")
             self.userPhotoURL = UserDefaults.standard.string(forKey: "userPhotoURL")
             self.isAuthenticated = true
+            CrashReporting.setUser(email: email)
             // Backfill/refresh name + photo from Google for sessions that predate
             // (or whose cached values are stale relative to) these fields.
             refreshGoogleProfile()
@@ -201,6 +202,7 @@ class AuthManager: ObservableObject {
             }
             self.isAuthenticated = true
             self.isLoading = false
+            CrashReporting.setUser(email: email)
             // Load this account's custom photo (migrating the legacy one on first
             // sign-in), not whatever the previous session left in memory.
             self.migrateLegacyPhotoIfNeeded()
@@ -216,6 +218,7 @@ class AuthManager: ObservableObject {
             self.userEmail = nil
             self.userName = "Guest"
             self.localPhotoData = self.loadLocalPhotoData()
+            CrashReporting.setUser(email: nil)
         }
     }
 
@@ -232,6 +235,7 @@ class AuthManager: ObservableObject {
             self.userName = nil
             self.userPhotoURL = nil
             self.localPhotoData = nil
+            CrashReporting.setUser(email: nil)
         }
     }
 

@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		5E17C0A0000000000000A003 /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = 5E17C0A0000000000000A002 /* Sentry */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		5AF01F7A2F216B1B00744DC7 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -65,6 +69,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5E17C0A0000000000000A003 /* Sentry in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -125,6 +130,7 @@
 			);
 			name = Plannr;
 			packageProductDependencies = (
+				5E17C0A0000000000000A002 /* Sentry */,
 			);
 			productName = SyllabusToCalendar;
 			productReference = 5AF01F6C2F216B1400744DC7 /* Plannr.app */;
@@ -208,6 +214,9 @@
 			);
 			mainGroup = 5AF01F632F216B1400744DC7;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				5E17C0A0000000000000A001 /* XCRemoteSwiftPackageReference "sentry-cocoa" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5AF01F6D2F216B1400744DC7 /* Products */;
 			projectDirPath = "";
@@ -571,6 +580,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		5E17C0A0000000000000A001 /* XCRemoteSwiftPackageReference "sentry-cocoa" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/getsentry/sentry-cocoa.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.40.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		5E17C0A0000000000000A002 /* Sentry */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5E17C0A0000000000000A001 /* XCRemoteSwiftPackageReference "sentry-cocoa" */;
+			productName = Sentry;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 5AF01F642F216B1400744DC7 /* Project object */;
 }

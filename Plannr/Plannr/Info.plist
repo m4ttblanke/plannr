@@ -2,6 +2,11 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Sentry crash-reporting DSN. Empty = crash reporting off (dev / CI / repo).
+	     Paste your project DSN here, or feed it from a build setting: $(SENTRY_DSN).
+	     See docs/CRASH_REPORTING.md. -->
+	<key>SENTRY_DSN</key>
+	<string></string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

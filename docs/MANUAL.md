@@ -133,6 +133,10 @@ The profile screen (tap the avatar in the top-right of the home screen) collects
 
 The hamburger menu (top-left of the home screen) has **Report an Issue** and **Suggest a Feature** items. Each opens a pre-filled email to the Plannr team — an issue report includes an app/OS/device summary; a feature suggestion prompts for what you want and why. If the device has no Mail account set up, the app shows the address to write to instead.
 
+### Crash Reporting
+
+Beta builds send automatic crash reports (via Sentry) so a "it crashed" report comes with a stack trace. A report includes the app version, the device/OS, a short trail of recent in-app actions, and — if you're signed in — your account email, so the report can be matched to your feedback. It does **not** include syllabus contents, event text, or your Google credentials. Guest sessions are reported without any identifier. Crash reporting is only active in builds configured with a reporting key; a development build with none sends nothing.
+
 
 ## **Known Problems**
 

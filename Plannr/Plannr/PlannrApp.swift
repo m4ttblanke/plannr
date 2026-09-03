@@ -14,6 +14,7 @@ struct PlannrApp: App {
 
     init() {
         AppAppearance.configure()
+        CrashReporting.start()
 
         // UI tests decide the first-run state explicitly: -uiTestShowOnboarding
         // forces the walkthrough, -uiTestReset otherwise skips straight to sign-in.

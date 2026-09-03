@@ -14,8 +14,13 @@ DerivedData/
 build/
 *.xcworkspace/xcuserdata/
 .swiftpm/
-Package.resolved
+# Keep the Xcode project's resolved SPM versions committed for reproducible
+# builds; ignore only a standalone SwiftPM package's lockfile.
+/Package.resolved
 timeline.xctimeline
+
+# Crash-reporting DSN / other local secrets (see docs/CRASH_REPORTING.md)
+Secrets.xcconfig
 playground.xcworkspace
 *.gcno
 *.gcda

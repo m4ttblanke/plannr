@@ -23,8 +23,12 @@ Working list of known problems and planned features. Last updated: September 2, 
 
 ### Pre-launch polish
 
-- **Crash reporting** (Sentry or Firebase Crashlytics) — highest-value beta add;
-  testers will report "it crashed" with no stack trace otherwise.
+- ~~**Crash reporting**~~ — done. Sentry (`sentry-cocoa` SPM) wrapped in
+  `CrashReporting.swift`, started from `PlannrApp.init`, no-op until a DSN is set
+  in `Info.plist` `SENTRY_DSN`. Sets the signed-in email as the Sentry user;
+  Debug builds get a "Force a test crash" button in the profile sheet. Setup +
+  dSYM notes in `docs/CRASH_REPORTING.md`. **Remaining:** create the Sentry
+  project and paste in the DSN.
 - ~~**"Try a sample syllabus"** button on the empty state~~ — done, as a guided
   walkthrough. The empty-state button creates a throwaway `isSample` class and
   runs `SampleTour`: anchored coach-mark bubbles across upload → preview →

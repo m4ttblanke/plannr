@@ -534,7 +534,21 @@ Needs a second Google account you can sign into.
   quarter/semester end date + auto label, `EventTypeTests` category
   normalization, `ClassSyncRequestTests` /calendar/sync body + response,
   `ParsePhaseTests` upload-phase timeline, `TermTests` + `TermStoreTests`
-  term folders) and `PlannrUITests/GuestFlowUITests`.
+  term folders) and `PlannrUITests/GuestFlowUITests` +
+  `PlannrUITests/OnboardingUITests`.
+
+### Crash reporting (only if a `SENTRY_DSN` is configured — see `docs/CRASH_REPORTING.md`)
+
+- [ ] Run a **Debug** build. Profile avatar → **Debug** section → it should read
+  "Crash reporting is ON for this build." (If it reads OFF, no DSN is set — skip
+  this section.)
+- [ ] Tap **Force a test crash**. The app terminates. Relaunch it.
+- [ ] In Sentry, within ~a minute, a new crash event appears, tagged
+  `environment: debug` and `release: plannr@<version>+<build>`, with the
+  breadcrumb "User tapped the debug test-crash button" and — if signed in — your
+  email as the user.
+- [ ] Sign out, reopen, and (if you can crash again) confirm the next event has
+  **no** user email.
 
 ---
 
