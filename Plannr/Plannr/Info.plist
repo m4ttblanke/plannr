@@ -7,6 +7,13 @@
 	     See docs/CRASH_REPORTING.md. -->
 	<key>SENTRY_DSN</key>
 	<string>https://0228dbf4fca0b91c1951a30d6c531466@o4512023845732352.ingest.us.sentry.io/4512023850385408</string>
+	<!-- Launch screen: just the sign-in / onboarding blue, so the cold-launch
+	     hand-off to those screens has no flash. -->
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
+	</dict>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
