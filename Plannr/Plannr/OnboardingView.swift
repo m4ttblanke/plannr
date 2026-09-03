@@ -85,6 +85,8 @@ struct OnboardingView: View {
                     }
                 }
                 .padding(.bottom, 24)
+                .accessibilityElement()
+                .accessibilityLabel("Page \(index + 1) of \(pages.count)")
 
                 Button(action: advance) {
                     Text(isLastPage ? "Get Started" : "Next")
@@ -106,6 +108,7 @@ struct OnboardingView: View {
                 .offset(y: 30)
                 .ignoresSafeArea(edges: .bottom)
                 .allowsHitTesting(false)
+                .accessibilityHidden(true)
         }
         .navigationBarHidden(true)
     }
@@ -122,6 +125,7 @@ struct OnboardingView: View {
                     .font(.system(size: 54, weight: .regular))
                     .foregroundColor(gold)
             }
+            .accessibilityHidden(true)
 
             VStack(spacing: 14) {
                 Text(page.title)

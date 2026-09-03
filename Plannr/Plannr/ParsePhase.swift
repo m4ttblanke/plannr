@@ -84,6 +84,7 @@ struct ParseProgressView: View {
                             .frame(width: 6, height: 6)
                     }
                 }
+                .accessibilityHidden(true)
 
                 if !accelerated {
                     Text("The first upload after a while can take up to a minute while the server wakes up.")
@@ -93,6 +94,9 @@ struct ParseProgressView: View {
                         .padding(.horizontal, 32)
                 }
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(phase.message)
+            .accessibilityAddTraits(.updatesFrequently)
         }
     }
 }

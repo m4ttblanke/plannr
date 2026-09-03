@@ -25,12 +25,13 @@ Working list of known problems and planned features. Last updated: September 3, 
 
 - Backend `/health` endpoint + an uptime monitor (also keeps the free dyno warm,
   which improves cold-start and OAuth reliability).
-- Accessibility: further passes as needed — the calendar day-number grids still
-  use fixed point sizes (they can't reflow), and a full VoiceOver walkthrough of
-  every flow hasn't been done. First pass is complete: `Color.secondaryText`
-  (~4.8:1 on black) replaced bare `.gray` captions; icon-only buttons got
-  `accessibilityLabel`s; sign-in / onboarding fixed fonts became scalable text
-  styles and the primary CTAs shrink-to-fit instead of truncating.
+- Accessibility: further polish as it comes up. Done so far: `Color.secondaryText`
+  (~4.8:1 on black) for captions; `accessibilityLabel`s on icon-only buttons;
+  fixed fonts → scalable text styles with shrink-to-fit CTAs; calendar day
+  cells are now scalable (bounded) and each is one VoiceOver button that speaks
+  its date + event count; decorative art (brand, waves, dots, coach-mark chrome)
+  hidden from VoiceOver; the coach-mark bubble and parse spinner read as single
+  elements. Not done: a device VoiceOver run through every screen; localization.
 
 ### Product roadmap (from the landing page "What's next")
 

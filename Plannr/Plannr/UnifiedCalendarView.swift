@@ -167,6 +167,8 @@ struct UnifiedCalendarView: View {
                     }
                 }
                 .padding(.horizontal)
+                // The 7-column day grid can't reflow; cap how far its numbers scale.
+                .dynamicTypeSize(...DynamicTypeSize.accessibility1)
 
                 // Events for the visible week / month
                 eventsListSection
@@ -457,6 +459,8 @@ struct UnifiedMonthlyCalendarView: View {
                 ForEach(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"], id: \.self) { day in
                     Text(day)
                         .font(.caption2)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                         .foregroundColor(.secondaryText)
                         .frame(maxWidth: .infinity)
                 }
@@ -464,7 +468,7 @@ struct UnifiedMonthlyCalendarView: View {
 
             LazyVGrid(columns: columns, spacing: 8) {
                 ForEach(0..<startingWeekday(), id: \.self) { _ in
-                    Text("").frame(height: 40)
+                    Text("").frame(height: 40).accessibilityHidden(true)
                 }
                 ForEach(daysInMonth(), id: \.self) { date in
                     UnifiedDayCell(
@@ -540,7 +544,9 @@ struct UnifiedDayColumn: View {
                 .foregroundColor(.secondaryText)
 
             Text("\(calendar.component(.day, from: date))")
-                .font(.system(size: 16, weight: isSelected ? .bold : .regular))
+                .font(.callout.weight(isSelected ? .bold : .regular))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
                 .foregroundColor(isSelected ? .blue : .white)
                 .frame(width: 32, height: 32)
                 .background(isSelected ? Color.blue.opacity(0.2) : Color.clear)
@@ -564,6 +570,7 @@ struct UnifiedDayColumn: View {
         .background(isSelected ? Color.white.opacity(0.05) : Color.clear)
         .cornerRadius(8)
         .onTapGesture { onTap() }
+        .dayCellAccessibility(date: date, eventCount: events.count, includeWeekday: true, isSelected: isSelected)
     }
 
     func dayName() -> String {
@@ -586,7 +593,9 @@ struct UnifiedDayCell: View {
     var body: some View {
         VStack(spacing: 2) {
             Text("\(calendar.component(.day, from: date))")
-                .font(.system(size: 14, weight: isSelected ? .bold : .regular))
+                .font(.subheadline.weight(isSelected ? .bold : .regular))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
                 .foregroundColor(isSelected ? .blue : .white)
 
             if !events.isEmpty {
@@ -604,6 +613,7 @@ struct UnifiedDayCell: View {
         .background(isSelected ? Color.blue.opacity(0.2) : Color.clear)
         .cornerRadius(8)
         .onTapGesture { onTap() }
+        .dayCellAccessibility(date: date, eventCount: events.count, includeWeekday: false, isSelected: isSelected)
     }
 }
 

@@ -237,6 +237,7 @@ struct ClassEditView: View {
                 EmptyView()
             }
             .frame(maxWidth: 40) // constrain to just the swatch
+            .accessibilityLabel("Class color")
 
             // Term folder
             if !termStore.terms.isEmpty {

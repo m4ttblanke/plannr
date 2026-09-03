@@ -176,6 +176,7 @@ struct CoachMarkView: View {
                 .ignoresSafeArea()
                 .contentShape(Rectangle())
                 .onTapGesture { }   // swallow taps; acknowledge is button-only
+                .accessibilityHidden(true)
 
             // Highlight ring around the target.
             RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -183,6 +184,7 @@ struct CoachMarkView: View {
                 .frame(width: targetRect.width + 12, height: targetRect.height + 12)
                 .position(x: targetRect.midX, y: targetRect.midY)
                 .allowsHitTesting(false)
+                .accessibilityHidden(true)
 
             // Pointer triangle.
             Triangle()
@@ -191,6 +193,7 @@ struct CoachMarkView: View {
                 .rotationEffect(.degrees(placeBelow ? 0 : 180))
                 .position(x: pointerX,
                           y: placeBelow ? bubbleY - 4 : bubbleY + estimatedHeight + 4)
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 8) {
                 Text(step.title)
@@ -221,6 +224,8 @@ struct CoachMarkView: View {
             .frame(width: bubbleWidth, alignment: .leading)
             .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color(white: 0.15)))
             .position(x: bubbleX + bubbleWidth / 2, y: bubbleY + estimatedHeight / 2)
+            .accessibilityElement(children: .contain)
+            .accessibilityAddTraits(.isModal)
         }
         .transition(.opacity)
     }

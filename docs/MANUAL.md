@@ -143,7 +143,7 @@ Beta builds send automatic crash reports (via Sentry) so a "it crashed" report c
 
 ### Accessibility
 
-Text follows the system **Dynamic Type** setting (Settings → Display & Brightness → Text Size, or the accessibility text sizes), and the large action buttons shrink their label to fit rather than truncate. Icon-only controls — calendar navigation arrows, the class delete button, the export and profile-photo buttons — carry **VoiceOver** labels. Secondary/caption text uses a lighter gray for better contrast on the dark background.
+Text follows the system **Dynamic Type** setting (Settings → Display & Brightness → Text Size, or the accessibility text sizes), and the large action buttons shrink their label to fit rather than truncate. The calendar day grid scales its numbers a little then holds, since a seven-column grid can't reflow. Icon-only controls — calendar navigation arrows, the class delete button, the export and profile-photo buttons — carry **VoiceOver** labels, each calendar day reads as a button with its date and event count, and decorative artwork is skipped. Secondary/caption text uses a lighter gray for better contrast on the dark background.
 
 
 ## **Known Problems**

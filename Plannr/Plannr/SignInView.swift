@@ -45,8 +45,10 @@ struct SignInView: View {
                         Image(systemName: "star.fill")
                             .font(.system(size: 32))
                             .foregroundColor(Color(red: 0.996, green: 0.722, blue: 0.074))
+                            .accessibilityHidden(true)
 
                         StorkeTowerLineArt()
+                            .accessibilityHidden(true)
 
                         Text("Plannr")
                             .font(.system(.largeTitle, design: .serif).weight(.bold))
@@ -57,6 +59,7 @@ struct SignInView: View {
                             .foregroundColor(.white.opacity(0.9))
                     }
                     .padding(.top, 36)
+                    .accessibilityElement(children: .combine)
 
                     Spacer()
 
@@ -132,6 +135,7 @@ struct SignInView: View {
                     .frame(height: 120)
                     .offset(y: 30)
                     .ignoresSafeArea(edges: .bottom)
+                    .accessibilityHidden(true)
             }
             .navigationBarHidden(true)
             .onAppear {
