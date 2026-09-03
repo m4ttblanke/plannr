@@ -574,9 +574,19 @@ Needs a second Google account you can sign into.
 - [ ] Sign out, reopen, and (if you can crash again) confirm the next event has
   **no** user email.
 
----
+### Accessibility (device pass)
 
-## 4. Cleanup
+- [ ] Settings → Accessibility → Display & Text Size → **Larger Text**, drag to
+  a large accessibility size. Walk the main flows (sign-in, My Classes, a class,
+  the preview, the calendar, Week at a Glance, Profile). **Expect:** text scales,
+  nothing is clipped or cut off mid-word, the calendar day grid stays intact
+  (numbers scale a little then hold), and every action button is still readable
+  and tappable. Reset the text size after.
+- [ ] Turn on **VoiceOver** (triple-click the side button if it's a shortcut).
+  Swipe through the same flows. **Expect:** every control is announced with a
+  meaningful name (calendar arrows say "Previous/Next week/month", each day says
+  its date + event count, the delete/export/photo buttons are named), decorative
+  art is skipped, and the sample-tour coach mark keeps focus on its bubble.
 
 - [ ] Delete the test classes in the app (this also removes their secondary
   Google Calendars).
