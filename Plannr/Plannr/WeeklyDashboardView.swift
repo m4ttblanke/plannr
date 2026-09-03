@@ -396,7 +396,8 @@ struct WeeklyDashboardView: View {
                return schedule.occurrences(
                    from: week.start, to: week.end,
                    className: cls.name, classColorHex: cls.colorHex, classID: cls.id,
-                   fallbackStart: termStore.term(id: cls.termID)?.startDate ?? .distantPast
+                   fallbackStart: termStore.term(id: cls.termID)?.startDate ?? .distantPast,
+                   endBound: cls.endDate ?? termStore.term(id: cls.termID)?.resolvedEndDate()
                )
            }
            .flatMap { $0 }

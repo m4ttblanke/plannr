@@ -369,7 +369,8 @@ struct CalendarPreviewView: View {
             className: className,
             classColorHex: sharedEventColor.toHex(),
             classID: existingClassID,
-            fallbackStart: resolvedTerm?.startDate ?? .distantPast
+            fallbackStart: resolvedTerm?.startDate ?? .distantPast,
+            endBound: existing?.endDate ?? resolvedTerm?.resolvedEndDate()
         ).map { CalendarEvent(meeting: $0) }
     }
 

@@ -163,10 +163,16 @@ This is the important one — sync must change only what changed.
 - [ ] Tap the **color swatch**, pick a new color.
   **Expect (if already synced):** 🔎 the `CS 101` calendar's color changes in
   Google Calendar within a few seconds (silent, no alert).
-- [ ] **End date** row → **Set** → pick a date **in the past** → back out and
-  reopen the class. **Expect:** status auto-flips to **INACTIVE** (this also runs
-  the INACTIVE side effects below). Set the end date back to the future (or clear
-  it with the ✕) and set status back to **ACTIVE** via the badge menu.
+- [ ] **Length** row → **Set length** → a stepper appears ("10 weeks", or the
+  term's length). Step it **down to 1 week** so the derived end date is in the
+  past → back out and reopen the class. **Expect:** status auto-flips to
+  **INACTIVE** (this also runs the INACTIVE side effects below), and the caption
+  reads "Ends <date> …". Step the length back up (or tap **Open-ended**) and set
+  status back to **ACTIVE** via the badge menu.
+- [ ] With a term assigned and a schedule with a first-class date set, confirm
+  the **Length** week count is measured from that first-class date (change the
+  first-class date in the schedule editor and the shown week count shifts; the
+  end date itself only moves when you use the stepper).
 - [ ] Tap **View Sync Sessions**. **Expect:** a list of "Session 1", "Session
   2"… each with a date and event count; tap one to expand its events.
 
@@ -189,8 +195,8 @@ This is the important one — sync must change only what changed.
   - A **recurring weekly event "CS 101"** on **Mon/Wed/Fri at 11:00–11:50 AM**.
   - A **recurring weekly event "CS 101 (Section)"** on **Thu at
     3:00–3:50 PM**.
-  - Recurrence runs until the class end date / term end (or open-ended if
-    neither is set — see §2 note on Current Term).
+  - Recurrence runs until the class's end date (from its **Length**), falling
+    back to the term end, or open-ended if neither is set.
 - [ ] Toggle it **OFF**.
   **Expect:** 🔎 both recurring meeting events disappear from Google Calendar
   (the one-off assignment events stay).
@@ -270,8 +276,9 @@ Open the profile avatar (top-right of any tab).
   **Sync!** it. **Expect:** after the sync completes, that term is now the
   **active term** (its name shows under the My Classes title; Calendar / Week
   at a Glance switch to it).
-- [ ] Open the class's edit screen. **Expect:** a **Term** picker and an
-  **End date** pre-filled to the term's end.
+- [ ] Open the class's edit screen. **Expect:** a **Term** picker and a
+  **Length** row whose stepper defaults to the term's length in weeks, with the
+  caption showing the derived end date (≈ the term's end).
 - [ ] Open a term in Manage Terms → **Archive term**. **Expect:** every class in
   it flips to **INACTIVE** (🔎 its recurring meetings leave Google Calendar and
   its calendar is unchecked).
@@ -548,7 +555,7 @@ Needs a second Google account you can sign into.
 | Preserve local edits on re-upload | §1F |
 | ClassEditView: edit / delete / undo / re-sync | §1G |
 | Color change → live calendar re-color | §1G |
-| End date + auto-INACTIVE | §1G |
+| Length (weeks) → derived end date + auto-INACTIVE | §1G |
 | INACTIVE (auto & manual) → meetings pulled + calendar unchecked; ACTIVE re-checks | §1G, §1H |
 | Sync Sessions history | §1G |
 | Class meetings → recurring Google Calendar events (+ off / edit) | §1H |

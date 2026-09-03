@@ -3,8 +3,9 @@
 //  Plannr
 //
 //  Structured input for a class's weekly schedule: meeting days with start/end
-//  times, an optional section/lab, how many weeks the class runs, and an
-//  optional one-time final exam. Reads and writes a `ClassSchedule`.
+//  times, an optional section/lab, the first-meeting date, and an optional
+//  one-time final exam. Reads and writes a `ClassSchedule`. (How long the class
+//  runs is set as a week count on the class itself, not here.)
 //
 
 import SwiftUI
@@ -21,7 +22,6 @@ struct ClassSchedulePicker: View {
     private static var defaultFinalStart: Date {
         Calendar.current.date(bySettingHour: 8, minute: 0, second: 0, of: Date()) ?? Date()
     }
-    private static let weekOptions = Array(1...20)
 
     @State private var lectureDays: Set<Weekday> = []
     @State private var lectureStart: Date = ClassSchedulePicker.defaultStart
@@ -32,9 +32,6 @@ struct ClassSchedulePicker: View {
     @State private var sectionEnd: Date = ClassSchedulePicker.defaultEnd
 
     @State private var firstMeeting: Date = Calendar.current.startOfDay(for: Date())
-    @State private var showAdvanced = false
-    @State private var limitWeeks = false
-    @State private var weeks = 10
     @State private var hasFinal = false
     @State private var finalDate: Date = Calendar.current.date(byAdding: .day, value: 77, to: Date()) ?? Date()
     @State private var finalStart: Date = ClassSchedulePicker.defaultFinalStart
@@ -48,7 +45,7 @@ struct ClassSchedulePicker: View {
         VStack(alignment: .leading, spacing: 14) {
             lectureBlock
             sectionBlock
-            if hasAnyMeeting { windowBlock }
+            if hasAnyMeeting { firstClassBlock }
             if !schedule.displayString.isEmpty {
                 Text(schedule.displayString).font(.caption).foregroundColor(.blue).padding(.top, 2)
             }
@@ -95,7 +92,7 @@ struct ClassSchedulePicker: View {
         }
     }
 
-    private var windowBlock: some View {
+    private var firstClassBlock: some View {
         VStack(alignment: .leading, spacing: 14) {
             Divider().background(Color.gray.opacity(0.3))
 
@@ -106,56 +103,24 @@ struct ClassSchedulePicker: View {
                     .labelsHidden().colorScheme(.dark)
             }
 
-            Button {
-                withAnimation(.easeInOut(duration: 0.15)) { showAdvanced.toggle() }
-            } label: {
-                HStack {
-                    Text("More options").font(.subheadline).foregroundColor(.blue)
-                    Spacer()
-                    Image(systemName: showAdvanced ? "chevron.up" : "chevron.down")
-                        .font(.caption).foregroundColor(.blue)
-                }
+            Toggle(isOn: $hasFinal.animation(.easeInOut(duration: 0.15))) {
+                Text("Add a final exam").font(.subheadline).foregroundColor(.white)
             }
-            .buttonStyle(.plain)
+            .tint(.blue)
 
-            if showAdvanced {
-                Toggle(isOn: $limitWeeks.animation(.easeInOut(duration: 0.15))) {
-                    Text("Repeat for a set number of weeks").font(.subheadline).foregroundColor(.white)
+            if hasFinal {
+                Text("A one-time event, usually during finals week after classes end.")
+                    .font(.caption2).foregroundColor(.gray)
+                HStack {
+                    Text("Date").font(.subheadline).foregroundColor(.white)
+                    Spacer()
+                    DatePicker("", selection: $finalDate, displayedComponents: .date)
+                        .labelsHidden().colorScheme(.dark)
                 }
-                .tint(.blue)
-
-                if limitWeeks {
-                    HStack {
-                        Text("Weeks").font(.subheadline).foregroundColor(.white)
-                        Spacer()
-                        Picker("", selection: $weeks) {
-                            ForEach(Self.weekOptions, id: \.self) { Text("\($0)").tag($0) }
-                        }
-                        .pickerStyle(.menu).tint(.white)
-                    }
-                }
-
-                Toggle(isOn: $hasFinal.animation(.easeInOut(duration: 0.15))) {
-                    Text("Add a final exam").font(.subheadline).foregroundColor(.white)
-                }
-                .tint(.blue)
-
-                if hasFinal {
-                    Text("A one-time event, usually during finals week after classes end.")
-                        .font(.caption2).foregroundColor(.gray)
-                    HStack {
-                        Text("Date").font(.subheadline).foregroundColor(.white)
-                        Spacer()
-                        DatePicker("", selection: $finalDate, displayedComponents: .date)
-                            .labelsHidden().colorScheme(.dark)
-                    }
-                    timeRangeRow(start: $finalStart, end: $finalEnd)
-                }
+                timeRangeRow(start: $finalStart, end: $finalEnd)
             }
         }
         .onChange(of: firstMeeting) { _, _ in push() }
-        .onChange(of: limitWeeks) { _, _ in push() }
-        .onChange(of: weeks) { _, _ in push() }
         .onChange(of: hasFinal) { _, _ in push() }
         .onChange(of: finalDate) { _, _ in push() }
         .onChange(of: finalStart) { _, _ in clamp(&finalEnd, after: finalStart); push() }
@@ -186,8 +151,6 @@ struct ClassSchedulePicker: View {
             ?? Calendar.current.date(byAdding: .minute, value: defaultMeetingMinutes, to: sectionStart) ?? sectionStart
 
         firstMeeting = schedule.firstMeetingDate ?? Calendar.current.startOfDay(for: Date())
-        if let w = schedule.weekCount { limitWeeks = true; weeks = min(max(w, 1), 20) }
-        showAdvanced = schedule.weekCount != nil || schedule.finalExam != nil
         if let f = schedule.finalExam {
             hasFinal = true
             finalDate = f.date
@@ -211,7 +174,6 @@ struct ClassSchedulePicker: View {
         }
 
         s.firstMeetingDate = hasAnyMeeting ? Calendar.current.startOfDay(for: firstMeeting) : nil
-        s.weekCount = (hasAnyMeeting && limitWeeks) ? weeks : nil
         s.finalExam = (hasAnyMeeting && hasFinal)
             ? ClassFinalExam(date: Calendar.current.startOfDay(for: finalDate),
                              start: TimeOfDay(from: finalStart), end: TimeOfDay(from: finalEnd))

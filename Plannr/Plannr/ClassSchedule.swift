@@ -111,8 +111,6 @@ struct ClassSchedule: Hashable {
 
     /// First day the class meets. nil → caller's fallback (term start / today).
     var firstMeetingDate: Date?
-    /// "Repeat for X weeks". nil → open-ended (bounded only by a class/term end).
-    var weekCount: Int?
     /// Optional one-time final exam.
     var finalExam: ClassFinalExam?
 
@@ -160,12 +158,14 @@ struct ClassSchedule: Hashable {
         }
     }
 
-    /// The [start, end) range the recurring meetings span, given a fallback for
-    /// when `firstMeetingDate` isn't set. `end` is nil for an open-ended schedule.
-    func meetingWindow(fallbackStart: Date, calendar: Calendar = .current) -> (start: Date, end: Date?) {
+    /// The [start, end) range the recurring meetings span. `start` is the
+    /// first-meeting date (or `fallbackStart` when it isn't set); `end` is the
+    /// class's end date (`endBound`, typically the class or term end), or nil for
+    /// an open-ended schedule.
+    func meetingWindow(fallbackStart: Date, endBound: Date? = nil,
+                       calendar: Calendar = .current) -> (start: Date, end: Date?) {
         let start = calendar.startOfDay(for: firstMeetingDate ?? fallbackStart)
-        let end = weekCount.flatMap { calendar.date(byAdding: .day, value: $0 * 7, to: start) }
-        return (start, end)
+        return (start, endBound)
     }
 }
 
@@ -174,7 +174,7 @@ extension ClassFinalExam: Codable {}
 extension ClassSchedule: Codable {
     enum CodingKeys: String, CodingKey {
         case lectureDays, lectureStart, lectureEnd, sectionDays, sectionStart, sectionEnd
-        case firstMeetingDate, weekCount, finalExam
+        case firstMeetingDate, finalExam
         // Legacy keys (start-time + fixed duration), read for migration only.
         case lectureTime, lectureDurationMinutes, sectionTime, sectionDurationMinutes
     }
@@ -197,7 +197,6 @@ extension ClassSchedule: Codable {
                               minutes: try c.decodeIfPresent(Int.self, forKey: .sectionDurationMinutes))
 
         firstMeetingDate = try c.decodeIfPresent(Date.self, forKey: .firstMeetingDate)
-        weekCount = try c.decodeIfPresent(Int.self, forKey: .weekCount)
         finalExam = try c.decodeIfPresent(ClassFinalExam.self, forKey: .finalExam)
     }
 
@@ -210,7 +209,6 @@ extension ClassSchedule: Codable {
         try c.encodeIfPresent(sectionStart, forKey: .sectionStart)
         try c.encodeIfPresent(sectionEnd, forKey: .sectionEnd)
         try c.encodeIfPresent(firstMeetingDate, forKey: .firstMeetingDate)
-        try c.encodeIfPresent(weekCount, forKey: .weekCount)
         try c.encodeIfPresent(finalExam, forKey: .finalExam)
     }
 
@@ -258,13 +256,15 @@ extension CalendarEvent {
 
 extension ClassSchedule {
     /// Meeting occurrences that start within `[from, to)`, respecting the
-    /// first-meeting date / "repeat for X weeks" window and including a one-time
-    /// final exam if it falls in range. `fallbackStart` is used when
-    /// `firstMeetingDate` isn't set (pass the term start, or `.distantPast`).
+    /// first-meeting date and the class's end date (`endBound`), and including a
+    /// one-time final exam if it falls in range. `fallbackStart` is used when
+    /// `firstMeetingDate` isn't set (pass the term start, or `.distantPast`);
+    /// `endBound` is the class/term end (nil → open-ended).
     func occurrences(
         from: Date, to: Date,
         className: String, classColorHex: String, classID: UUID,
         fallbackStart: Date = .distantPast,
+        endBound: Date? = nil,
         calendar: Calendar = .current
     ) -> [ClassMeetingOccurrence] {
         guard from < to else { return [] }
@@ -272,7 +272,7 @@ extension ClassSchedule {
         let keyFormatter = DateFormatter()
         keyFormatter.dateFormat = "yyyyMMdd"
 
-        let window = meetingWindow(fallbackStart: fallbackStart, calendar: calendar)
+        let window = meetingWindow(fallbackStart: fallbackStart, endBound: endBound, calendar: calendar)
         let lower = max(calendar.startOfDay(for: from), window.start)
         let upper = window.end.map { min(to, $0) } ?? to
 

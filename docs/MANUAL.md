@@ -25,7 +25,7 @@ If Google access is later revoked (for example, by removing the app from your Go
 
 Users can add multiple classes and view their full class list on the home page. Each class can be assigned a custom color for easy visual identification across the calendar.
 
-When adding or editing a class, users can set a **structured weekly schedule** — pick the lecture days and a start/end time, and optionally a separate section/lab meeting on its own day and time. The schedule can also carry a first-meeting date, a "repeat for X weeks" limit, and a final-exam date and time. Uploading a syllabus that states these times fills them in automatically (see AI-Powered Event Extraction).
+When adding or editing a class, users can set a **structured weekly schedule** — pick the lecture days and a start/end time, and optionally a separate section/lab meeting on its own day and time. The schedule can also carry a first-meeting date and a final-exam date and time. How long the class runs is set separately, as a **Length** in weeks on the class's edit screen (see Term Folders). Uploading a syllabus that states these times fills them in automatically (see AI-Powered Event Extraction).
 
 Each class has a status shown as a tappable badge on its edit screen: **ACTIVE**, **INACTIVE**, or **NO SYLLABUS** (read-only, until events are added). Switching a class to **INACTIVE** — manually, or automatically once its end date passes — turns off its class-meeting sync, removes its recurring meeting events from Google Calendar, and unchecks (hides) its dedicated calendar in the Google Calendar sidebar without deleting it. Switching back to **ACTIVE** re-checks that calendar.
 
@@ -38,7 +38,7 @@ Classes can be grouped into **term folders**. The header under "My Classes" is a
 
 - New classes are **unfiled by default**; the Add-Class screen and the class edit screen both have a **Term** picker to file one, including a **New Term…** option to create a term right there.
 - Selecting a term in the switcher makes it the **active term**. So does **syncing a class** to Google Calendar — the class's term becomes the current one. The **Calendar** and **Week at a Glance** views then show only that term's classes (plus any unfiled ones).
-- A new class filed into a term inherits the term's end date, and — if the term has "Auto-sync class meetings" on — starts with meeting sync enabled. The **End date** on the class's edit screen can override it (e.g. a summer session) or be cleared for an open-ended class; it's what stops meeting recurrence and auto-switches the class to INACTIVE once it passes.
+- A new class filed into a term inherits the term's length, and — if the term has "Auto-sync class meetings" on — starts with meeting sync enabled. The **Length** control on the class's edit screen (a week count, e.g. "10 weeks") overrides it for a shorter or longer class, or can be set to **open-ended**. The length sets the class's end date, which is what stops meeting recurrence and auto-switches the class to INACTIVE once it passes.
 - **Archive term** (in the term editor) sets every class in it to INACTIVE in one step.
 - **Deleting a term** doesn't delete its classes — they just become unfiled.
 - Upgrading from a build with the old single "Current Term": your term becomes a folder and your existing classes are filed into it once, automatically.
@@ -101,7 +101,7 @@ Users can push all parsed events to their Google Calendar with one tap. Plannr c
 
 ### Class Meeting Sync
 
-On a class with a structured schedule, signed-in users can turn on **Add class meetings to Google Calendar**. Plannr writes the weekly lecture and section times to that class's calendar as recurring events, plus a one-off event for the final exam. The recurrence runs until the "repeat for X weeks" limit, the class end date, or the term end date — whichever applies — and is open-ended if none is set. Turning the toggle off (or setting the class to INACTIVE) removes those recurring events again. Class meetings are kept out of the in-app Calendar and Week at a Glance views unless the corresponding display setting is enabled.
+On a class with a structured schedule, signed-in users can turn on **Add class meetings to Google Calendar**. Plannr writes the weekly lecture and section times to that class's calendar as recurring events, plus a one-off event for the final exam. The recurrence runs until the class's end date — set by its **Length** in weeks, or falling back to the term end when the class is open-ended — and is fully open-ended if neither is set. Turning the toggle off (or setting the class to INACTIVE) removes those recurring events again. Class meetings are kept out of the in-app Calendar and Week at a Glance views unless the corresponding display setting is enabled.
 
 ### Export Events
 

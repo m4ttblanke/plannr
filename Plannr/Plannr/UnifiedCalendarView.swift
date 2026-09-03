@@ -93,7 +93,8 @@ struct UnifiedCalendarView: View {
             return schedule.occurrences(
                 from: from, to: to,
                 className: cls.name, classColorHex: cls.colorHex, classID: cls.id,
-                fallbackStart: termStore.term(id: cls.termID)?.startDate ?? .distantPast
+                fallbackStart: termStore.term(id: cls.termID)?.startDate ?? .distantPast,
+                endBound: cls.endDate ?? termStore.term(id: cls.termID)?.resolvedEndDate()
             ).map { UnifiedEvent(meeting: $0, classColor: cls.color) }
         }
     }

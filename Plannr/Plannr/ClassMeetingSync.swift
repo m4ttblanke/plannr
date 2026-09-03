@@ -60,7 +60,6 @@ enum ClassMeetingSync {
             let timezone: String
             let start_date: String
             let until_date: String?
-            let week_count: Int?
             let patterns: [PatternBody]
             let final_exam: FinalExamBody?
         }
@@ -97,8 +96,8 @@ enum ClassMeetingSync {
         // First meeting: the schedule's own date, else the term start, else today.
         let startDate = df.string(from: schedule?.firstMeetingDate
                                   ?? term?.startDate ?? Date())
-        // "Repeat for X weeks" wins; otherwise fall back to the class/term end.
-        let weekCount = enabled ? schedule?.weekCount : nil
+        // Recurrence end: the class's own end date (set as a week count in the
+        // class editor), else the term end, else open-ended.
         let untilDate = (cls.endDate ?? term?.resolvedEndDate()).map { df.string(from: $0) }
 
         let finalExam: FinalExamBody? = (enabled ? schedule?.finalExam : nil).map { fe in
@@ -115,7 +114,6 @@ enum ClassMeetingSync {
             timezone: TimeZone.current.identifier,
             start_date: startDate,
             until_date: untilDate,
-            week_count: weekCount,
             patterns: patterns,
             final_exam: finalExam
         )

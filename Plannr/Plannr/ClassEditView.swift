@@ -22,7 +22,6 @@ struct ClassEditView: View {
     @State private var showSyncError = false
     @State private var showSyncSuccess = false
     @State private var navigateToUpload = false
-    @State private var showEndDatePicker = false
     @State private var showSyncSessions = false
     @State private var scheduleDraft: ClassSchedule
     @State private var showScheduleEditor = false
@@ -236,58 +235,41 @@ struct ClassEditView: View {
                 }
             }
 
-            // End date row
+            // Length — how many weeks the class runs. Drives the end date, which
+            // stops the recurring meetings and auto-switches the class to INACTIVE.
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
                     Image(systemName: "calendar.badge.clock")
                         .font(.caption)
                         .foregroundColor(.gray)
-                    Text("End date")
+                    Text("Length")
                         .font(.caption)
                         .foregroundColor(.gray)
                     Spacer()
-                    if let endDate = editableClass.endDate {
-                        Text(endDate.formatted(date: .abbreviated, time: .omitted))
+                    if lengthInWeeks == nil {
+                        Button("Set length") { setLength(weeks: defaultLengthWeeks) }
                             .font(.caption)
-                            .foregroundColor(.white)
-                        Button {
+                            .foregroundColor(.blue)
+                    } else {
+                        Button("Open-ended") {
                             editableClass.endDate = nil
                             persistClass()
-                            showEndDatePicker = false
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                        }
-                    } else {
-                        Button("Set") {
-                            showEndDatePicker.toggle()
                         }
                         .font(.caption)
                         .foregroundColor(.blue)
                     }
                 }
-                if showEndDatePicker {
-                    DatePicker(
-                        "",
-                        selection: Binding(
-                            get: { editableClass.endDate ?? suggestedEndDate },
-                            set: { newDate in
-                                editableClass.endDate = newDate
-                                persistClass()
-                                showEndDatePicker = false
-                            }
-                        ),
-                        displayedComponents: .date
-                    )
-                    .datePickerStyle(.graphical)
-                    .colorScheme(.dark)
-                    .labelsHidden()
+
+                if let weeks = lengthInWeeks {
+                    Stepper(value: Binding(get: { weeks }, set: { setLength(weeks: $0) }),
+                            in: 1...52) {
+                        Text("\(weeks) \(weeks == 1 ? "week" : "weeks")")
+                            .font(.subheadline)
+                            .foregroundColor(.white)
+                    }
                 }
 
-                Text(editableClass.endDate == nil
-                     ? "No end date — meetings recur to the term's end and the class stays ACTIVE."
-                     : "Recurring meetings stop here, and the class auto-switches to INACTIVE once it passes.")
+                Text(lengthCaption)
                     .font(.caption2)
                     .foregroundColor(.gray)
             }
@@ -302,12 +284,40 @@ struct ClassEditView: View {
         .padding(.horizontal)
     }
 
-    /// What the "Set" end-date picker opens on: the class's term end if it has
-    /// one, otherwise three months out.
-    private var suggestedEndDate: Date {
-        termStore.term(id: editableClass.termID)?.resolvedEndDate()
-            ?? Calendar.current.date(byAdding: .month, value: 3, to: Date())
-            ?? Date()
+    /// The date the class length counts from: the first class meeting, else the
+    /// term start, else today.
+    private var lengthAnchor: Date {
+        editableClass.structuredSchedule?.firstMeetingDate
+            ?? termStore.term(id: editableClass.termID)?.startDate
+            ?? Calendar.current.startOfDay(for: Date())
+    }
+
+    /// Class length in whole weeks, derived from the end date, or nil when the
+    /// class is open-ended. (Shown value can shift if the first-meeting date
+    /// later moves — the end date itself stays put until the stepper is used.)
+    private var lengthInWeeks: Int? {
+        guard let end = editableClass.endDate else { return nil }
+        let days = Calendar.current.dateComponents([.day], from: lengthAnchor, to: end).day ?? 0
+        return max(1, Int((Double(days) / 7.0).rounded()))
+    }
+
+    /// Weeks to seed the stepper with the first time a length is set: the term's
+    /// length if the class is in one, otherwise a 10-week quarter.
+    private var defaultLengthWeeks: Int {
+        termStore.term(id: editableClass.termID)?.weeks ?? 10
+    }
+
+    private var lengthCaption: String {
+        guard let end = editableClass.endDate else {
+            return "Open-ended — meetings recur to the term's end and the class stays ACTIVE."
+        }
+        return "Ends \(end.formatted(date: .abbreviated, time: .omitted)) — meetings stop then and the class switches to INACTIVE once it passes."
+    }
+
+    private func setLength(weeks: Int) {
+        let w = min(max(weeks, 1), 52)
+        editableClass.endDate = Calendar.current.date(byAdding: .day, value: w * 7, to: lengthAnchor)
+        persistClass()
     }
 
     // MARK: - Schedule + class meetings
