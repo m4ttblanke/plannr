@@ -12,8 +12,16 @@ enum AppTab {
     case myClasses, calendar, weeklyDashboard
 }
 
+/// Which classes the My Classes list shows.
+enum ClassScope: Hashable {
+    case all
+    case term(UUID)
+    case unfiled
+}
+
 struct PDFUploadView: View {
     @StateObject private var classManager: ClassManager
+    @StateObject private var termStore: TermStore
     @StateObject private var settingsManager = SettingsManager.shared
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.scenePhase) private var scenePhase
@@ -22,23 +30,102 @@ struct PDFUploadView: View {
     @State private var selectedTab: AppTab = .myClasses
     @State private var showProfileSheet = false
     @State private var hasSetInitialTab = false
+    @State private var hasRunTermMigration = false
+    @State private var classScope: ClassScope = .all
+    @State private var showManageTerms = false
     @State private var showMailComposer = false
     @State private var showFeedbackFallbackAlert = false
     @State private var feedbackKind: ReportIssue.Kind = .issue
 
     init(isGuest: Bool = false, accountEmail: String? = nil) {
         _classManager = StateObject(wrappedValue: ClassManager(isGuest: isGuest, accountEmail: accountEmail))
+        _termStore = StateObject(wrappedValue: TermStore(isGuest: isGuest, accountEmail: accountEmail))
     }
-    
+
     // Computed property to determine default tab based on whether user has classes
     private var defaultTab: AppTab {
         return classManager.classes.isEmpty ? .myClasses : .weeklyDashboard
     }
 
-    /// The current term's name (typed, or derived from its start month), shown
-    /// under the My Classes title. Empty when no term start date is set.
+    /// The name shown under the My Classes title — the selected scope, or the
+    /// current term when scope is "All". Empty when there are no classes/terms.
     private var termLabel: String {
-        classManager.classes.isEmpty ? "" : settingsManager.term.displayLabel()
+        guard !classManager.classes.isEmpty else { return "" }
+        switch classScope {
+        case .all:       return termStore.activeTerm?.displayName() ?? ""
+        case .unfiled:   return "Unfiled"
+        case .term(let id): return termStore.term(id: id)?.displayName() ?? ""
+        }
+    }
+
+    /// Classes visible in the My Classes list, per the term scope.
+    private var scopedClasses: [Class] {
+        switch classScope {
+        case .all:          return classManager.classes
+        case .unfiled:      return classManager.classes.filter { $0.termID == nil }
+        case .term(let id): return classManager.classes.filter { $0.termID == id }
+        }
+    }
+
+    private var scopeTitle: String {
+        switch classScope {
+        case .all:          return "All classes"
+        case .unfiled:      return "Unfiled"
+        case .term(let id): return termStore.term(id: id)?.displayName() ?? "Term"
+        }
+    }
+
+    @ViewBuilder
+    private var termScopeMenu: some View {
+        Menu {
+            Picker("Scope", selection: $classScope) {
+                Text("All classes").tag(ClassScope.all)
+                ForEach(termStore.terms) { term in
+                    Text(term.displayName()).tag(ClassScope.term(term.id))
+                }
+                if classManager.classes.contains(where: { $0.termID == nil }) {
+                    Text("Unfiled").tag(ClassScope.unfiled)
+                }
+            }
+            Divider()
+            Button {
+                showManageTerms = true
+            } label: {
+                Label("Manage terms…", systemImage: "folder.badge.gearshape")
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text(termLabel.isEmpty ? scopeTitle : termLabel)
+                Image(systemName: "chevron.down").font(.caption2)
+            }
+            .font(.subheadline)
+            .foregroundColor(.gray)
+        }
+        .onChange(of: classScope) { _, newValue in
+            if case .term(let id) = newValue { termStore.activeTermID = id }
+        }
+    }
+
+    /// One-time: seed a term from the Phase-1 single `TermSettings` and file the
+    /// existing (unfiled) classes into it, so upgrading users keep continuity.
+    private func runTermMigrationIfNeeded() {
+        guard !hasRunTermMigration else { return }
+        hasRunTermMigration = true
+        guard termStore.terms.isEmpty,
+              settingsManager.term.startDate != nil,
+              !classManager.classes.isEmpty else { return }
+
+        let term = Term(seedingFrom: settingsManager.term)
+        termStore.add(term)
+        termStore.activeTermID = term.id
+        for cls in classManager.classes where cls.termID == nil {
+            var updated = cls
+            updated.termID = term.id
+            classManager.updateClass(updated)
+        }
+        // Consume the legacy settings so this never runs twice.
+        settingsManager.term = TermSettings()
+        classScope = .term(term.id)
     }
 
     var body: some View {
@@ -99,10 +186,8 @@ struct PDFUploadView: View {
                                 .foregroundColor(.white)
                                 .accessibilityIdentifier("tabTitle")
 
-                            if selectedTab == .myClasses, !termLabel.isEmpty {
-                                Text(termLabel)
-                                    .font(.subheadline)
-                                    .foregroundColor(.gray)
+                            if selectedTab == .myClasses {
+                                termScopeMenu
                             }
                         }
                         .padding(.leading, 8)
@@ -126,17 +211,23 @@ struct PDFUploadView: View {
                     if selectedTab == .myClasses {
                         ScrollView {
                             VStack(spacing: 16) {
-                                // Existing classes
-                                if !classManager.classes.isEmpty {
-                                    ForEach(classManager.classes) { classItem in
+                                // Existing classes (filtered by the term scope)
+                                if !scopedClasses.isEmpty {
+                                    ForEach(scopedClasses) { classItem in
                                         NavigationLink(value: classItem) {
                                             ClassCard(classItem: classItem)
                                                 .environmentObject(classManager)
                                                 .environmentObject(authManager)
+                                                .environmentObject(termStore)
                                         }
                                         .buttonStyle(.plain)
                                         .padding(.horizontal)
                                     }
+                                } else if !classManager.classes.isEmpty {
+                                    Text(classScope == .unfiled ? "No unfiled classes." : "No classes in this term yet.")
+                                        .font(.subheadline)
+                                        .foregroundColor(.gray)
+                                        .padding(.top, 8)
                                 }
 
                                 // Add New Class Button
@@ -162,9 +253,11 @@ struct PDFUploadView: View {
                     } else if selectedTab == .calendar {
                         UnifiedCalendarView()
                             .environmentObject(classManager)
+                            .environmentObject(termStore)
                     } else if selectedTab == .weeklyDashboard {
                         WeeklyDashboardView()
                             .environmentObject(classManager)
+                            .environmentObject(termStore)
                     }
                 }
             }
@@ -176,6 +269,7 @@ struct PDFUploadView: View {
                     hasSetInitialTab = true
                     selectedTab = defaultTab
                 }
+                runTermMigrationIfNeeded()
                 syncNotifications()
             }
             .onChange(of: classManager.classes) { _, _ in syncNotifications() }
@@ -191,18 +285,28 @@ struct PDFUploadView: View {
                     .environmentObject(classManager)
                     .environmentObject(authManager)
                     .environmentObject(settingsManager)
+                    .environmentObject(termStore)
+            }
+            .navigationDestination(isPresented: $showManageTerms) {
+                ManageTermsView()
+                    .environmentObject(classManager)
+                    .environmentObject(termStore)
+                    .environmentObject(authManager)
+                    .environmentObject(settingsManager)
             }
             .sheet(isPresented: $showAddClass) {
                 AddClassView()
                     .environmentObject(classManager)
                     .environmentObject(authManager)
                     .environmentObject(settingsManager)
+                    .environmentObject(termStore)
             }
             .sheet(isPresented: $showProfileSheet) {
                 ProfileView()
                     .environmentObject(authManager)
                     .environmentObject(classManager)
                     .environmentObject(settingsManager)
+                    .environmentObject(termStore)
             }
             .sheet(isPresented: $showMailComposer) {
                 MailComposeView(

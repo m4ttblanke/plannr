@@ -11,6 +11,7 @@ struct ClassEditView: View {
     @EnvironmentObject var classManager: ClassManager
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var settingsManager: SettingsManager
+    @EnvironmentObject var termStore: TermStore
     @Environment(\.dismiss) private var dismiss
 
     // Local mutable copy of the class
@@ -111,6 +112,7 @@ struct ClassEditView: View {
             .environmentObject(classManager)
             .environmentObject(authManager)
             .environmentObject(settingsManager)
+            .environmentObject(termStore)
         }
         .alert("Sync Failed", isPresented: $showSyncError) {
             Button("OK", role: .cancel) {}
@@ -206,6 +208,33 @@ struct ClassEditView: View {
                 EmptyView()
             }
             .frame(maxWidth: 40) // constrain to just the swatch
+
+            // Term folder
+            if !termStore.terms.isEmpty {
+                HStack(spacing: 6) {
+                    Image(systemName: "folder")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                    Text("Term")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                    Spacer()
+                    Picker("Term", selection: Binding(
+                        get: { editableClass.termID },
+                        set: { newID in
+                            editableClass.termID = newID
+                            persistClass()
+                        }
+                    )) {
+                        Text("None").tag(UUID?.none)
+                        ForEach(termStore.terms) { term in
+                            Text(term.displayName()).tag(Optional(term.id))
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .tint(.white)
+                }
+            }
 
             // End date row
             VStack(alignment: .leading, spacing: 6) {
@@ -553,34 +582,10 @@ struct ClassEditView: View {
     }
 
     /// Check/uncheck this class's calendar in the user's Google Calendar sidebar.
-    /// Called when the class is switched active/inactive. Best-effort and silent:
-    /// a class with no synced calendar yet has nothing to toggle.
     private func setCalendarVisibility(selected: Bool) async {
-        guard !authManager.isGuest,
-              let calId = editableClass.googleCalendarId,
-              let email = UserDefaults.standard.string(forKey: "userEmail"),
-              let encodedEmail = email.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: "\(BACKEND_URL)calendar/visibility?email=\(encodedEmail)") else { return }
-
-        struct VisibilityBody: Encodable {
-            let googleCalendarId: String
-            let selected: Bool
-            enum CodingKeys: String, CodingKey {
-                case googleCalendarId = "google_calendar_id"
-                case selected
-            }
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.timeoutInterval = 90
-        do {
-            request.httpBody = try JSONEncoder().encode(VisibilityBody(googleCalendarId: calId, selected: selected))
-            _ = try await authManager.send(request)
-        } catch {
-            // Silent — visibility is a convenience, not a correctness requirement.
-        }
+        guard !authManager.isGuest, let calId = editableClass.googleCalendarId else { return }
+        await ClassCalendar.setVisibility(calendarId: calId, selected: selected,
+                                          send: { try await authManager.send($0) })
     }
 
     // MARK: - Class meeting sync
@@ -593,7 +598,7 @@ struct ClassEditView: View {
 
         let outcome = await ClassMeetingSync.run(
             for: editableClass,
-            settings: settingsManager,
+            term: termStore.term(id: editableClass.termID),
             send: { try await authManager.send($0) }
         )
 
@@ -830,5 +835,6 @@ struct ClassEventRow: View {
         .environmentObject(ClassManager())
         .environmentObject(AuthManager())
         .environmentObject(SettingsManager.shared)
+        .environmentObject(TermStore())
     }
 }

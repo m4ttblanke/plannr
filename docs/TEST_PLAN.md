@@ -252,16 +252,27 @@ Open the profile avatar (top-right of any tab).
 - [ ] **Photo:** tap the avatar → pick an image from Photos. **Expect:** it
   replaces the Google photo everywhere. Tap **Remove Custom Photo** → back to
   the Google photo.
-- [ ] **Current Term:** leave the label blank, pick **Quarter**, set a **Start
-  date**. **Expect:** the label field's placeholder reads a derived name
-  ("Fall 2026" etc.), "Ends" shows *start + 10 weeks* with a "10 weeks" note,
-  and that same name appears under the **My Classes** title. Switch to
-  **Semester** → "Ends" jumps to +16 weeks. Switch to **Custom** → an editable
-  End date picker appears, seeded from the previous derived value.
-- [ ] Add a new class (or upload a syllabus into one) while a term end is set.
-  **Expect:** the class's **End date** on its edit screen is pre-filled to the
-  term end; you can still change or clear it per class. (This also bounds
-  class-meeting recurrence — re-toggle meetings to see it.)
+- [ ] **Terms → Manage Terms → New Term.** Leave the name blank, pick
+  **Quarter**, set a **Start date**, tap **Save**.
+  **Expect:** the row shows a derived name ("Fall 2026" etc.), the date range,
+  *10 weeks*, and "0 classes". Reopen it, switch to **Semester** → the length
+  caption becomes 16 weeks; **Custom** → a weeks stepper appears.
+- [ ] From Manage Terms, add a **second** term. Reopen the first and tap
+  **Make Active Term** (or pick it in the My Classes switcher).
+- [ ] Go to **My Classes**. The header under the title is a switcher — pick
+  **All classes**, the term, **Unfiled**. **Expect:** the list filters, and the
+  header shows the current scope.
+- [ ] **Add New Class** while terms exist. **Expect:** a **Term** picker
+  (default = the active term, or "None"). Create one filed into a term.
+  **Expect:** on its edit screen the **Term** picker and an **End date**
+  pre-filled to the term's end; the class shows only when that term (or "All")
+  is selected in the switcher, and in **Calendar** / **Week at a Glance** only
+  when that term is the active one.
+- [ ] Open a term in Manage Terms → **Archive term**. **Expect:** every class in
+  it flips to **INACTIVE** (🔎 its recurring meetings leave Google Calendar and
+  its calendar is unchecked).
+- [ ] In Manage Terms, **delete** a term. **Expect:** its classes aren't deleted
+  — they become **Unfiled**.
 - [ ] **Deadline Reminders → Remind me:** pick "2 days before".
 - [ ] **Class Meetings → Show in Week at a Glance:** turn it **ON**. Go back to
   **Week at a Glance**.
@@ -478,7 +489,8 @@ Needs a second Google account you can sign into.
   `NotificationManagerTests` nearest-60 selection, `TermSettingsTests`
   quarter/semester end date + auto label, `EventTypeTests` category
   normalization, `ClassSyncRequestTests` /calendar/sync body + response,
-  `ParsePhaseTests` upload-phase timeline) and `PlannrUITests/GuestFlowUITests`.
+  `ParsePhaseTests` upload-phase timeline, `TermTests` + `TermStoreTests`
+  term folders) and `PlannrUITests/GuestFlowUITests`.
 
 ---
 
@@ -542,7 +554,7 @@ Needs a second Google account you can sign into.
 | Task completion + **persistence across relaunch** | §1J |
 | "Class Meetings" display settings (Calendar + Week at a Glance toggles) + filter behavior | §1K |
 | Profile photo (custom + remove) | §1K |
-| Current Term: quarter/semester system, derived end + label, defaults class end date | §1K, §1H |
+| Term folders: create/edit/delete, active-term switcher, per-class filing, Calendar/Week scoping, archive | §1K |
 | Deadline reminder lead time | §1K, §2d |
 | Auto-sync changes setting | §1K |
 | Auto-sync class meetings setting (new/syllabus classes only) | §1K |

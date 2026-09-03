@@ -16,6 +16,7 @@ struct SyllabusUploadView: View {
     @EnvironmentObject var classManager: ClassManager
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var settingsManager: SettingsManager
+    @EnvironmentObject var termStore: TermStore
 
     let className: String
     let classSchedule: String
@@ -213,6 +214,7 @@ struct SyllabusUploadView: View {
                 .environmentObject(classManager)
                 .environmentObject(authManager)
                 .environmentObject(settingsManager)
+                .environmentObject(termStore)
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -618,5 +620,6 @@ struct TextEntryView: View {
         .environmentObject(ClassManager())
         .environmentObject(AuthManager())
         .environmentObject(SettingsManager.shared)
+        .environmentObject(TermStore())
     }
 }

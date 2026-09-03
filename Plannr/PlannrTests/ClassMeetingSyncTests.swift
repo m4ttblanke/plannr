@@ -50,7 +50,7 @@ final class ClassMeetingSyncTests: XCTestCase {
 
     func testEnabledScheduleSendsLectureAndSectionPatterns() async {
         var sent: URLRequest?
-        _ = await ClassMeetingSync.run(for: scheduledClass(), settings: .shared) { req in
+        _ = await ClassMeetingSync.run(for: scheduledClass(), term: nil) { req in
             sent = req
             return (Data(#"{"google_calendar_id":"c","meetings":[]}"#.utf8), self.http(200))
         }
@@ -69,7 +69,7 @@ final class ClassMeetingSyncTests: XCTestCase {
 
     func testDisabledClearsPatterns() async {
         var sent: URLRequest?
-        _ = await ClassMeetingSync.run(for: scheduledClass(meetingSyncEnabled: false), settings: .shared) { req in
+        _ = await ClassMeetingSync.run(for: scheduledClass(meetingSyncEnabled: false), term: nil) { req in
             sent = req
             return (Data(#"{"google_calendar_id":null,"meetings":[]}"#.utf8), self.http(200))
         }
@@ -81,7 +81,7 @@ final class ClassMeetingSyncTests: XCTestCase {
 
     func testSuccessReturnsUpdatedClassWithIds() async {
         let json = #"{"google_calendar_id":"cal-42","meetings":[{"kind":"lecture","google_event_id":"e1"},{"kind":"section","google_event_id":"e2"}]}"#
-        let outcome = await ClassMeetingSync.run(for: scheduledClass(), settings: .shared) { _ in
+        let outcome = await ClassMeetingSync.run(for: scheduledClass(), term: nil) { _ in
             (Data(json.utf8), self.http(200))
         }
         guard case .updated(let updated) = outcome else { return XCTFail("expected .updated, got \(outcome)") }
@@ -90,14 +90,14 @@ final class ClassMeetingSyncTests: XCTestCase {
     }
 
     func testUnauthorizedIsDistinct() async {
-        let outcome = await ClassMeetingSync.run(for: scheduledClass(), settings: .shared) { _ in
+        let outcome = await ClassMeetingSync.run(for: scheduledClass(), term: nil) { _ in
             (Data("{}".utf8), self.http(401))
         }
         guard case .unauthorized = outcome else { return XCTFail("expected .unauthorized") }
     }
 
     func testClientErrorIsMarkedRevertable() async {
-        let outcome = await ClassMeetingSync.run(for: scheduledClass(), settings: .shared) { _ in
+        let outcome = await ClassMeetingSync.run(for: scheduledClass(), term: nil) { _ in
             (Data(#"{"error":"bad schedule"}"#.utf8), self.http(400))
         }
         guard case .failed(let message, let clientError) = outcome else { return XCTFail("expected .failed") }
@@ -106,7 +106,7 @@ final class ClassMeetingSyncTests: XCTestCase {
     }
 
     func testServerErrorIsNotRevertable() async {
-        let outcome = await ClassMeetingSync.run(for: scheduledClass(), settings: .shared) { _ in
+        let outcome = await ClassMeetingSync.run(for: scheduledClass(), term: nil) { _ in
             (Data("upstream boom".utf8), self.http(503))
         }
         guard case .failed(_, let clientError) = outcome else { return XCTFail("expected .failed") }
@@ -115,7 +115,7 @@ final class ClassMeetingSyncTests: XCTestCase {
 
     func testTransportErrorIsReportedAsFailure() async {
         struct Boom: Error {}
-        let outcome = await ClassMeetingSync.run(for: scheduledClass(), settings: .shared) { _ in
+        let outcome = await ClassMeetingSync.run(for: scheduledClass(), term: nil) { _ in
             throw Boom()
         }
         guard case .failed(_, let clientError) = outcome else { return XCTFail("expected .failed") }

@@ -12,6 +12,7 @@ import SwiftUI
 struct WeeklyDashboardView: View {
    @EnvironmentObject var classManager: ClassManager
    @EnvironmentObject var authManager: AuthManager
+   @EnvironmentObject var termStore: TermStore
    @ObservedObject private var settingsManager = SettingsManager.shared
 
    @State private var currentWeek: Date = Date()
@@ -389,13 +390,13 @@ struct WeeklyDashboardView: View {
        guard settingsManager.showClassMeetingsInWeekView, selectedFilter == .all else { return [] }
        let calendar = Calendar.current
        guard let week = calendar.dateInterval(of: .weekOfYear, for: currentWeek) else { return [] }
-       return classManager.classes
+       return scopedClasses
            .compactMap { cls -> [ClassMeetingOccurrence]? in
                guard let schedule = cls.structuredSchedule, !schedule.isEmpty else { return nil }
                return schedule.occurrences(
                    from: week.start, to: week.end,
                    className: cls.name, classColorHex: cls.colorHex, classID: cls.id,
-                   fallbackStart: settingsManager.term.startDate ?? .distantPast
+                   fallbackStart: termStore.term(id: cls.termID)?.startDate ?? .distantPast
                )
            }
            .flatMap { $0 }
@@ -436,8 +437,15 @@ struct WeeklyDashboardView: View {
        return Int((Double(completedThisWeek) / Double(thisWeekEvents.count)) * 100)
    }
   
+   /// Classes shown here — scoped to the active term (plus unfiled classes)
+   /// when one is set, otherwise everything.
+   private var scopedClasses: [Class] {
+       guard let active = termStore.activeTerm else { return classManager.classes }
+       return classManager.classes.filter { $0.termID == active.id || $0.termID == nil }
+   }
+
    private var allEvents: [CalendarEvent] {
-       classManager.classes.flatMap { $0.events }.filter { !$0.isDeletedLocally }
+       scopedClasses.flatMap { $0.events }.filter { !$0.isDeletedLocally }
    }
   
    private var filteredEventsThisWeek: [CalendarEvent] {
@@ -723,5 +731,6 @@ extension CalendarEvent {
 #Preview {
    WeeklyDashboardView()
        .environmentObject(ClassManager())
+       .environmentObject(TermStore())
        .environmentObject(AuthManager())
 }

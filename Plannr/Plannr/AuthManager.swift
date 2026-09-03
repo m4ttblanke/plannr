@@ -36,8 +36,9 @@ class AuthManager: ObservableObject {
                         "settings.autoSyncClassMeetings"] {
                 defaults.removeObject(forKey: key)
             }
-            // Per-account class stores written by real sign-ins.
-            for key in defaults.dictionaryRepresentation().keys where key.hasPrefix("savedClasses.") {
+            // Per-account class + term stores written by real sign-ins.
+            for key in defaults.dictionaryRepresentation().keys
+            where key.hasPrefix("savedClasses.") || key.hasPrefix("terms.") {
                 defaults.removeObject(forKey: key)
             }
             if let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first,

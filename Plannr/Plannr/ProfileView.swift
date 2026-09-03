@@ -66,9 +66,11 @@ struct ProfileView: View {
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var classManager: ClassManager
     @EnvironmentObject var settingsManager: SettingsManager
+    @EnvironmentObject var termStore: TermStore
     @Environment(\.dismiss) private var dismiss
 
     @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var showManageTerms = false
     @State private var showDeleteConfirm = false
     @State private var showDeleteFailedAlert = false
     @State private var showNotificationDeniedAlert = false
@@ -169,84 +171,47 @@ struct ProfileView: View {
     // MARK: Term
 
     private var termSection: some View {
-        SettingsSection(title: "Current Term", icon: "graduationcap.fill") {
-            TextField(termLabelPlaceholder, text: Binding(
-                get: { settingsManager.term.label },
-                set: { settingsManager.term.label = $0 }
-            ))
-            .padding(10)
-            .background(Color.gray.opacity(0.15))
-            .foregroundColor(.white)
-            .cornerRadius(8)
-
-            Picker("System", selection: Binding(
-                get: { settingsManager.term.system },
-                set: { setTermSystem($0) }
-            )) {
-                ForEach(TermSystem.allCases) { Text($0.title).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .colorScheme(.dark)
-
-            DatePicker(
-                "Start date",
-                selection: Binding(
-                    get: { settingsManager.term.startDate ?? Date() },
-                    set: { settingsManager.term.startDate = $0 }
-                ),
-                displayedComponents: .date
-            )
-            .foregroundColor(.white)
-            .colorScheme(.dark)
-
-            if settingsManager.term.system == .custom {
-                DatePicker(
-                    "End date",
-                    selection: Binding(
-                        get: { settingsManager.term.endDate ?? settingsManager.term.resolvedEndDate() ?? Calendar.current.date(byAdding: .month, value: 4, to: Date())! },
-                        set: { settingsManager.term.endDate = $0 }
-                    ),
-                    displayedComponents: .date
-                )
-                .foregroundColor(.white)
-                .colorScheme(.dark)
-            } else {
+        SettingsSection(title: "Terms", icon: "graduationcap.fill") {
+            if let active = termStore.activeTerm {
                 HStack {
-                    Text("Ends")
+                    Text(active.displayName())
                         .foregroundColor(.white)
                     Spacer()
-                    Text(derivedEndText)
+                    Text(activeTermEndText)
+                        .font(.caption)
                         .foregroundColor(.gray)
                 }
+            } else {
+                Text("Group your classes by quarter or semester so meeting recurrence and end dates fill in automatically.")
+                    .font(.caption2)
+                    .foregroundColor(.gray)
             }
 
-            Text("New classes default to this end date. Set it per class from the class screen.")
-                .font(.caption2)
-                .foregroundColor(.gray)
+            Button {
+                showManageTerms = true
+            } label: {
+                HStack {
+                    Image(systemName: "folder.badge.gearshape")
+                    Text(termStore.terms.isEmpty ? "Set Up a Term" : "Manage Terms")
+                }
+                .font(.subheadline)
+                .foregroundColor(.blue)
+            }
+        }
+        .sheet(isPresented: $showManageTerms) {
+            NavigationStack {
+                ManageTermsView()
+                    .environmentObject(classManager)
+                    .environmentObject(termStore)
+                    .environmentObject(authManager)
+                    .environmentObject(settingsManager)
+            }
         }
     }
 
-    private var termLabelPlaceholder: String {
-        let derived = settingsManager.term.displayLabel()
-        return derived.isEmpty ? "e.g. Fall 2026" : derived
-    }
-
-    private var derivedEndText: String {
-        guard let end = settingsManager.term.resolvedEndDate() else { return "set a start date" }
-        let weeks = settingsManager.term.system.weeks
-        let dateText = end.formatted(date: .abbreviated, time: .omitted)
-        return weeks.map { "\(dateText)  ·  \($0) weeks" } ?? dateText
-    }
-
-    private func setTermSystem(_ newValue: TermSystem) {
-        var t = settingsManager.term
-        if newValue == .custom {
-            if t.endDate == nil { t.endDate = t.resolvedEndDate() }
-        } else {
-            t.endDate = nil   // let the system's week count drive it
-        }
-        t.system = newValue
-        settingsManager.term = t
+    private var activeTermEndText: String {
+        guard let end = termStore.activeTerm?.resolvedEndDate() else { return "" }
+        return "ends \(end.formatted(date: .abbreviated, time: .omitted))"
     }
 
     // MARK: Reminders
@@ -471,4 +436,5 @@ private struct SettingsSection<Content: View>: View {
         .environmentObject(AuthManager())
         .environmentObject(ClassManager())
         .environmentObject(SettingsManager.shared)
+        .environmentObject(TermStore())
 }

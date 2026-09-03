@@ -172,7 +172,7 @@ final class GuestFlowUITests: XCTestCase {
         app.buttons["profileButton"].tap()
 
         XCTAssertTrue(app.staticTexts["Guest User"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.staticTexts["Current Term"].exists)
+        XCTAssertTrue(app.staticTexts["Terms"].exists)
         XCTAssertTrue(app.staticTexts["Deadline Reminders"].exists)
         XCTAssertTrue(app.staticTexts["Class Meetings"].exists)       // the show-meetings settings
         XCTAssertTrue(app.staticTexts["Notifications"].exists)

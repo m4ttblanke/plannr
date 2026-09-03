@@ -12,6 +12,13 @@ struct CalendarPreviewView: View {
     @EnvironmentObject var classManager: ClassManager
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var settingsManager: SettingsManager
+    @EnvironmentObject var termStore: TermStore
+
+    /// The term folder of the class being previewed (for the fallback
+    /// recurrence window / default end date).
+    private var resolvedTerm: Term? {
+        termStore.term(id: classManager.classes.first(where: { $0.id == existingClassID })?.termID)
+    }
 
     let className: String
     let classSchedule: String
@@ -183,7 +190,7 @@ struct CalendarPreviewView: View {
                             status: .active,
                             googleCalendarId: syncResp.googleCalendarId,
                             lastSynced: Date(),
-                            endDate: existingClass?.endDate ?? settingsManager.term.resolvedEndDate(),
+                            endDate: existingClass?.endDate ?? resolvedTerm?.resolvedEndDate(),
                             syncHistory: existingSyncHistory + [SyncSession(events: syncedEvents)],
                             hasUnsyncedChanges: false,
                             structuredSchedule: mergedSchedule,
@@ -327,7 +334,7 @@ struct CalendarPreviewView: View {
             status: acceptedEvents.isEmpty ? .noSyllabus : .active,
             googleCalendarId: nil,
             lastSynced: nil,
-            endDate: existingClass?.endDate ?? settingsManager.term.resolvedEndDate(),
+            endDate: existingClass?.endDate ?? resolvedTerm?.resolvedEndDate(),
             syncHistory: existingClass?.syncHistory ?? [],
             hasUnsyncedChanges: false,
             structuredSchedule: mergedSchedule,
@@ -355,7 +362,7 @@ struct CalendarPreviewView: View {
             className: className,
             classColorHex: sharedEventColor.toHex(),
             classID: existingClassID,
-            fallbackStart: settingsManager.term.startDate ?? .distantPast
+            fallbackStart: resolvedTerm?.startDate ?? .distantPast
         ).map { CalendarEvent(meeting: $0) }
     }
 
@@ -1082,5 +1089,6 @@ struct ActivityViewController: UIViewControllerRepresentable {
         .environmentObject(ClassManager())
         .environmentObject(AuthManager())
         .environmentObject(SettingsManager.shared)
+        .environmentObject(TermStore())
     }
 }

@@ -51,6 +51,7 @@ struct UnifiedEvent: Identifiable {
 
 struct UnifiedCalendarView: View {
     @EnvironmentObject var classManager: ClassManager
+    @EnvironmentObject var termStore: TermStore
     @ObservedObject private var settingsManager = SettingsManager.shared
     @State private var isWeekly = true
     @State private var selectedEvent: UnifiedEvent?
@@ -65,8 +66,15 @@ struct UnifiedCalendarView: View {
         return f
     }()
 
+    /// Classes shown in this view — scoped to the active term (plus unfiled
+    /// classes) when one is set, otherwise everything.
+    private var scopedClasses: [Class] {
+        guard let active = termStore.activeTerm else { return classManager.classes }
+        return classManager.classes.filter { $0.termID == active.id || $0.termID == nil }
+    }
+
     private var assignmentEvents: [UnifiedEvent] {
-        classManager.classes.flatMap { cls in
+        scopedClasses.flatMap { cls in
             cls.events
                 .filter { !$0.isDeletedLocally }
                 .map { UnifiedEvent(event: $0, classColor: cls.color, className: cls.name) }
@@ -80,12 +88,12 @@ struct UnifiedCalendarView: View {
         let calendar = Calendar.current
         let from = calendar.date(byAdding: .month, value: -2, to: Date()) ?? Date()
         let to = calendar.date(byAdding: .month, value: 6, to: Date()) ?? Date()
-        return classManager.classes.flatMap { cls -> [UnifiedEvent] in
+        return scopedClasses.flatMap { cls -> [UnifiedEvent] in
             guard let schedule = cls.structuredSchedule, !schedule.isEmpty else { return [] }
             return schedule.occurrences(
                 from: from, to: to,
                 className: cls.name, classColorHex: cls.colorHex, classID: cls.id,
-                fallbackStart: settingsManager.term.startDate ?? .distantPast
+                fallbackStart: termStore.term(id: cls.termID)?.startDate ?? .distantPast
             ).map { UnifiedEvent(meeting: $0, classColor: cls.color) }
         }
     }
@@ -124,10 +132,10 @@ struct UnifiedCalendarView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 // Class color legend
-                if !classManager.classes.isEmpty {
+                if !scopedClasses.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 16) {
-                            ForEach(classManager.classes) { cls in
+                            ForEach(scopedClasses) { cls in
                                 HStack(spacing: 6) {
                                     Circle()
                                         .fill(cls.color)

@@ -23,6 +23,7 @@ Working list of known problems and planned features. Last updated: September 3, 
 
 ### Pre-launch polish
 
+- **End Date per class** Check if the end date in the Edit Class view is even used
 - **Crash reporting** (Sentry or Firebase Crashlytics) — highest-value beta add;
   testers will report "it crashed" with no stack trace otherwise.
 - **First-run onboarding** — 3 cards: upload → review & edit → sync.
@@ -42,20 +43,6 @@ Working list of known problems and planned features. Last updated: September 3, 
   restore itself as a new session so it's also undoable; decide whether class
   meetings / status / color are part of the snapshot or stay as-is (probably
   events only for v1).
-- **Term folders (Current Term, phase 2).** Phase 1 shipped: a single
-  `TermSettings` with a quarter/semester/custom `system` that derives the term
-  end, an auto-derived label shown on My Classes, and new classes defaulting
-  their end date to the term end. Phase 2 promotes this to multiple `Term`s
-  (id + name + dates + system), a `Class.termID` (nullable — classes are
-  unfiled by default and opt in), per-account `savedTerms`, a migration that
-  files existing classes into a term built from the current settings, My
-  Classes grouped by term with a term switcher, an "Add to term" step in both
-  class-creation paths, folder-level settings (term dates/system + the
-  meeting-sync default), an "Archive term" bulk-INACTIVE action, and scoping
-  Calendar / Week at a Glance to the active term.
-  It would be better with Start date and Term length, students who need help planning
-  won't know the exact end date of the term, but will know it lasts 10 weeks or 14 weeks
-  or 16 weeks.
 - Haptics on accept / decline / sync success.
 - App icon and launch screen pass (currently generated defaults).
 - Backend `/health` endpoint + an uptime monitor (also keeps the free dyno warm,

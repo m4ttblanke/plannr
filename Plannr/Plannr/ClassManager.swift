@@ -130,6 +130,7 @@ struct Class: Identifiable, Codable, Hashable {
             && lhs.structuredSchedule == rhs.structuredSchedule
             && lhs.meetingSyncEnabled == rhs.meetingSyncEnabled
             && lhs.meetingEventIds == rhs.meetingEventIds
+            && lhs.termID == rhs.termID
     }
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
@@ -155,6 +156,8 @@ struct Class: Identifiable, Codable, Hashable {
     /// Google Calendar event ids for the recurring meeting events (one per
     /// pattern: lecture, section). Kept so they can be updated or removed.
     var meetingEventIds: [String]
+    /// The term folder this class belongs to, or nil when unfiled.
+    var termID: UUID?
 
     var color: Color {
         get { Color(hex: colorHex) }
@@ -163,7 +166,7 @@ struct Class: Identifiable, Codable, Hashable {
 
     enum CodingKeys: String, CodingKey {
         case id, name, schedule, colorHex, events, status, googleCalendarId, lastSynced, endDate
-        case hasUnsyncedChanges, syncHistory, structuredSchedule, meetingSyncEnabled, meetingEventIds
+        case hasUnsyncedChanges, syncHistory, structuredSchedule, meetingSyncEnabled, meetingEventIds, termID
     }
 
     init(
@@ -179,14 +182,15 @@ struct Class: Identifiable, Codable, Hashable {
         hasUnsyncedChanges: Bool = false,
         structuredSchedule: ClassSchedule? = nil,
         meetingSyncEnabled: Bool = false,
-        meetingEventIds: [String] = []
+        meetingEventIds: [String] = [],
+        termID: UUID? = nil
     ) {
         self.init(
             id: UUID(), name: name, schedule: schedule, colorHex: colorHex, events: events,
             status: status, googleCalendarId: googleCalendarId, lastSynced: lastSynced,
             endDate: endDate, syncHistory: syncHistory, hasUnsyncedChanges: hasUnsyncedChanges,
             structuredSchedule: structuredSchedule, meetingSyncEnabled: meetingSyncEnabled,
-            meetingEventIds: meetingEventIds
+            meetingEventIds: meetingEventIds, termID: termID
         )
     }
 
@@ -204,7 +208,8 @@ struct Class: Identifiable, Codable, Hashable {
         hasUnsyncedChanges: Bool = false,
         structuredSchedule: ClassSchedule? = nil,
         meetingSyncEnabled: Bool = false,
-        meetingEventIds: [String] = []
+        meetingEventIds: [String] = [],
+        termID: UUID? = nil
     ) {
         self.id = id
         self.name = name
@@ -220,6 +225,7 @@ struct Class: Identifiable, Codable, Hashable {
         self.structuredSchedule = structuredSchedule
         self.meetingSyncEnabled = meetingSyncEnabled
         self.meetingEventIds = meetingEventIds
+        self.termID = termID
     }
 
     init(from decoder: Decoder) throws {
@@ -238,5 +244,6 @@ struct Class: Identifiable, Codable, Hashable {
         structuredSchedule = try container.decodeIfPresent(ClassSchedule.self, forKey: .structuredSchedule)
         meetingSyncEnabled = try container.decodeIfPresent(Bool.self, forKey: .meetingSyncEnabled) ?? false
         meetingEventIds = try container.decodeIfPresent([String].self, forKey: .meetingEventIds) ?? []
+        termID = try container.decodeIfPresent(UUID.self, forKey: .termID)
     }
 }

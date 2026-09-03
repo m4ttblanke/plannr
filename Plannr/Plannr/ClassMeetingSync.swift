@@ -24,10 +24,12 @@ enum ClassMeetingSync {
     /// - Parameters:
     ///   - cls: the class to sync. `cls.meetingSyncEnabled` decides whether the
     ///          backend writes the meetings (true) or clears them (false).
+    ///   - term: the class's term folder, used as a fallback recurrence window
+    ///           when the schedule has no first-meeting date / the class no end date.
     ///   - send: pass `authManager.send` so a revoked token still triggers sign-out.
     static func run(
         for cls: Class,
-        settings: SettingsManager,
+        term: Term?,
         send: (URLRequest) async throws -> (Data, HTTPURLResponse)
     ) async -> Outcome {
         guard let email = UserDefaults.standard.string(forKey: "userEmail"),
@@ -94,10 +96,10 @@ enum ClassMeetingSync {
 
         // First meeting: the schedule's own date, else the term start, else today.
         let startDate = df.string(from: schedule?.firstMeetingDate
-                                  ?? settings.term.startDate ?? Date())
+                                  ?? term?.startDate ?? Date())
         // "Repeat for X weeks" wins; otherwise fall back to the class/term end.
         let weekCount = enabled ? schedule?.weekCount : nil
-        let untilDate = (cls.endDate ?? settings.term.endDate).map { df.string(from: $0) }
+        let untilDate = (cls.endDate ?? term?.resolvedEndDate()).map { df.string(from: $0) }
 
         let finalExam: FinalExamBody? = (enabled ? schedule?.finalExam : nil).map { fe in
             FinalExamBody(date: df.string(from: fe.date),

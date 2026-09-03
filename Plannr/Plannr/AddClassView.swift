@@ -12,10 +12,13 @@ struct AddClassView: View {
     @EnvironmentObject var classManager: ClassManager
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var settingsManager: SettingsManager
+    @EnvironmentObject var termStore: TermStore
 
     @State private var className: String = ""
     @State private var schedule = ClassSchedule()
     @State private var selectedColor: Color = .blue
+    @State private var selectedTermID: UUID?
+    @State private var didSetInitialTerm = false
 
     var body: some View {
         NavigationStack {
@@ -60,6 +63,23 @@ struct AddClassView: View {
                                     ColorPicker("", selection: $selectedColor)
                                         .labelsHidden()
                                 }
+
+                                if !termStore.terms.isEmpty {
+                                    HStack {
+                                        Text("Term")
+                                            .font(.headline)
+                                            .foregroundColor(.white)
+                                        Spacer()
+                                        Picker("Term", selection: $selectedTermID) {
+                                            Text("None").tag(UUID?.none)
+                                            ForEach(termStore.terms) { term in
+                                                Text(term.displayName()).tag(Optional(term.id))
+                                            }
+                                        }
+                                        .pickerStyle(.menu)
+                                        .tint(.white)
+                                    }
+                                }
                             }
                             .padding(.horizontal)
                         }
@@ -94,23 +114,32 @@ struct AddClassView: View {
                     .foregroundColor(.white)
                 }
             }
+            .onAppear {
+                if !didSetInitialTerm {
+                    didSetInitialTerm = true
+                    selectedTermID = termStore.activeTerm?.id
+                }
+            }
         }
     }
 
     private func addClass() {
-        // "Auto-sync class meetings": a signed-in user who has the setting on gets
-        // meeting sync turned on for any class they create with a schedule.
+        let term = termStore.term(id: selectedTermID)
+
+        // "Auto-sync class meetings": on when the global setting is on, or the
+        // chosen term opts its classes in.
         let autoSyncMeetings = !schedule.isEmpty
-            && settingsManager.autoSyncClassMeetings
             && !authManager.isGuest
+            && (settingsManager.autoSyncClassMeetings || term?.autoSyncMeetings == true)
 
         let newClass = Class(
             name: className,
             schedule: schedule.displayString,
             colorHex: selectedColor.toHex(),
-            endDate: settingsManager.term.resolvedEndDate(),
+            endDate: term?.resolvedEndDate(),
             structuredSchedule: schedule.isEmpty ? nil : schedule,
-            meetingSyncEnabled: autoSyncMeetings
+            meetingSyncEnabled: autoSyncMeetings,
+            termID: selectedTermID
         )
         classManager.addClass(newClass)
 
@@ -120,7 +149,7 @@ struct AddClassView: View {
             Task {
                 let outcome = await ClassMeetingSync.run(
                     for: newClass,
-                    settings: settingsManager,
+                    term: term,
                     send: { try await authManager.send($0) }
                 )
                 if case .updated(let synced) = outcome {
@@ -136,4 +165,5 @@ struct AddClassView: View {
         .environmentObject(ClassManager())
         .environmentObject(AuthManager())
         .environmentObject(SettingsManager.shared)
+        .environmentObject(TermStore())
 }

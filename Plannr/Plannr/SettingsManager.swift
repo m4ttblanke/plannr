@@ -32,6 +32,37 @@ enum TermSystem: String, CaseIterable, Identifiable {
         case .custom:   return nil
         }
     }
+
+    /// A sensible starting length in weeks for a term of this system — used as
+    /// the default the user can then adjust.
+    var defaultWeeks: Int {
+        switch self {
+        case .quarter:  return 10
+        case .semester: return 16
+        case .custom:   return 12
+        }
+    }
+}
+
+/// "Fall 2026" from a start month + year. Quarter systems distinguish Winter;
+/// semester systems fold Winter into Spring. Empty string when `startDate` is nil.
+func termSeasonLabel(startDate: Date?, system: TermSystem, calendar: Calendar = .current) -> String {
+    guard let startDate else { return "" }
+    let month = calendar.component(.month, from: startDate)
+    let year = calendar.component(.year, from: startDate)
+    let season: String
+    switch system {
+    case .semester:
+        season = (1...5).contains(month) ? "Spring" : (6...7).contains(month) ? "Summer" : "Fall"
+    case .quarter, .custom:
+        switch month {
+        case 1...3: season = "Winter"
+        case 4...5: season = "Spring"
+        case 6...8: season = "Summer"
+        default:    season = "Fall"
+        }
+    }
+    return "\(season) \(year)"
 }
 
 struct TermSettings: Equatable {
@@ -53,22 +84,7 @@ struct TermSettings: Equatable {
     func displayLabel(calendar: Calendar = .current) -> String {
         let typed = label.trimmingCharacters(in: .whitespacesAndNewlines)
         if !typed.isEmpty { return typed }
-        guard let startDate else { return "" }
-        let month = calendar.component(.month, from: startDate)
-        let year = calendar.component(.year, from: startDate)
-        let season: String
-        switch system {
-        case .semester:
-            season = (1...5).contains(month) ? "Spring" : (6...7).contains(month) ? "Summer" : "Fall"
-        case .quarter, .custom:
-            switch month {
-            case 1...3: season = "Winter"
-            case 4...5: season = "Spring"
-            case 6...8: season = "Summer"
-            default:    season = "Fall"
-            }
-        }
-        return "\(season) \(year)"
+        return termSeasonLabel(startDate: startDate, system: system, calendar: calendar)
     }
 }
 
