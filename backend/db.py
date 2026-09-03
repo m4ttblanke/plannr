@@ -11,3 +11,13 @@ def verify_connection() -> None:
     with engine.connect() as conn:
         conn.execute(text("SELECT 1"))
     print("Database connection verified.")
+
+
+def ping() -> bool:
+    """True if the database answers a trivial query right now — for /health."""
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return True
+    except Exception:
+        return False

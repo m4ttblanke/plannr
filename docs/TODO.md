@@ -2,14 +2,13 @@
 
 Working list of known problems and planned features. Last updated: September 3, 2026.
 
+Pre-launch polish is done (onboarding, sample-syllabus tour, crash reporting,
+sync resilience + auto-resync, restore a sync session, haptics, launch screen,
+accessibility first pass, `/health` + keep-warm). What's left:
+
 ---
 
 ## Problems to fix
-
-### High priority
-
-
-### Medium priority
 
 - **OCR is not enabled in production.** The Render Python runtime has no
   `tesseract` / `poppler` binaries and there is no `Aptfile` / Dockerfile, so
@@ -19,14 +18,7 @@ Working list of known problems and planned features. Last updated: September 3, 
 
 ---
 
-## Upcoming features
-
-### Pre-launch polish
-
-- Backend `/health` endpoint + an uptime monitor (also keeps the free dyno warm,
-  which improves cold-start and OAuth reliability).
-
-### Product roadmap (from the landing page "What's next")
+## Product roadmap (from the landing page "What's next")
 
 - Canvas integration — pull assignments and due dates straight from Canvas.
 - Apple Calendar support (Google Calendar only today).

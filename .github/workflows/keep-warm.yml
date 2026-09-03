@@ -1,0 +1,43 @@
+name: Keep backend warm
+
+# Pings the API's /health every ~10 min so Render's free dyno doesn't cold-start
+# (which also slows the OAuth round-trip). Doubles as a crude uptime check — the
+# run fails if /health doesn't answer 200. For real alerting, point an uptime
+# service (UptimeRobot, Better Uptime, cron-job.org) at the same URL; see
+# docs/OPS.md.
+#
+# Notes: scheduled workflows run only on the default branch, can be delayed
+# several minutes under GitHub load, and auto-disable after 60 days of repo
+# inactivity (re-enable from the Actions tab).
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: keep-warm
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: GET /health
+        env:
+          HEALTH_URL: ${{ vars.HEALTH_URL || 'https://plannr-api.onrender.com/health' }}
+        run: |
+          set -euo pipefail
+          echo "GET $HEALTH_URL"
+          code=$(curl -sS -o /tmp/health.json -w '%{http_code}' \
+            --max-time 90 --retry 4 --retry-delay 20 --retry-all-errors "$HEALTH_URL")
+          echo "HTTP $code"
+          cat /tmp/health.json; echo
+          if [ "$code" != "200" ]; then
+            echo "::error::/health returned $code"
+            exit 1
+          fi
+          if grep -q '"database": *"unavailable"' /tmp/health.json; then
+            echo "::warning::backend is up but reports database unavailable"
+          fi

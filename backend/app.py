@@ -15,8 +15,9 @@ import csv
 import io
 import json
 import logging
+import os
 from io import BytesIO
-from datetime import date as date_type, timedelta
+from datetime import date as date_type, datetime, timedelta, timezone
 from icalendar import Calendar as ICalendar, Event as ICalEvent
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
@@ -32,6 +33,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from config import settings
+from db import ping as db_ping
 from repositories.user_repository import initialize, get_google_credentials, upsert_google_credentials, delete_user
 
 
@@ -228,6 +230,28 @@ app = FastAPI(
     title='Plannr API',
     description='Upload your syllabus, the API parses it and uploads the relevant time slots to your Google Calendar'
 )
+
+_STARTED_AT = datetime.now(timezone.utc)
+
+
+@app.get('/health', tags=['Ops'])
+async def health():
+    """Liveness + readiness for the uptime monitor (which also keeps Render's
+    free dyno warm). Always **200** while the process is serving — the app
+    tolerates a briefly-unreachable database, so a DB nap must not make Render
+    cycle the instance. `database` / `ready` in the body let a richer monitor
+    alert on a degraded-but-serving state.
+    """
+    db_ok = db_ping()
+    now = datetime.now(timezone.utc)
+    return JSONResponse(status_code=200, content={
+        "status": "ok",
+        "ready": db_ok,
+        "database": "ok" if db_ok else "unavailable",
+        "uptime_seconds": int((now - _STARTED_AT).total_seconds()),
+        "version": (os.getenv("RENDER_GIT_COMMIT") or "dev")[:12],
+        "time": now.isoformat(),
+    })
 
 # Per-IP rate limiting. Requires uvicorn to be run with --proxy-headers so
 # request.client.host reflects the real client IP behind Render's proxy

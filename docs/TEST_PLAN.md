@@ -21,6 +21,9 @@ Calendar at [calendar.google.com](https://calendar.google.com).
   uvicorn app:app --reload      # needs Postgres running + backend/.env filled in
   ```
   Open `<backend>/docs` in a browser — you should see the Swagger UI.
+- [ ] **`GET <backend>/health`** returns `200` with `{"status":"ok",
+  "database":"ok", ...}`. (For prod, the GitHub Actions "Keep backend warm" job
+  should also be green in the Actions tab.)
 - [ ] **`Plannr/Plannr/Config.swift`** `BACKEND_URL` points at that backend
   (trailing slash, e.g. `"http://localhost:8000/"` or the Render URL).
 - [ ] **Google account** you can sign in with (and later revoke — don't use a
