@@ -1469,6 +1469,12 @@ _TESTFLIGHT_PAGE = """<!DOCTYPE html>
     display: inline-block; padding: 13px 26px; border-radius: 10px; font-weight: 600;
     text-decoration: none; background: #4f8cff; color: #07111d;
   }}
+  ol.steps {{
+    text-align: left; color: #9aa5b1; font-size: 0.92rem; line-height: 1.6;
+    margin: 28px 0 0; padding-left: 20px;
+  }}
+  ol.steps li {{ margin-bottom: 8px; }}
+  ol.steps a {{ color: #4f8cff; }}
 </style>
 </head>
 <body>
@@ -1526,11 +1532,19 @@ async def testflight_success(request: Request, session_id: str = Query(...)):
             status_code=200
         )
 
+    install_steps = (
+        '<ol class="steps">'
+        '<li>Open this page on the iPhone or iPad you want Plannr on — TestFlight installs there directly.</li>'
+        '<li>Don\'t have the TestFlight app yet? Get it free from the '
+        '<a href="https://apps.apple.com/app/testflight/id899247664">App Store</a> first.</li>'
+        '<li>Tap <strong>Join TestFlight</strong> below, then <strong>Accept</strong> and <strong>Install</strong> in TestFlight.</li>'
+        '</ol>'
+    )
     return HTMLResponse(
         _TESTFLIGHT_PAGE.format(
             title="You're in", heading="You're in!",
-            message="Thanks for your purchase. Tap below to join the Plannr TestFlight beta.",
-            action=f'<a class="btn" href="{settings.testflight_link}">Join TestFlight</a>',
+            message="Thanks for your purchase. Follow the steps below to install Plannr through TestFlight.",
+            action=f'<a class="btn" href="{settings.testflight_link}">Join TestFlight</a>{install_steps}',
             analytics=_CLOUDFLARE_BEACON
         )
     )
