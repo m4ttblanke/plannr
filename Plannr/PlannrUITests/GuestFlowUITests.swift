@@ -30,6 +30,21 @@ final class GuestFlowUITests: XCTestCase {
                       "Guest banner should appear", file: file, line: line)
     }
 
+    /// SwiftUI's `Menu` renders as a native context menu, whose presentation
+    /// animation can race a synthetic tap under load (e.g. parallel CI
+    /// simulators). Retry the tap rather than assuming one `.tap()` opens it.
+    private func openMenu(file: StaticString = #filePath, line: UInt = #line) {
+        let menuButton = app.buttons["menuButton"]
+        XCTAssertTrue(menuButton.waitForExistence(timeout: 5), "menu button should exist", file: file, line: line)
+
+        let firstItem = app.buttons["Calendar"]
+        for _ in 0..<3 {
+            menuButton.tap()
+            if firstItem.waitForExistence(timeout: 3) { return }
+        }
+        XCTFail("hamburger menu never opened after 3 attempts", file: file, line: line)
+    }
+
     private func addClass(named name: String) {
         app.buttons["Add New Class"].tap()
         XCTAssertTrue(app.staticTexts["Add New Class"].waitForExistence(timeout: 3))
@@ -184,8 +199,7 @@ final class GuestFlowUITests: XCTestCase {
     func testHamburgerMenuSwitchesTabs() {
         enterGuestMode()
 
-        app.buttons["menuButton"].tap()
-        XCTAssertTrue(app.buttons["Calendar"].waitForExistence(timeout: 3))
+        openMenu()
         XCTAssertTrue(app.buttons["Week at a Glance"].exists)
         XCTAssertTrue(app.buttons["Report an Issue"].exists)
         XCTAssertTrue(app.buttons["Suggest a Feature"].exists)
@@ -193,8 +207,10 @@ final class GuestFlowUITests: XCTestCase {
 
         XCTAssertEqual(app.staticTexts["tabTitle"].label, "Calendar")
 
-        app.buttons["menuButton"].tap()
-        app.buttons["Week at a Glance"].tap()
+        openMenu()
+        let weekItem = app.buttons["Week at a Glance"]
+        XCTAssertTrue(weekItem.waitForExistence(timeout: 5))
+        weekItem.tap()
         XCTAssertEqual(app.staticTexts["tabTitle"].label, "Week at a Glance")
     }
 
@@ -209,8 +225,11 @@ final class GuestFlowUITests: XCTestCase {
     private func assertFeedbackItemWorks(menuLabel: String, alertTitle: String,
                                          file: StaticString = #filePath, line: UInt = #line) {
         enterGuestMode()
-        app.buttons["menuButton"].tap()
-        app.buttons[menuLabel].tap()
+        openMenu(file: file, line: line)
+
+        let menuItem = app.buttons[menuLabel]
+        XCTAssertTrue(menuItem.waitForExistence(timeout: 5), "\(menuLabel) menu item should appear", file: file, line: line)
+        menuItem.tap()
 
         // No Mail account on the simulator → the mailto fallback alert.
         let alert = app.alerts[alertTitle]
