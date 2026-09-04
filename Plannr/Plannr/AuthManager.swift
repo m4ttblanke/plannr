@@ -310,7 +310,13 @@ class AuthManager: ObservableObject {
             UserDefaults.standard.set(picture, forKey: "userPhotoURL")
         }
 
-        DispatchQueue.main.async {
+        // Apply the published state on the main thread. `handleCallback` is
+        // delivered on the main thread (ASWebAuthenticationSession completion /
+        // `.onOpenURL`), so this runs **synchronously** — the view that swaps to
+        // the signed-in UI in the same call stack then sees `userEmail` already
+        // set, so account-scoped stores (ClassManager / TermStore) initialize
+        // with `savedClasses.<account-token>` rather than the unscoped fallback.
+        applyOnMain {
             self.userEmail = email
             self.sessionToken = token
             self.userName = name
@@ -327,9 +333,20 @@ class AuthManager: ObservableObject {
         }
     }
 
+    /// Run `work` on the main thread — inline when already there (so callers on
+    /// the main thread see the state change before they return), otherwise
+    /// hopped. Auth-state changes must land before the view tree re-renders.
+    private func applyOnMain(_ work: @escaping () -> Void) {
+        if Thread.isMainThread { work() } else { DispatchQueue.main.async(execute: work) }
+    }
+
     /// Sign in as guest — no data is persisted
     func signInAsGuest() {
-        DispatchQueue.main.async {
+        // Synchronous when called from the main thread (it always is — a button
+        // tap), so `isGuest` is true before the view swaps in and ClassManager /
+        // TermStore init in guest (in-memory only) mode rather than persisting to
+        // the unscoped `savedClasses` key.
+        applyOnMain {
             self.isGuest = true
             self.isAuthenticated = true
             self.userEmail = nil
@@ -347,7 +364,7 @@ class AuthManager: ObservableObject {
         UserDefaults.standard.removeObject(forKey: "userName")
         UserDefaults.standard.removeObject(forKey: "userPhotoURL")
 
-        DispatchQueue.main.async {
+        applyOnMain {
             self.isAuthenticated = false
             self.isGuest = false
             self.userEmail = nil

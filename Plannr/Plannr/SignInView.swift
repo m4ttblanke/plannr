@@ -21,6 +21,10 @@ struct SignInView: View {
     var body: some View {
         if showPDFUpload {
             PDFUploadView(isGuest: authManager.isGuest, accountEmail: authManager.userEmail)
+                // Tie the view's identity (and its @StateObject ClassManager /
+                // TermStore) to the account, so switching accounts rebuilds the
+                // per-account stores instead of reusing the first account's.
+                .id(authManager.isGuest ? "guest" : (authManager.userEmail ?? "signed-in"))
                 .onChange(of: authManager.isAuthenticated) { _, isAuthenticated in
                     if !isAuthenticated {
                         showPDFUpload = false
