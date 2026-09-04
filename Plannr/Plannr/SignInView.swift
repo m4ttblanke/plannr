@@ -12,24 +12,21 @@ struct SignInView: View {
     @EnvironmentObject var authManager: AuthManager
     @State private var isAuthenticating: Bool = false
     @State private var authError: String?
-    @State private var showPDFUpload: Bool = false
     /// The brand (star, tower, "Plannr", waves) is on screen from the first
     /// frame — matching the launch screen — and the sign-in controls fade in
     /// a beat later.
     @State private var showControls: Bool = false
 
     var body: some View {
-        if showPDFUpload {
+        // Drive the screen straight off the auth state, not a separate flag —
+        // so a returning user whose session AuthManager.init() restored lands in
+        // the app on cold launch instead of the sign-in screen.
+        if authManager.isAuthenticated {
             PDFUploadView(isGuest: authManager.isGuest, accountEmail: authManager.userEmail)
                 // Tie the view's identity (and its @StateObject ClassManager /
                 // TermStore) to the account, so switching accounts rebuilds the
                 // per-account stores instead of reusing the first account's.
                 .id(authManager.isGuest ? "guest" : (authManager.userEmail ?? "signed-in"))
-                .onChange(of: authManager.isAuthenticated) { _, isAuthenticated in
-                    if !isAuthenticated {
-                        showPDFUpload = false
-                    }
-                }
         } else {
             ZStack(alignment: .bottom) {
                 LinearGradient(
@@ -114,7 +111,6 @@ struct SignInView: View {
 
                         Button(action: {
                             authManager.signInAsGuest()
-                            showPDFUpload = true
                         }) {
                             Text("Continue as Guest")
                                 .font(.system(.callout, design: .serif).weight(.medium))
@@ -179,12 +175,10 @@ struct SignInView: View {
 
             // ASWebAuthenticationSession hands us the plannr://auth/callback?...
             // redirect directly; AuthManager owns parsing it (success + error).
-            if let callbackURL = callbackURL {
-                if authManager.handleCallback(url: callbackURL) {
-                    showPDFUpload = true
-                } else {
-                    authError = authManager.errorMessage ?? "Sign-in failed. Please try again."
-                }
+            // On success it flips authManager.isAuthenticated (synchronously, on
+            // the main thread), which swaps this view to PDFUploadView.
+            if let callbackURL = callbackURL, !authManager.handleCallback(url: callbackURL) {
+                authError = authManager.errorMessage ?? "Sign-in failed. Please try again."
             }
         }
 
