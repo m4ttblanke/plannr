@@ -56,8 +56,10 @@ RESTful API built with **FastAPI**, deployed on **[Render](https://render.com)**
 | Database | Render-managed PostgreSQL (`plannr-db`) |
 | ORM / migrations | SQLAlchemy + Alembic |
 | Rate limiting | `slowapi`, per-IP (100/min default; tighter per-route) |
+| Health check | `GET /health` — always 200 while serving; body reports DB
+readiness. `render.yaml` sets it as `healthCheckPath`. |
 | Plan | Free tier (spins down after ~15 min idle; first request after a
-cold start can take ~30 s) |
+cold start can take ~30 s — the keep-warm workflow below mitigates this) |
 
 **Data stored server-side:** only a user record (`email`, timestamps) and their
 Google OAuth credentials (access token, refresh token, scopes). Classes, events,
@@ -87,9 +89,17 @@ startCommand:  alembic upgrade head && uvicorn app:app --host 0.0.0.0 --port $PO
 `--proxy-headers --forwarded-allow-ips='*'` is required so per-IP rate limiting
 sees the real client IP (from `X-Forwarded-For`) rather than Render's proxy.
 
-There is **no GitHub Actions workflow** — Render's native GitHub integration is
-the entire CD pipeline. There are no CI/CD repository secrets to configure;
-all runtime configuration is Render environment variables (see below).
+Render's native GitHub integration is the entire **CD** pipeline — there are no
+CI/CD repository secrets to configure; all runtime configuration is Render
+environment variables (see below).
+
+The one GitHub Actions workflow, [`keep-warm.yml`](../.github/workflows/keep-warm.yml),
+is **not** part of deployment — it just `curl`s `/health` every ~10 minutes so
+the free dyno doesn't cold-start (which also steadies the OAuth round-trip). It
+fails on a non-200 and warns when the DB is unavailable, so it doubles as a crude
+uptime check. Override the target with a repo variable `HEALTH_URL`. For real
+alerting, point an uptime service (UptimeRobot / Better Stack) at the same URL —
+see [`OPS.md`](OPS.md).
 
 ---
 
@@ -105,6 +115,14 @@ all runtime configuration is Render environment variables (see below).
   - Gemini API enabled
 - A **Gemini API key** from [aistudio.google.com](https://aistudio.google.com)
 - *(Optional, for the paid TestFlight flow)* a **Stripe** account
+- *(Optional)* a **[Sentry](https://sentry.io)** project for iOS crash reports —
+  paste its DSN into `Plannr/Plannr/Info.plist` (`SENTRY_DSN`). Empty = crash
+  reporting off. See [`CRASH_REPORTING.md`](CRASH_REPORTING.md).
+
+The iOS app links one Swift Package — **`sentry-cocoa`**, pinned in
+`Plannr/Plannr.xcodeproj/.../Package.resolved`. Xcode resolves it on first open;
+if it errors with *"Missing package product 'Sentry'"*, run **File → Packages →
+Resolve Package Versions**.
 
 ### System dependencies — OCR fallback
 
@@ -299,6 +317,11 @@ the `stripe listen` / test-card walkthrough.
 
 - **Build fails with an SDK or Swift-version error** — use Xcode 16+ (iOS 18
   SDK). Deployment target is iOS 18.0.
+
+- **"Missing package product 'Sentry'"** — Xcode hasn't fetched the Swift
+  Package. **File → Packages → Resolve Package Versions** (or, from the CLI,
+  `xcodebuild -project Plannr/Plannr.xcodeproj -scheme Plannr
+  -resolvePackageDependencies`). It's a one-time fetch per checkout.
 
 - **"Sign in with Google" opens then immediately returns an error** — the app
   now surfaces the backend's error message on the sign-in screen. Check the

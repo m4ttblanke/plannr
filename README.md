@@ -6,10 +6,18 @@ A student can:
 - Upload syllabi as a PDF, camera scan, photo, or pasted text
 - Review AI-extracted events and accept, decline, or edit them individually
 - Assign each class a color that carries through to its Google Calendar
-- Sync events to a dedicated per-class secondary Google Calendar
+- Group classes into **term folders** (Quarter / Semester / Custom length)
+- Sync events to a dedicated per-class secondary Google Calendar, plus recurring
+  class-meeting events pulled from the syllabus
 - Re-upload an updated syllabus and reconcile changes with existing events
+- Roll a class back to any past sync from its history
 - Export events as `.ics` or `.csv`
 - Use the app in guest mode without signing in
+
+First launch shows a 3-card walkthrough, and the empty state has a **Try a sample
+syllabus** button — a guided, simulated run through the whole flow (no server
+call, no calendar writes) so a new user sees how it works without hunting for a
+PDF. Beta builds report crashes to Sentry.
 
 Originally built as a class project at UC Santa Barbara. The original repository is at:
 https://github.com/ucsb-cs148-w26/pj07-syllabus-to-cal-2pm
@@ -35,12 +43,14 @@ https://github.com/ucsb-cs148-w26/pj07-syllabus-to-cal-2pm
 - **Google Gemini** — AI-powered syllabus parsing
 - **Stripe** — one-time payment gating access to the TestFlight demo
 - **slowapi** — per-IP rate limiting on all backend endpoints
+- **Sentry** (`sentry-cocoa`, SPM) — iOS crash reporting; inert unless a DSN is set
+- **GitHub Actions** — a `/health` keep-warm ping so Render's free dyno doesn't cold-start
 - **Cloudflare Web Analytics** — privacy-focused traffic/conversion tracking on the marketing site (no cookies, no user tracking)
 
 ## Prerequisites
 
-- **Xcode 15+** (iOS 17+ SDK)
-- **Python 3.10+**
+- **Xcode 16+** (iOS 18 SDK; deployment target is iOS 18.0)
+- **Python 3.12** (`backend/.python-version`)
 - **PostgreSQL 14+** — `brew install postgresql@16 && brew services start postgresql@16`
 - A **Google Cloud project** with these APIs enabled:
   - Google Calendar API
@@ -68,9 +78,11 @@ https://plannr-api.onrender.com
 
 Deployment is automated — every push to `main` triggers a redeploy via `render.yaml`. The `alembic upgrade head` migration runs automatically on each deploy before the server starts.
 
-The production database is a Render-managed PostgreSQL instance. The `render.yaml` at the repo root defines both the web service and the database.
+The production database is a Render-managed PostgreSQL instance. The `render.yaml` at the repo root defines both the web service and the database, and sets `healthCheckPath: /health`.
 
-> **Note:** The Render free tier spins down after 15 minutes of inactivity. The first request after a period of inactivity may take up to 30 seconds while the service wakes up.
+`GET /health` returns `200` (with `database` / `ready` in the body) while the process is serving. `.github/workflows/keep-warm.yml` pings it every ~10 minutes so the free dyno doesn't cold-start — which also steadies the OAuth round-trip. See [`docs/OPS.md`](docs/OPS.md) for the endpoint, the workflow's caveats, and pointing a real uptime service (UptimeRobot / Better Stack) at the same URL.
+
+> **Note:** The Render free tier still spins down after ~15 minutes with no traffic at all; the first request then takes up to ~30 seconds while the service wakes up.
 
 ## Local Development Setup
 
@@ -145,16 +157,19 @@ let BACKEND_URL = "http://localhost:8000/"
 let BACKEND_URL = "https://plannr-api.onrender.com/"
 ```
 
+The app links one Swift Package (**`sentry-cocoa`**, pinned in `Package.resolved`). Xcode resolves it on first open; if the build reports *"Missing package product 'Sentry'"*, run **File → Packages → Resolve Package Versions**. Crash reporting stays off until a DSN is set in `Plannr/Plannr/Info.plist` (`SENTRY_DSN`) — see [`docs/CRASH_REPORTING.md`](docs/CRASH_REPORTING.md).
+
 Press `Cmd+R` to build and run on a simulator or device.
 
 ## How It Works
 
+0. **First launch** — a 3-card walkthrough (upload → review → sync). New users can also tap **Try a sample syllabus** from the empty state for a guided, fully simulated run — no server call, no calendar writes — then delete the sample.
 1. **Sign In** — Tap "Sign in with Google" to authenticate via OAuth. The backend stores your refresh token in PostgreSQL so future API calls can access your Calendar without re-authenticating.
-2. **Add a Class** — Give it a name, schedule, and color.
-3. **Upload Syllabus** — Upload a PDF, scan with the camera, pick from Photos, or paste text. The backend extracts text and sends it to Gemini, which returns a structured list of graded deliverables with inferred dates.
+2. **Add a Class** — Give it a name, schedule, color, and (optionally) a term folder.
+3. **Upload Syllabus** — Upload a PDF, scan with the camera, pick from Photos, or paste text. The backend extracts text and sends it to Gemini, which returns a structured list of graded deliverables with inferred dates — plus meeting times, if the syllabus states them.
 4. **Review Events** — Accept, decline, or edit each extracted event before syncing.
-5. **Sync** — Tapping Sync creates a dedicated secondary Google Calendar for the class (named after it, colored to match) and pushes all accepted events as all-day events.
-6. **Re-sync** — If you edit or delete events later, or upload a new syllabus, the app reconciles changes and pushes only the diff to Google Calendar.
+5. **Sync** — Tapping Sync creates a dedicated secondary Google Calendar for the class (named after it, colored to match) and pushes all accepted events as all-day events. Transient failures retry with backoff; anything still pending re-syncs automatically when the connection returns.
+6. **Re-sync** — If you edit or delete events later, or upload a new syllabus, the app reconciles changes and pushes only the diff to Google Calendar. Every sync is snapshotted, and you can **restore** the class's events to any past one.
 
 ## TestFlight Access (Stripe)
 
@@ -181,44 +196,70 @@ Point your test Payment Link's redirect at `http://localhost:8000/testflight/suc
 
 ```
 plannr/
-├── Plannr/                  iOS Xcode project
+├── Plannr/                  iOS Xcode project (SwiftUI)
 │   └── Plannr/
 │       ├── Config.swift     Backend URL — change this for production
-│       ├── AuthManager.swift
-│       ├── ClassManager.swift
+│       ├── Info.plist       CFBundleURLSchemes, SENTRY_DSN, UILaunchScreen
+│       ├── AuthManager.swift ClassManager.swift SettingsManager.swift TermStore.swift
+│       ├── SignInView.swift OnboardingView.swift PDFUploadView.swift
+│       ├── SyllabusUploadView.swift CalendarPreviewView.swift ClassEditView.swift
+│       ├── SampleTour.swift SampleSyllabus.swift  (guided sample walkthrough)
+│       ├── ClassSyncRequest.swift ClassAutoResync.swift ClassRestore.swift EventReconciler.swift
+│       ├── CrashReporting.swift NetworkMonitor.swift Haptics.swift Accessibility.swift AppColors.swift
 │       └── ...
+│   ├── PlannrTests/         XCTest unit suite
+│   └── PlannrUITests/       GuestFlowUITests, OnboardingUITests
 ├── backend/
-│   ├── app.py               FastAPI routes
+│   ├── app.py               FastAPI routes (incl. GET /health)
 │   ├── config.py            Typed settings via pydantic-settings
-│   ├── db.py                SQLAlchemy engine + session
+│   ├── db.py                SQLAlchemy engine + session + ping()
 │   ├── models.py            ORM models (User, GoogleCredentials)
-│   ├── repositories/
-│   │   └── user_repository.py
+│   ├── repositories/user_repository.py
 │   ├── alembic/             Migration history
-│   ├── alembic.ini
-│   ├── requirements.txt
-│   ├── .env.example
+│   ├── requirements.txt  .env.example  .python-version
 │   └── tests/
+├── .github/workflows/
+│   └── keep-warm.yml        pings /health every ~10 min
+├── render.yaml              Render Blueprint (web service + Postgres)
 └── docs/
-    ├── index.html           Landing page
-    ├── style.css
-    ├── ticker.js
-    ├── privacy.html
-    ├── terms.html
-    ├── favicon.ico / favicon-16.png / favicon-32.png / apple-touch-icon.png
-    ├── PlannrDemo.mp4
-    ├── MANUAL.md
-    ├── PRIVACY_POLICY.md
-    └── TERMS_OF_SERVICE.md
+    ├── index.html style.css site.js   Landing page
+    ├── privacy.html terms.html + favicons, apple-touch-icon, PlannrDemo.mp4
+    ├── MANUAL.md            User-facing feature manual
+    ├── TEST_PLAN.md         Manual QA walkthrough + automated-test list
+    ├── DEPLOY.md            Architecture, env vars, install, troubleshooting
+    ├── OPS.md               /health + keep-warm + uptime monitoring
+    ├── CRASH_REPORTING.md   Sentry setup (DSN, dSYMs)
+    ├── COSTS.md  TODO.md
+    └── PRIVACY_POLICY.md  TERMS_OF_SERVICE.md
 ```
 
 ## Running Tests
 
+**Backend** (pytest):
+
 ```bash
-cd backend
-source venv/bin/activate
-pytest tests/ -v
+cd backend && source venv/bin/activate
+pytest tests/ -q
 ```
+
+**iOS** (XCTest, on a simulator):
+
+```bash
+xcodebuild test -project Plannr/Plannr.xcodeproj -scheme Plannr \
+  -destination 'platform=iOS Simulator,name=iPhone 16'
+```
+
+## Documentation
+
+| File | What it covers |
+|---|---|
+| [`docs/MANUAL.md`](docs/MANUAL.md) | Every user-facing feature |
+| [`docs/TEST_PLAN.md`](docs/TEST_PLAN.md) | Manual QA pass + the automated-test inventory |
+| [`docs/DEPLOY.md`](docs/DEPLOY.md) | Architecture, environment variables, local setup, troubleshooting |
+| [`docs/OPS.md`](docs/OPS.md) | `/health`, the keep-warm workflow, uptime monitoring |
+| [`docs/CRASH_REPORTING.md`](docs/CRASH_REPORTING.md) | Sentry project + DSN + dSYM upload |
+| [`docs/COSTS.md`](docs/COSTS.md) | Running-cost breakdown |
+| [`docs/TODO.md`](docs/TODO.md) | What's left |
 
 ## License
 
