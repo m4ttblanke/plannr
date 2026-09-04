@@ -30,19 +30,24 @@ final class GuestFlowUITests: XCTestCase {
                       "Guest banner should appear", file: file, line: line)
     }
 
-    /// SwiftUI's `Menu` renders as a native context menu, whose presentation
-    /// animation can race a synthetic tap under load (e.g. parallel CI
-    /// simulators). Retry the tap rather than assuming one `.tap()` opens it.
+    /// SwiftUI's `Menu` renders as a native context menu. A plain `.tap()` on
+    /// its accessibility element is unreliable at opening it — on CI's slower,
+    /// parallelized simulators the element's own `.tap()` (which XCTest may
+    /// route through an accessibility "press" action rather than a physical
+    /// touch) can repeatedly land without presenting the menu at all, not just
+    /// race its animation. A coordinate tap forces a real touch event instead,
+    /// and we retry with generous headroom since CI has been observed needing
+    /// more than a couple of attempts.
     private func openMenu(file: StaticString = #filePath, line: UInt = #line) {
         let menuButton = app.buttons["menuButton"]
         XCTAssertTrue(menuButton.waitForExistence(timeout: 5), "menu button should exist", file: file, line: line)
 
         let firstItem = app.buttons["Calendar"]
-        for _ in 0..<3 {
-            menuButton.tap()
-            if firstItem.waitForExistence(timeout: 3) { return }
+        for _ in 0..<6 {
+            menuButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            if firstItem.waitForExistence(timeout: 4) { return }
         }
-        XCTFail("hamburger menu never opened after 3 attempts", file: file, line: line)
+        XCTFail("hamburger menu never opened after 6 attempts", file: file, line: line)
     }
 
     private func addClass(named name: String) {
@@ -200,9 +205,9 @@ final class GuestFlowUITests: XCTestCase {
         enterGuestMode()
 
         openMenu()
-        XCTAssertTrue(app.buttons["Week at a Glance"].exists)
-        XCTAssertTrue(app.buttons["Report an Issue"].exists)
-        XCTAssertTrue(app.buttons["Suggest a Feature"].exists)
+        XCTAssertTrue(app.buttons["Week at a Glance"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["Report an Issue"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["Suggest a Feature"].waitForExistence(timeout: 3))
         app.buttons["Calendar"].tap()
 
         XCTAssertEqual(app.staticTexts["tabTitle"].label, "Calendar")
