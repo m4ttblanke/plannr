@@ -617,6 +617,7 @@ struct ClassCard: View {
            let url = URL(string: "\(BACKEND_URL)calendar?email=\(encodedEmail)&google_calendar_id=\(encodedCalId)") {
             var request = URLRequest(url: url)
             request.httpMethod = "DELETE"
+            attachBackendAuth(&request)
             // Via `send` so a revoked token still triggers the global sign-out.
             _ = try? await authManager.send(request)
         }

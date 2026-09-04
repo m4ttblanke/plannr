@@ -3,7 +3,7 @@
 Plannr is an iOS app that parses course syllabi and syncs the important due dates — exams, homeworks, quizzes, and more — directly to a student's Google Calendar.
 
 A student can:
-- Upload syllabi as a PDF, camera scan, photo, or pasted text
+- Upload syllabi as a PDF or pasted text (camera scan / photo import are stubbed with a "coming soon" notice until server-side OCR is enabled)
 - Review AI-extracted events and accept, decline, or edit them individually
 - Assign each class a color that carries through to its Google Calendar
 - Group classes into **term folders** (Quarter / Semester / Custom length)
@@ -44,7 +44,7 @@ https://github.com/ucsb-cs148-w26/pj07-syllabus-to-cal-2pm
 - **Stripe** — one-time payment gating access to the TestFlight demo
 - **slowapi** — per-IP rate limiting on all backend endpoints
 - **Sentry** (`sentry-cocoa`, SPM) — iOS crash reporting; inert unless a DSN is set
-- **GitHub Actions** — a `/health` keep-warm ping so Render's free dyno doesn't cold-start
+- **GitHub Actions** — CI (backend `pytest` + iOS `xcodebuild test`) on every push/PR, plus a `/health` keep-warm ping so Render's free dyno doesn't cold-start
 - **Cloudflare Web Analytics** — privacy-focused traffic/conversion tracking on the marketing site (no cookies, no user tracking)
 
 ## Prerequisites
@@ -166,7 +166,7 @@ Press `Cmd+R` to build and run on a simulator or device.
 0. **First launch** — a 3-card walkthrough (upload → review → sync). New users can also tap **Try a sample syllabus** from the empty state for a guided, fully simulated run — no server call, no calendar writes — then delete the sample.
 1. **Sign In** — Tap "Sign in with Google" to authenticate via OAuth. The backend stores your refresh token in PostgreSQL so future API calls can access your Calendar without re-authenticating.
 2. **Add a Class** — Give it a name, schedule, color, and (optionally) a term folder.
-3. **Upload Syllabus** — Upload a PDF, scan with the camera, pick from Photos, or paste text. The backend extracts text and sends it to Gemini, which returns a structured list of graded deliverables with inferred dates — plus meeting times, if the syllabus states them.
+3. **Upload Syllabus** — Upload a PDF or paste text (camera scan / Photos import show a "coming soon" notice until server-side OCR is enabled). The backend extracts text and sends it to Gemini, which returns a structured list of graded deliverables with inferred dates — plus meeting times, if the syllabus states them.
 4. **Review Events** — Accept, decline, or edit each extracted event before syncing.
 5. **Sync** — Tapping Sync creates a dedicated secondary Google Calendar for the class (named after it, colored to match) and pushes all accepted events as all-day events. Transient failures retry with backoff; anything still pending re-syncs automatically when the connection returns.
 6. **Re-sync** — If you edit or delete events later, or upload a new syllabus, the app reconciles changes and pushes only the diff to Google Calendar. Every sync is snapshotted, and you can **restore** the class's events to any past one.
@@ -219,6 +219,7 @@ plannr/
 │   ├── requirements.txt  .env.example  .python-version
 │   └── tests/
 ├── .github/workflows/
+│   ├── ci.yml               backend pytest + iOS xcodebuild test, on push/PR
 │   └── keep-warm.yml        pings /health every ~10 min
 ├── render.yaml              Render Blueprint (web service + Postgres)
 └── docs/

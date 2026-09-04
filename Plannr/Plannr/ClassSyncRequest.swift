@@ -159,6 +159,7 @@ enum ClassSyncRequest {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        attachBackendAuth(&request)
         request.httpBody = try JSONEncoder().encode(body)
         return request
     }

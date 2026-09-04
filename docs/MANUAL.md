@@ -52,11 +52,16 @@ Classes can be grouped into **term folders**. The header under "My Classes" is a
 
 ### Upload Syllabi
 
-Users can upload their syllabi in four ways: PDF file upload, camera document scanning, photo library import, or manual text paste. Scanned pages and photos are run through OCR (text recognition) automatically. All methods convert the input into a format ready for AI processing.
+Users can upload their syllabi as a **PDF file upload** or a **manual text paste**. The
+**camera document scan** and **photo library import** options currently show a
+"Camera support coming soon!" notice — they produce image-only PDFs that need
+server-side OCR, which isn't enabled on the production backend yet (see
+`TODO.md`). Both paths, and the OCR fallback below, are still in the codebase for
+when OCR ships.
 
 Notes:
-- Uploads are limited to 10 MB. OCR reads at most the first 30 pages of a scanned document.
-- Camera scanning requires a physical device (it is not available on the iOS Simulator) and camera permission.
+- Uploads are limited to 10 MB. When OCR is enabled it reads at most the first 30 pages of a scanned document.
+- Camera scanning (when re-enabled) requires a physical device — it is not available on the iOS Simulator — and camera permission.
 - For scanned or photographed syllabi, clear, high-contrast, straight-on images produce the best results.
 
 <img src="MANUAL_IMAGES/upload.png" alt="alt text" width="300">
@@ -149,6 +154,6 @@ Text follows the system **Dynamic Type** setting (Settings → Display & Brightn
 ## **Known Problems**
 
 - Very large syllabi with many deadlines can exceed what the parser handles in a single pass; the app will suggest splitting the document into smaller uploads.
-- OCR of scanned or photographed syllabi depends on image quality — faint, skewed, or low-contrast scans may yield incomplete results. OCR is also not currently enabled on the production backend, so scanned-only PDFs may need to be uploaded as text-layer PDFs or pasted as text.
+- Camera scan and photo import are disabled in the app for now (a "coming soon" notice) because server-side OCR isn't enabled on the production backend. Upload a text-layer PDF or paste the text instead. When OCR is enabled, its accuracy will still depend on image quality — faint, skewed, or low-contrast scans may yield incomplete results.
 - Term dates aren't yet passed to syllabus parsing — Gemini still infers the term/year from the syllabus text itself.
 - iOS caps an app at 64 pending local notifications. Plannr schedules only the 60 soonest deadline reminders and rolls that window forward each time the app is opened, so with a very large backlog the furthest-out reminders aren't scheduled until nearer ones have fired (and if the app isn't opened for a long stretch, later reminders won't have been scheduled yet).

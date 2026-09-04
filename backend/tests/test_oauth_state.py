@@ -5,7 +5,7 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 
-from app import issue_oauth_state, verify_oauth_state, OAUTH_STATE_TTL
+from app import issue_oauth_state, verify_oauth_state, decode_oauth_state, OAUTH_STATE_TTL
 
 
 class TestSignedState:
@@ -36,6 +36,29 @@ class TestSignedState:
 
     def test_each_issue_is_unique(self):
         assert issue_oauth_state("a") != issue_oauth_state("b")
+
+
+class TestStateNonce:
+    """The signed state round-trips an optional client nonce."""
+
+    def test_nonce_is_absent_by_default(self):
+        assert decode_oauth_state(issue_oauth_state("v")) == {
+            "code_verifier": "v", "nonce": None
+        }
+
+    def test_nonce_round_trips(self):
+        token = issue_oauth_state("v", "client-nonce-123")
+        assert decode_oauth_state(token) == {
+            "code_verifier": "v", "nonce": "client-nonce-123"
+        }
+
+    def test_verify_oauth_state_still_returns_only_the_verifier(self):
+        token = issue_oauth_state("v", "client-nonce-123")
+        assert verify_oauth_state(token) == "v"
+
+    def test_tampering_with_a_state_that_has_a_nonce_is_rejected(self):
+        body, sig = issue_oauth_state("v", "n").split(".", 1)
+        assert decode_oauth_state(f"{body}x.{sig}") is None
 
 
 class TestAuthCallback:
@@ -82,3 +105,12 @@ class TestAuthGoogle:
         s1 = self._state_from_redirect(client.get("/auth/google"))
         s2 = self._state_from_redirect(client.get("/auth/google"))
         assert s1 != s2
+
+    def test_client_nonce_is_sealed_into_the_state(self):
+        from fastapi.testclient import TestClient
+        from app import app
+
+        client = TestClient(app, follow_redirects=False)
+        resp = client.get("/auth/google", params={"nonce": "device-nonce-abc"})
+        state = self._state_from_redirect(resp)
+        assert decode_oauth_state(state)["nonce"] == "device-nonce-abc"

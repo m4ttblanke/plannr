@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, Query, Body, Request
+from fastapi import FastAPI, File, UploadFile, Query, Body, Request, Header, Depends
 from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse, HTMLResponse
 import stripe
 from google import genai
@@ -34,7 +34,15 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from config import settings
 from db import ping as db_ping
-from repositories.user_repository import initialize, get_google_credentials, upsert_google_credentials, delete_user
+from repositories.user_repository import (
+    initialize,
+    get_google_credentials,
+    upsert_google_credentials,
+    delete_user,
+    authenticate,
+    rotate_session_token,
+    user_exists,
+)
 
 
 logging.basicConfig(
@@ -187,18 +195,22 @@ def _b64u_decode(text: str) -> bytes:
     return base64.urlsafe_b64decode(text + "=" * (-len(text) % 4))
 
 
-def issue_oauth_state(code_verifier: str) -> str:
-    """Pack the PKCE verifier + timestamp into a signed, URL-safe state token."""
-    body = _b64u(json.dumps(
-        {"cv": code_verifier, "ts": int(time.time())}, separators=(",", ":")
-    ).encode())
+def issue_oauth_state(code_verifier: str, nonce: Optional[str] = None) -> str:
+    """Pack the PKCE verifier + timestamp (+ optional client nonce) into a signed,
+    URL-safe state token. The nonce is a value the iOS app generates before
+    starting the flow; echoing it back on the callback lets the app confirm the
+    callback belongs to the sign-in *it* initiated (not one replayed at it)."""
+    payload = {"cv": code_verifier, "ts": int(time.time())}
+    if nonce:
+        payload["n"] = nonce
+    body = _b64u(json.dumps(payload, separators=(",", ":")).encode())
     sig = _b64u(hmac.new(_oauth_state_key(), body.encode(), hashlib.sha256).digest())
     return f"{body}.{sig}"
 
 
-def verify_oauth_state(state: str) -> Optional[str]:
-    """Return the code_verifier if `state` is well-formed, correctly signed and
-    unexpired; otherwise None."""
+def decode_oauth_state(state: str) -> Optional[dict]:
+    """Return {"code_verifier": str, "nonce": str | None} if `state` is
+    well-formed, correctly signed and unexpired; otherwise None."""
     if not state or state.count(".") != 1:
         return None
     body, sig = state.split(".", 1)
@@ -212,7 +224,15 @@ def verify_oauth_state(state: str) -> Optional[str]:
         return None
     if time.time() - ts > OAUTH_STATE_TTL:
         return None
-    return code_verifier
+    nonce = data.get("n")
+    return {"code_verifier": code_verifier, "nonce": str(nonce) if nonce else None}
+
+
+def verify_oauth_state(state: str) -> Optional[str]:
+    """Return just the code_verifier from a valid `state`, or None. Kept for
+    callers/tests that only need the PKCE verifier."""
+    decoded = decode_oauth_state(state)
+    return decoded["code_verifier"] if decoded else None
 
 
 # Verify database connectivity at startup, but don't take the whole app down if
@@ -290,10 +310,65 @@ def _build_credentials(creds_data: dict) -> Credentials:
     )
 
 
+# ── Per-user request authentication ─────────────────────────────────────────
+#
+# Every endpoint that reads or writes a specific user's data identifies the user
+# by the `email` query parameter (not a secret) and authenticates the caller with
+# an opaque bearer token issued at sign-in:
+#
+#     Authorization: Bearer <session_token>
+#
+# The token is minted in /auth/callback, handed to the app through the
+# `plannr://auth/callback?...&token=` redirect, and stored in the
+# `google_credentials.session_token` column. `authenticate(email, token)` returns
+# the stored Google credentials only when the token matches (constant-time), so
+# knowing a victim's email is no longer enough to touch their account.
+
+class AuthError(Exception):
+    """Raised by `require_account` when the bearer token is missing or wrong."""
+
+
+@app.exception_handler(AuthError)
+async def _auth_error_handler(request: Request, exc: AuthError):
+    return JSONResponse(
+        status_code=401,
+        content={"error": str(exc) or "Authentication required. Please sign in again."},
+    )
+
+
+def _bearer_token(authorization: Optional[str]) -> Optional[str]:
+    """Extract the token from an `Authorization: Bearer <token>` header."""
+    if not authorization:
+        return None
+    scheme, _, value = authorization.strip().partition(" ")
+    if scheme.lower() != "bearer" or not value.strip():
+        return None
+    return value.strip()
+
+
+async def require_account(
+    email: str = Query(...),
+    authorization: Optional[str] = Header(default=None),
+) -> dict:
+    """FastAPI dependency: authenticate the caller and return their stored Google
+    OAuth credentials dict. Raises `AuthError` (→ 401) when the bearer token is
+    absent or does not match the token issued to `email` at sign-in."""
+    creds = authenticate(email, _bearer_token(authorization))
+    if not creds:
+        raise AuthError("Authentication required. Please sign in again.")
+    return creds
+
+
 @app.get('/auth/google', tags=['OAuth'])
 @limiter.limit("10/minute")
-async def google_auth(request: Request):
-    """Start OAuth flow - redirects to Google sign-in"""
+async def google_auth(request: Request, nonce: str = Query(None)):
+    """Start OAuth flow - redirects to Google sign-in.
+
+    `nonce` (optional) is an opaque value the iOS app generates and remembers for
+    this one sign-in attempt; it is sealed into the signed `state` and echoed
+    back on the `plannr://auth/callback` redirect so the app can reject a
+    callback it did not initiate. Capped so a caller can't bloat the state token.
+    """
     if not settings.google_client_id or not settings.google_client_secret:
         return JSONResponse(
             status_code=500,
@@ -304,7 +379,7 @@ async def google_auth(request: Request):
     code_challenge = base64.urlsafe_b64encode(
         hashlib.sha256(code_verifier.encode()).digest()
     ).rstrip(b"=").decode()
-    state = issue_oauth_state(code_verifier)
+    state = issue_oauth_state(code_verifier, (nonce or "")[:128] or None)
 
     flow = get_oauth_flow()
     authorization_url, _ = flow.authorization_url(
@@ -325,10 +400,12 @@ async def auth_callback(request: Request, code: str = Query(...), state: str = Q
     try:
         # Validate the signed OAuth state parameter to prevent CSRF attacks
         from urllib.parse import quote as _quote
-        code_verifier = verify_oauth_state(state)
-        if not code_verifier:
+        state_data = decode_oauth_state(state)
+        if not state_data:
             error_url = f"plannr://auth/callback?error={_quote('Invalid or expired sign-in session. Please try signing in again.')}"
             return RedirectResponse(url=error_url)
+        code_verifier = state_data["code_verifier"]
+        client_nonce = state_data["nonce"]
 
         flow = get_oauth_flow()
         flow.fetch_token(code=code, code_verifier=code_verifier)
@@ -353,9 +430,23 @@ async def auth_callback(request: Request, code: str = Query(...), state: str = Q
 
         upsert_google_credentials(email, creds_data)
 
-        # Redirect to iOS app with custom URL scheme
+        # Mint (rotate) the opaque session token the app sends as a bearer token
+        # on every per-user request. A fresh token per sign-in means an old
+        # device is logged out once a new one signs in — acceptable for a
+        # single-session model and matches the existing "sign in again" UX.
+        session_token = rotate_session_token(email)
+        if not session_token:
+            raise RuntimeError("Failed to issue a session token after sign-in.")
+
+        # Redirect to iOS app with custom URL scheme. Echo the client nonce (if
+        # the app sent one) so it can confirm this callback matches the sign-in
+        # it started.
         from urllib.parse import quote
-        app_callback_url = f"plannr://auth/callback?email={quote(email)}&name={quote(name)}&picture={quote(picture)}"
+        nonce_param = f"&nonce={quote(client_nonce)}" if client_nonce else ""
+        app_callback_url = (
+            f"plannr://auth/callback?email={quote(email)}&name={quote(name)}"
+            f"&picture={quote(picture)}&token={quote(session_token)}{nonce_param}"
+        )
         return RedirectResponse(url=app_callback_url)
 
     except Exception as e:
@@ -368,13 +459,11 @@ async def auth_callback(request: Request, code: str = Query(...), state: str = Q
 
 @app.get('/me', tags=['OAuth'])
 @limiter.limit("30/minute")
-async def get_me(request: Request, email: str = Query(...)):
+async def get_me(request: Request, email: str = Query(...),
+                 creds_data: dict = Depends(require_account)):
     """Re-fetch current Google profile info (name, picture) for an already-linked
     account. Lets the app backfill/refresh the profile photo for sessions that
     predate this field, without requiring a full sign-out/sign-in."""
-    creds_data = get_google_credentials(email)
-    if not creds_data:
-        return JSONResponse(status_code=401, content={"error": "User not authenticated."})
     try:
         user_info_service = build('oauth2', 'v2', credentials=_build_credentials(creds_data))
         user_info = user_info_service.userinfo().get().execute()
@@ -393,13 +482,24 @@ async def get_me(request: Request, email: str = Query(...)):
 
 @app.delete('/account', tags=['OAuth'])
 @limiter.limit("5/minute")
-async def delete_account(request: Request, email: str = Query(...)):
+async def delete_account(request: Request, email: str = Query(...),
+                         authorization: Optional[str] = Header(default=None)):
     """Delete a user's account record and stored Google OAuth credentials.
 
-    Returns 200 only when the deletion actually committed (or the user did not
-    exist — `delete_user` is a no-op in that case). A DB failure returns 500 so
-    the client does not wipe local state while server-side data still exists.
+    Requires the account's bearer token — *unless the account is already gone*,
+    in which case it stays idempotent and returns 200 (the client retries this
+    call after a lost response). Returns 200 only when the deletion actually
+    committed. A DB failure returns 500 so the client does not wipe local state
+    while server-side data still exists.
     """
+    if not authenticate(email, _bearer_token(authorization)):
+        if user_exists(email):
+            return JSONResponse(
+                status_code=401,
+                content={"error": "Authentication required. Please sign in again."},
+            )
+        # Nothing to delete and nobody to authenticate — treat as done.
+        return JSONResponse(status_code=200, content={"message": "Account already deleted."})
     try:
         delete_user(email)
     except Exception:
@@ -896,7 +996,8 @@ def _build_google_event_body(event: SyncEventRequest, reminder_minutes: Optional
 
 @app.post('/calendar/sync', tags=['Syllabus to Calendar'])
 @limiter.limit("20/minute")
-async def sync_class_calendar(request: Request, email: str = Query(...), body: CalendarClassSyncRequest = Body(...)):
+async def sync_class_calendar(request: Request, email: str = Query(...), body: CalendarClassSyncRequest = Body(...),
+                              creds_data: dict = Depends(require_account)):
     """
     Idempotent sync of a class's events to a dedicated secondary Google Calendar.
 
@@ -915,9 +1016,6 @@ async def sync_class_calendar(request: Request, email: str = Query(...), body: C
     Returns the google_calendar_id and per-event mappings {local_id, google_event_id}.
     """
     try:
-        creds_data = get_google_credentials(email)
-        if not creds_data:
-            return JSONResponse(status_code=401, content={"error": "User not authenticated."})
 
         service = build('calendar', 'v3', credentials=_build_credentials(creds_data))
 
@@ -1037,13 +1135,10 @@ async def sync_class_calendar(request: Request, email: str = Query(...), body: C
 
 @app.delete('/calendar', tags=['Syllabus to Calendar'])
 @limiter.limit("10/minute")
-async def delete_class_calendar(request: Request, email: str = Query(...), google_calendar_id: str = Query(...)):
+async def delete_class_calendar(request: Request, email: str = Query(...), google_calendar_id: str = Query(...),
+                                creds_data: dict = Depends(require_account)):
     """Delete a secondary Google Calendar by its ID."""
     try:
-        creds_data = get_google_credentials(email)
-        if not creds_data:
-            return JSONResponse(status_code=401, content={"error": "User not authenticated."})
-
         service = build('calendar', 'v3', credentials=_build_credentials(creds_data))
         service.calendars().delete(calendarId=google_calendar_id).execute()
         return JSONResponse(status_code=200, content={"message": "Calendar deleted."})
@@ -1059,16 +1154,13 @@ async def delete_class_calendar(request: Request, email: str = Query(...), googl
 
 @app.post('/calendar/visibility', tags=['Syllabus to Calendar'])
 @limiter.limit("20/minute")
-async def set_calendar_visibility(request: Request, email: str = Query(...), body: CalendarVisibilityRequest = Body(...)):
+async def set_calendar_visibility(request: Request, email: str = Query(...), body: CalendarVisibilityRequest = Body(...),
+                                  creds_data: dict = Depends(require_account)):
     """Show or hide a class's secondary calendar in the user's Google Calendar
     list — the sidebar checkbox. Called when a class is switched active/inactive
     so an inactive class's events stop cluttering the calendar without deleting
     the calendar itself."""
     try:
-        creds_data = get_google_credentials(email)
-        if not creds_data:
-            return JSONResponse(status_code=401, content={"error": "User not authenticated."})
-
         service = build('calendar', 'v3', credentials=_build_credentials(creds_data))
         try:
             service.calendarList().patch(
@@ -1207,7 +1299,8 @@ def _delete_tagged_meeting_events(service, cal_id: str) -> None:
 @app.post('/calendar/meetings', tags=['Syllabus to Calendar'])
 @limiter.limit("20/minute")
 async def sync_class_meetings(request: Request, email: str = Query(...),
-                              body: ClassMeetingsRequest = Body(...)):
+                              body: ClassMeetingsRequest = Body(...),
+                              creds_data: dict = Depends(require_account)):
     """Make a class's recurring weekly meeting events on its secondary Google
     Calendar exactly match `body.patterns`.
 
@@ -1219,10 +1312,6 @@ async def sync_class_meetings(request: Request, email: str = Query(...),
     Returns {google_calendar_id, meetings: [{kind, google_event_id}]}.
     """
     try:
-        creds_data = get_google_credentials(email)
-        if not creds_data:
-            return JSONResponse(status_code=401, content={"error": "User not authenticated."})
-
         # Turning meetings off for a class that has no calendar at all is a no-op
         # — don't create a calendar just to leave it empty.
         if not body.patterns and not body.google_calendar_id:

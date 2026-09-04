@@ -118,7 +118,7 @@ def synced(monkeypatch):
     fake = FakeService(rec)
 
     monkeypatch.setattr("app.build", lambda *a, **k: fake)
-    monkeypatch.setattr("app.get_google_credentials", lambda email: {"refresh_token": "r"})
+    monkeypatch.setattr("app.authenticate", lambda email, token: {"refresh_token": "r"})
     monkeypatch.setattr("app._build_credentials", lambda data: object())
 
     return TestClient(app), rec, fake

@@ -36,6 +36,11 @@ struct SyllabusUploadView: View {
     @State private var showCameraScanner = false
     @State private var showImagePicker = false
     @State private var showTextEntry = false
+    // Camera scan + photo upload produce image-only PDFs that need server-side
+    // OCR, which isn't enabled in production yet — gate them behind a notice
+    // instead of letting the upload fail. Re-enable once OCR ships (see
+    // docs/TODO.md).
+    @State private var showImageUploadComingSoon = false
     
     @State private var pdfURL: URL?
     @State private var pdfFileName: String = "No file attached"
@@ -159,22 +164,23 @@ struct SyllabusUploadView: View {
                 }
                 
                 Button("Scan Document") {
-                    if VNDocumentCameraViewController.isSupported {
-                        showCameraScanner = true
-                    } else {
-                        uploadError = "Camera scanning is not supported on this device."
-                    }
+                    showImageUploadComingSoon = true
                 }
 
                 Button("Upload from Photos") {
-                    showImagePicker = true
+                    showImageUploadComingSoon = true
                 }
-                
+
                 Button("Enter Text Manually") {
                     showTextEntry = true
                 }
-                
+
                 Button("Cancel", role: .cancel) {}
+            }
+            .alert("Camera support coming soon!", isPresented: $showImageUploadComingSoon) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("Scanning and photo uploads aren't available yet. For now, upload a PDF or paste your syllabus text.")
             }
             .sheet(isPresented: $showDocumentPicker) {
                 DocumentPicker { url in

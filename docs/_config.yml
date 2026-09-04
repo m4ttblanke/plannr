@@ -1,0 +1,27 @@
+# GitHub Pages (Jekyll) config for the Plannr marketing site.
+#
+# Pages is served from this folder: Settings -> Pages -> "Deploy from a branch"
+# -> main / /docs. GitHub Pages runs Jekyll by default; the `exclude` list below
+# is the ONLY thing keeping the operational / internal docs that also live in
+# docs/ from being published at https://<site>/<file>.
+#
+# Public (served): index.html, privacy.html, terms.html, style.css, site.js,
+#   favicon*.{ico,png}, apple-touch-icon.png, screenshots/, PlannrDemo.mp4
+#
+# When you add another internal doc under docs/, add it here too.
+#
+# Do NOT add a docs/.nojekyll file — that disables Jekyll and would serve every
+# file in this folder verbatim, defeating the exclusion.
+
+exclude:
+  - COSTS.md
+  - CRASH_REPORTING.md
+  - DEPLOY.md
+  - MANUAL.md
+  - MANUAL_IMAGES/
+  - OPS.md
+  - PRIVACY_POLICY.md
+  - TERMS_OF_SERVICE.md
+  - TEST_PLAN.md
+  - TODO.md
+  - README.md

@@ -21,6 +21,8 @@ services:
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
+      - key: TOKEN_ENC_KEY
+        sync: false
       - key: TESTFLIGHT_LINK
         sync: false
       - key: DATABASE_URL
@@ -30,5 +32,9 @@ services:
 
 databases:
   - name: plannr-db
-    plan: free
+    # Paid plan (~$6/mo, 0.1 CPU / 256 MB / 1 GB storage). NOT `free` — the free
+    # Render Postgres is deleted after ~30 days and has no backups. Verify the
+    # exact slug on the database's Settings page in the Render dashboard if a
+    # blueprint sync rejects it (Render has renamed plans over time).
+    plan: basic-256mb
     region: oregon

@@ -121,6 +121,7 @@ enum ClassMeetingSync {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        attachBackendAuth(&request)
         // The class calendar may not exist yet, and the backend runs several
         // Google Calendar calls — allow for a cold start on Render's free tier.
         request.timeoutInterval = 90

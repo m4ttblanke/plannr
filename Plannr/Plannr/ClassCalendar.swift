@@ -34,6 +34,7 @@ enum ClassCalendar {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        attachBackendAuth(&request)
         request.timeoutInterval = 90
         do {
             request.httpBody = try JSONEncoder().encode(VisibilityBody(googleCalendarId: calendarId, selected: selected))

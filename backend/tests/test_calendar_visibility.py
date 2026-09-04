@@ -47,7 +47,7 @@ def _client(monkeypatch, patch_raises=None):
     rec = []
     fake = FakeService(rec, patch_raises)
     monkeypatch.setattr("app.build", lambda *a, **k: fake)
-    monkeypatch.setattr("app.get_google_credentials", lambda email: {"refresh_token": "r"})
+    monkeypatch.setattr("app.authenticate", lambda email, token: {"refresh_token": "r"})
     monkeypatch.setattr("app._build_credentials", lambda data: object())
     return TestClient(app), rec
 
@@ -86,7 +86,7 @@ def test_missing_calendar_is_skipped_not_an_error(monkeypatch):
 
 def test_unauthenticated_returns_401(monkeypatch):
     client, _ = _client(monkeypatch)
-    monkeypatch.setattr("app.get_google_credentials", lambda email: None)
+    monkeypatch.setattr("app.authenticate", lambda email, token: None)
     resp = _post(client, selected=False)
     assert resp.status_code == 401
 

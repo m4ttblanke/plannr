@@ -12,6 +12,11 @@ class AuthManager: ObservableObject {
     @Published var isAuthenticated: Bool = false
     @Published var isGuest: Bool = false
     @Published var userEmail: String?
+    /// Opaque bearer token issued by the backend at sign-in, sent as
+    /// `Authorization: Bearer` on every per-user request. Mirrored in
+    /// UserDefaults (`sessionTokenDefaultsKey`) so request builders in other
+    /// files can read it without a reference to AuthManager.
+    @Published var sessionToken: String?
     @Published var userName: String?
     @Published var userPhotoURL: String?
     @Published var localPhotoData: Data?
@@ -23,12 +28,18 @@ class AuthManager: ObservableObject {
     /// first time a signed-in session initializes.
     private static let legacyPhotoFilename = "profile_photo.jpg"
 
+    /// UserDefaults key holding the one-time nonce for the in-flight sign-in.
+    /// Generated when the auth URL is built, verified against the callback, then
+    /// discarded — so a `plannr://auth/callback` this app never initiated is
+    /// rejected even if it carries a well-formed email + token.
+    private static let pendingNonceKey = "pendingAuthNonce"
+
     init() {
         // UI tests launch with -uiTestReset to start from a clean, signed-out
         // state regardless of what a previous run (or manual use) left behind.
         if CommandLine.arguments.contains("-uiTestReset") {
             let defaults = UserDefaults.standard
-            for key in ["userEmail", "userName", "userPhotoURL", "savedClasses",
+            for key in ["userEmail", "sessionToken", "pendingAuthNonce", "userName", "userPhotoURL", "savedClasses",
                         "settings.term", "settings.reminderLeadTimeDays",
                         "settings.autoSyncEnabled", "settings.notificationsEnabled",
                         "settings.showClassMeetingsInWeekView",
@@ -52,6 +63,7 @@ class AuthManager: ObservableObject {
         // Check if user is already authenticated (from UserDefaults)
         if let email = UserDefaults.standard.string(forKey: "userEmail") {
             self.userEmail = email
+            self.sessionToken = UserDefaults.standard.string(forKey: sessionTokenDefaultsKey)
             self.userName = UserDefaults.standard.string(forKey: "userName")
             self.userPhotoURL = UserDefaults.standard.string(forKey: "userPhotoURL")
             self.isAuthenticated = true
@@ -78,10 +90,13 @@ class AuthManager: ObservableObject {
         }
 
         Task {
-            // Routed through `send` so a 401 (revoked/expired Google credentials)
-            // triggers the global session-expired sign-out. This runs on every
-            // launch, so it's the main place that condition gets caught.
-            guard let (data, http) = try? await self.send(URLRequest(url: url)),
+            var request = URLRequest(url: url)
+            attachBackendAuth(&request)
+            // Routed through `send` so a 401 (revoked/expired Google credentials,
+            // or a missing/stale session token) triggers the global
+            // session-expired sign-out. This runs on every launch, so it's the
+            // main place that condition gets caught.
+            guard let (data, http) = try? await self.send(request),
                   http.statusCode == 200,
                   let me = try? JSONDecoder().decode(MeResponse.self, from: data) else { return }
 
@@ -199,9 +214,18 @@ class AuthManager: ObservableObject {
         return exponential + Double.random(in: 0...0.4)
     }
 
-    /// Returns the Google OAuth URL from the backend
+    /// Returns the Google OAuth start URL, carrying a fresh one-time `nonce` that
+    /// the backend seals into the signed `state` and echoes back on the
+    /// callback. Also stores that nonce for `handleCallback` to check. Calling
+    /// this begins a new sign-in attempt and invalidates any previous one.
     func getGoogleAuthURL() -> URL? {
-        return URL(string: "\(BACKEND_URL)auth/google")
+        let nonce = (UUID().uuidString + UUID().uuidString)
+            .replacingOccurrences(of: "-", with: "").lowercased()   // 64 hex chars, ~244 bits
+        UserDefaults.standard.set(nonce, forKey: Self.pendingNonceKey)
+
+        var components = URLComponents(string: "\(BACKEND_URL)auth/google")
+        components?.queryItems = [URLQueryItem(name: "nonce", value: nonce)]
+        return components?.url
     }
 
     /// Parse an OAuth callback URL (plannr://auth/callback?...). Handles both the
@@ -218,9 +242,16 @@ class AuthManager: ObservableObject {
             return false
         }
 
+        // Consume the in-flight nonce now, so every exit path below leaves no
+        // stale nonce that a later unsolicited callback could match.
+        let expectedNonce = UserDefaults.standard.string(forKey: Self.pendingNonceKey)
+        UserDefaults.standard.removeObject(forKey: Self.pendingNonceKey)
+
         var email: String?
         var name: String?
         var picture: String?
+        var token: String?
+        var nonce: String?
 
         for item in components.queryItems ?? [] {
             switch item.name {
@@ -232,8 +263,20 @@ class AuthManager: ObservableObject {
             case "email":   email = item.value
             case "name":    name = item.value
             case "picture": picture = item.value
+            case "token":   token = item.value
+            case "nonce":   nonce = item.value
             default:        break
             }
+        }
+
+        // The callback must match the sign-in this app started: a non-empty
+        // nonce we're expecting, echoed back exactly. Rejects a replayed or
+        // injected `plannr://auth/callback` even with a valid-looking payload.
+        guard let expectedNonce = expectedNonce, !expectedNonce.isEmpty,
+              let nonce = nonce, nonce == expectedNonce else {
+            errorMessage = "Sign-in couldn't be verified. Please try again."
+            isLoading = false
+            return false
         }
 
         guard let email = email, !email.isEmpty else {
@@ -242,15 +285,24 @@ class AuthManager: ObservableObject {
             return false
         }
 
+        // The session token authenticates every later per-user request; a
+        // callback without one can't produce a usable session.
+        guard let token = token, !token.isEmpty else {
+            errorMessage = "Sign-in didn't complete. Please try again."
+            isLoading = false
+            return false
+        }
+
         errorMessage = nil
-        completeAuthentication(email: email, name: name, picture: picture)
+        completeAuthentication(email: email, name: name, picture: picture, token: token)
         return true
     }
 
     /// Called when OAuth completes successfully via web
-    func completeAuthentication(email: String, name: String?, picture: String? = nil) {
+    func completeAuthentication(email: String, name: String?, picture: String? = nil, token: String) {
         // Save to UserDefaults
         UserDefaults.standard.set(email, forKey: "userEmail")
+        UserDefaults.standard.set(token, forKey: sessionTokenDefaultsKey)
         if let name = name {
             UserDefaults.standard.set(name, forKey: "userName")
         }
@@ -260,6 +312,7 @@ class AuthManager: ObservableObject {
 
         DispatchQueue.main.async {
             self.userEmail = email
+            self.sessionToken = token
             self.userName = name
             if let picture = picture, !picture.isEmpty {
                 self.userPhotoURL = picture
@@ -289,6 +342,8 @@ class AuthManager: ObservableObject {
     /// Sign out the user
     func signOut() {
         UserDefaults.standard.removeObject(forKey: "userEmail")
+        UserDefaults.standard.removeObject(forKey: sessionTokenDefaultsKey)
+        UserDefaults.standard.removeObject(forKey: Self.pendingNonceKey)
         UserDefaults.standard.removeObject(forKey: "userName")
         UserDefaults.standard.removeObject(forKey: "userPhotoURL")
 
@@ -296,6 +351,7 @@ class AuthManager: ObservableObject {
             self.isAuthenticated = false
             self.isGuest = false
             self.userEmail = nil
+            self.sessionToken = nil
             self.userName = nil
             self.userPhotoURL = nil
             self.localPhotoData = nil
@@ -409,6 +465,7 @@ class AuthManager: ObservableObject {
         for attempt in 1...2 {
             var request = URLRequest(url: deleteURL)
             request.httpMethod = "DELETE"
+            attachBackendAuth(&request)
             request.timeoutInterval = attempt == 1 ? 45 : 30
             do {
                 let (data, response) = try await httpDataProvider(request)
@@ -437,6 +494,7 @@ class AuthManager: ObservableObject {
     /// confirm the deletion, so keep local data.
     private func probeAccountDeleted(meURL: URL, fallbackFailure: String) async -> DeletionOutcome {
         var request = URLRequest(url: meURL)
+        attachBackendAuth(&request)
         request.timeoutInterval = 20
         do {
             let (_, response) = try await httpDataProvider(request)

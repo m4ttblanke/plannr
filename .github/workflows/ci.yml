@@ -1,0 +1,109 @@
+name: CI
+
+# Runs the backend pytest suite and the iOS test targets on every push to main
+# and every pull request. No repository secrets required — the backend job uses
+# throwaway values for the settings that have no default, and a disposable
+# Postgres service container.
+#
+# Cost note: the iOS job uses a macOS runner (billed at a higher rate). If that
+# becomes a concern, add `paths-ignore: ['docs/**', '**/*.md']` to the triggers
+# below, or split the iOS job onto a manual/`workflow_dispatch`-only trigger.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend · pytest
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      # config.Settings has no defaults for these; any non-empty value works for tests.
+      GOOGLE_CLIENT_ID: ci-test-client-id
+      GOOGLE_CLIENT_SECRET: ci-test-client-secret
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/plannr
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: plannr
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate a throwaway token-encryption key
+        run: |
+          echo "TOKEN_ENC_KEY=$(python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')" >> "$GITHUB_ENV"
+
+      - name: Run migrations
+        run: alembic upgrade head
+
+      - name: Run tests
+        run: pytest -q
+
+  ios:
+    name: iOS · xcodebuild test
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: xcodebuild -version
+
+      - name: Cache resolved Swift packages
+        uses: actions/cache@v4
+        with:
+          path: .spm
+          key: spm-${{ runner.os }}-${{ hashFiles('Plannr/Plannr.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      - name: Run tests
+        run: |
+          xcodebuild test \
+            -project Plannr/Plannr.xcodeproj \
+            -scheme Plannr \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -clonedSourcePackagesDirPath .spm \
+            -resultBundlePath TestResults.xcresult \
+            -retry-tests-on-failure \
+            -quiet \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Upload xcresult on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcresult
+          path: TestResults.xcresult
+          retention-days: 7

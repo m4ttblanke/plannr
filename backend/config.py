@@ -11,6 +11,12 @@ class Settings(BaseSettings):
     stripe_secret_key: Optional[str] = None
     stripe_webhook_secret: Optional[str] = None
     testflight_link: Optional[str] = None
+    # Fernet key(s) for encrypting stored Google OAuth tokens at rest. One or
+    # more urlsafe-base64 32-byte keys, newest first, comma-separated (extra keys
+    # are for rotation — reads try them all). Unset = tokens stored in plaintext
+    # (dev only). Generate: python -c "from cryptography.fernet import Fernet;
+    # print(Fernet.generate_key().decode())"
+    token_enc_key: Optional[str] = None
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 

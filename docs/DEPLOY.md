@@ -62,14 +62,52 @@ readiness. `render.yaml` sets it as `healthCheckPath`. |
 cold start can take ~30 s — the keep-warm workflow below mitigates this) |
 
 **Data stored server-side:** only a user record (`email`, timestamps) and their
-Google OAuth credentials (access token, refresh token, scopes). Classes, events,
-and settings live entirely on-device in the iOS app — the backend is stateless
-with respect to a user's syllabus data.
+Google OAuth credentials (access token, refresh token, scopes, plus a hash of the
+session token below). Classes, events, and settings live entirely on-device in
+the iOS app — the backend is stateless with respect to a user's syllabus data.
+
+**Secrets at rest.** The Google `access_token` / `refresh_token` columns are
+encrypted by the backend (Fernet — AES-128-CBC + HMAC) before they are written,
+keyed by **`TOKEN_ENC_KEY`** (see the env table). Ciphertext carries an
+`enc:v1:` prefix; a value without it is treated as legacy plaintext and rewritten
+encrypted on the user's next sign-in, so no data migration is needed. If
+`TOKEN_ENC_KEY` is unset the columns are stored in plaintext and the process logs
+a warning at startup — **acceptable for local dev only.** The **session token**
+is never stored reversibly: only its SHA-256 hash is kept, and
+`authenticate()` compares hashes.
+
+**Request authentication.** Every per-user endpoint (`/me`, `/calendar/sync`,
+`/calendar/meetings`, `/calendar/visibility`, `DELETE /calendar`,
+`DELETE /account`) requires an opaque **session token** as
+`Authorization: Bearer <token>`. The token is minted (rotated) on each successful
+`/auth/callback` and returned to the app on the `plannr://auth/callback?…&token=`
+redirect; only its hash is stored in `google_credentials.session_token`. The
+`email` query parameter only *identifies* the account — it is not a credential. A
+missing or wrong token returns 401, which the app treats as "session expired" and
+signs out. Because the token rotates per sign-in, signing in on a second device
+invalidates the first device's session.
+
+> **One-time migration:** existing users have no session token until they sign in
+> again. The first per-user request from an already-installed app will 401 and
+> the app will drop to the sign-in screen once; after re-authenticating it has a
+> token and works normally. No server action needed — the Alembic migration
+> `92c09a31fa6e` adds the nullable column; the OAuth-token columns migrate
+> themselves on that same re-sign-in.
 
 **OAuth state** is a signed, self-contained token (HMAC over the PKCE
-`code_verifier` + timestamp, keyed from the Google client secret). There is no
-server-side session store, so a redeploy or restart mid-login does not break the
-flow, and the design is safe to run behind multiple instances.
+`code_verifier` + timestamp + an optional client nonce, keyed from the Google
+client secret). There is no server-side session store for the *login flow*, so a
+redeploy or restart mid-login does not break it, and the design is safe to run
+behind multiple instances.
+
+**Callback binding.** The app generates a one-time `nonce` before it opens
+`/auth/google?nonce=…`, the backend seals it into the signed `state`, and
+`/auth/callback` echoes it on the `plannr://auth/callback?…&nonce=…` redirect.
+`AuthManager.handleCallback` accepts the callback only if that nonce matches the
+one it just stored — so a `plannr://auth/callback` the app never initiated is
+rejected even with a well-formed `email` + `token`. The nonce is optional in the
+state (an app build that doesn't send one still works), but a build that sends
+one always requires the echo back.
 
 ### Deployment Pipeline
 
@@ -89,17 +127,45 @@ startCommand:  alembic upgrade head && uvicorn app:app --host 0.0.0.0 --port $PO
 `--proxy-headers --forwarded-allow-ips='*'` is required so per-IP rate limiting
 sees the real client IP (from `X-Forwarded-For`) rather than Render's proxy.
 
-Render's native GitHub integration is the entire **CD** pipeline — there are no
-CI/CD repository secrets to configure; all runtime configuration is Render
-environment variables (see below).
+Render's native GitHub integration is the entire **CD** pipeline — no repository
+secrets to configure; all runtime configuration is Render environment variables
+(see below).
 
-The one GitHub Actions workflow, [`keep-warm.yml`](../.github/workflows/keep-warm.yml),
-is **not** part of deployment — it just `curl`s `/health` every ~10 minutes so
-the free dyno doesn't cold-start (which also steadies the OAuth round-trip). It
-fails on a non-200 and warns when the DB is unavailable, so it doubles as a crude
+**CI** is separate: [`ci.yml`](../.github/workflows/ci.yml) runs on every push to
+`main` and every PR — a `backend` job (`pip install` + `alembic upgrade head` +
+`pytest`, against a disposable Postgres service) and an `ios` job
+(`xcodebuild test` for `PlannrTests` / `PlannrUITests` on an iOS Simulator). It
+needs no secrets. Render deploys are **not** gated on it today; add it as a
+required status check in branch protection to gate merges.
+
+The other workflow, [`keep-warm.yml`](../.github/workflows/keep-warm.yml), is
+**not** part of deployment — it just `curl`s `/health` every ~10 minutes so the
+free dyno doesn't cold-start (which also steadies the OAuth round-trip). It fails
+on a non-200 and warns when the DB is unavailable, so it doubles as a crude
 uptime check. Override the target with a repo variable `HEALTH_URL`. For real
 alerting, point an uptime service (UptimeRobot / Better Stack) at the same URL —
 see [`OPS.md`](OPS.md).
+
+### Marketing site (GitHub Pages)
+
+The public site is served by **GitHub Pages** from `main` → **`/docs`** (Settings
+→ Pages). Only these files are meant to be public:
+
+```
+docs/index.html  privacy.html  terms.html  style.css  site.js
+docs/favicon*.{ico,png}  apple-touch-icon.png  screenshots/  PlannrDemo.mp4
+```
+
+The operational docs that also live in `docs/` (`DEPLOY.md`, `COSTS.md`,
+`OPS.md`, `TEST_PLAN.md`, `MANUAL.md`, `TODO.md`, `CRASH_REPORTING.md`, and the
+`*_POLICY.md` / `*_OF_SERVICE.md` sources) are kept **out of the built site** by
+[`docs/_config.yml`](_config.yml)'s `exclude:` list — so `https://<site>/DEPLOY.md`
+404s while the files stay where the repo (and README links) expect them. When
+adding a new internal doc under `docs/`, add it to that `exclude:` list.
+
+> This relies on Jekyll processing (the Pages default). Do **not** add a
+> `docs/.nojekyll` file — that would disable `exclude:` and serve every file
+> raw.
 
 ---
 
@@ -162,6 +228,7 @@ All backend configuration is read from environment variables (locally via
 | `GOOGLE_REDIRECT_URI` | Yes | Must exactly match a redirect URI registered on the OAuth client. Production: `https://plannr-api.onrender.com/auth/callback`. Local: `http://localhost:8000/auth/callback`. |
 | `GEMINI_API_KEY` | Yes* | Gemini API key. If unset, `/syllabus` returns a "not configured" error. |
 | `DATABASE_URL` | Yes | PostgreSQL connection string. On Render this is wired automatically from the `plannr-db` database. |
+| `TOKEN_ENC_KEY` | Prod | Fernet key(s) encrypting stored Google OAuth tokens at rest. Unset = tokens stored **in plaintext** (dev only). Generate: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. Rotate by prepending a new key, comma-separated (`NEW,OLD`), until every row has re-written on next sign-in, then drop `OLD`. |
 | `STRIPE_SECRET_KEY` | No | Restricted key (`rk_...`) with "Checkout Sessions: Read". Needed only for the TestFlight payment flow. |
 | `STRIPE_WEBHOOK_SECRET` | No | Signing secret (`whsec_...`) for `POST /stripe/webhook`. |
 | `TESTFLIGHT_LINK` | No | Public TestFlight join link, revealed to customers after a confirmed payment. |

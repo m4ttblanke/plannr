@@ -45,8 +45,8 @@ Your data is handled in accordance with [Google's Privacy Policy](https://polici
 We take the following measures to protect your data, including sensitive data such as your Google OAuth credentials:
 
 - **Encryption in Transit:** All communication between the Plannr app, our backend server, and Google's APIs (OAuth, Calendar, Gemini) is encrypted using HTTPS/TLS.
-- **Encryption at Rest:** Our database is hosted on Render, which encrypts data at rest at the infrastructure level.
-- **Access Controls:** Our database is not publicly accessible and can only be reached by our backend service. OAuth access and refresh tokens are used exclusively server-side to make authorized calls to the Google Calendar API on your behalf and are never exposed in the app itself or in application logs.
+- **Encryption at Rest:** Your Google OAuth access and refresh tokens are encrypted by the Plannr backend (authenticated symmetric encryption) before they are written to the database. The database itself is hosted on Render, which additionally encrypts data at rest at the infrastructure level.
+- **Access Controls:** Our database is not publicly accessible and can only be reached by our backend service. OAuth access and refresh tokens are used exclusively server-side to make authorized calls to the Google Calendar API on your behalf and are never exposed in the app itself or in application logs. Per-user API requests are authenticated with a bearer token that is stored only as a one-way hash.
 - **Data Minimization:** We collect and retain only the data necessary to provide the syllabus-to-calendar service, as described in Section 2. The app itself does not use analytics or third-party tracking tools (see Section 5 regarding our marketing website).
 
 ## 7. Data Retention

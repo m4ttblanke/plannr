@@ -18,7 +18,7 @@ the one you set.
 | --- | --- | --- |
 | Apple Developer Program | **$99 / year** | Required to ship to TestFlight or the App Store. Flat fee. |
 | Render — web service | **$0 (free) → ~$7 / mo** ($84/yr) | Currently `plan: free` in `render.yaml`. Free tier spins down after ~15 min idle (cold-start delay on the next request). Starter is ~$7/mo. |
-| Render — PostgreSQL | **$0 (free) → $6 / mo** ($72/yr) | Currently `plan: free`. Render's free Postgres is time-limited and can be deleted — **not safe for a real launch**. The paid plan is **$6/mo**. |
+| Render — PostgreSQL | **$6 / mo** ($72/yr) | **Now on the paid `basic-256mb` plan** (0.1 CPU / 256 MB / 1 GB storage) in `render.yaml` — durable, not time-limited, with automatic daily backups. The free tier (deleted after ~30 days, no backups) is no longer in use. |
 | Landing page hosting | **$0** | Served from `docs/` via GitHub Pages (supports HTTPS + a custom domain). |
 | Domain — `tryplannr.app` (planned) | **$16 year 1, then $30 / yr** | Via Squarespace. Not yet purchased. `.app` requires HTTPS, which GitHub Pages provides. Squarespace pricing is on the high side — plan to transfer to a cheaper registrar (~$12–15/yr for `.app`) later. |
 | Cloudflare Web Analytics | **$0** | Free tier. |
@@ -27,7 +27,7 @@ the one you set.
 
 | Scenario | Annual fixed cost | When it applies |
 | --- | --- | --- |
-| **Minimum** (all free Render tiers, no domain) | **~$99 / yr** (~$8.25/mo) | Beta only. Accepts cold starts and the risk of losing the free database. |
+| **Minimum** (free web tier, no domain) | **~$99 + $72 / yr** (~$14.25/mo) | Current setup: free web service (cold starts), paid `$6/mo` database (durable). |
 | **DB-only paid** (free web + $6/mo DB + domain) | **~$201 / yr** (~$16.75/mo) | Durable data, but the API still cold-starts. Year 1 ~$187 with the $16 intro domain price. |
 | **Fully paid** (Starter web + $6/mo DB + domain) | **~$285 / yr** (~$23.75/mo) | No cold starts. Year 1 ~$271. This is the target for paying customers. |
 
@@ -100,10 +100,10 @@ Year 1 is ~$14 cheaper thanks to the intro domain price.
 
 1. **Price (set in Stripe).** Doubling the price nearly halves the break-even
    count. This is the single biggest lever.
-2. **Free vs. paid Render.** Staying on free tiers drops fixed cost to ~$99/yr,
-   but the free database can be deleted and cold starts hurt conversion. The
-   cheapest safe step up is the **$6/mo paid Postgres** while leaving the web
-   service free (~$201/yr) — durable data, but the API still cold-starts.
+2. **Render web tier.** The database is already on the **$6/mo paid Postgres**
+   (durable, backed up). The remaining lever is the web service: still free, so
+   the API cold-starts after ~15 min idle (the keep-warm workflow only softens
+   this). Moving it to a paid instance (~$7/mo) removes cold starts entirely.
 3. **Domain registrar.** `tryplannr.app` through Squarespace is $16 the first
    year then **$30/yr** — roughly double a budget registrar. Transferring to
    Cloudflare/Porkbun/Namecheap after the first year saves ~$15/yr.
