@@ -212,6 +212,24 @@ nav .nav-links {
   line-height: 1.75;
 }
 
+.hero-perk {
+  margin-top: 22px;
+  font-size: 0.9rem;
+  color: var(--muted);
+  max-width: 420px;
+  line-height: 1.6;
+}
+
+.hero-perk strong { color: var(--text); font-weight: 700; }
+
+.hero-perk a {
+  color: var(--accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.hero-perk a:hover { text-decoration: underline; }
+
 .hero-device-wrap {
   margin-top: 64px;
   display: flex;

@@ -1,9 +1,10 @@
 import secrets
 from contextlib import contextmanager
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from db import SessionLocal, engine
-from models import User, GoogleCredentials
+from models import User, GoogleCredentials, BetaPurchaser
 from crypto import (
     encrypt_token,
     decrypt_token,
@@ -95,6 +96,61 @@ def delete_user(email: str) -> None:
         user = db.query(User).filter(User.email == email).first()
         if user:
             db.delete(user)
+
+
+def record_beta_purchase(
+    stripe_session_id: str,
+    email: str | None,
+    amount_total: int | None = None,
+    currency: str | None = None,
+) -> bool:
+    """Persist a paid TestFlight beta purchase as a local backstop to Stripe's
+    own records.
+
+    Idempotent on ``stripe_session_id``: a duplicate webhook delivery (or the
+    checkout.session.completed / async_payment_succeeded double-fire) is a no-op.
+    Returns True if a new row was inserted, False if this session was already
+    recorded.
+    """
+    try:
+        with _session() as db:
+            already = db.query(BetaPurchaser.id).filter(
+                BetaPurchaser.stripe_session_id == stripe_session_id
+            ).first()
+            if already:
+                return False
+            db.add(BetaPurchaser(
+                stripe_session_id=stripe_session_id,
+                email=email,
+                amount_total=amount_total,
+                currency=currency,
+            ))
+        return True
+    except IntegrityError:
+        # Concurrent delivery inserted the same session between our check and
+        # commit — the unique constraint did its job.
+        return False
+
+
+def list_beta_purchasers() -> list[dict]:
+    """All recorded beta purchases, oldest first. For launch-time fulfillment of
+    the "3 months free" offer."""
+    with _session() as db:
+        rows = (
+            db.query(BetaPurchaser)
+            .order_by(BetaPurchaser.created_at.asc())
+            .all()
+        )
+        return [
+            {
+                "stripe_session_id": r.stripe_session_id,
+                "email": r.email,
+                "amount_total": r.amount_total,
+                "currency": r.currency,
+                "created_at": r.created_at,
+            }
+            for r in rows
+        ]
 
 
 def upsert_google_credentials(email: str, creds: dict) -> None:
