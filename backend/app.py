@@ -42,6 +42,7 @@ from repositories.user_repository import (
     authenticate,
     rotate_session_token,
     user_exists,
+    record_beta_purchase,
 )
 
 
@@ -1475,6 +1476,10 @@ _TESTFLIGHT_PAGE = """<!DOCTYPE html>
   }}
   ol.steps li {{ margin-bottom: 8px; }}
   ol.steps a {{ color: #4f8cff; }}
+  p.perk {{
+    color: #9aa5b1; font-size: 0.85rem; line-height: 1.6; margin: 24px 0 0;
+  }}
+  p.perk strong {{ color: #f5f7fa; }}
 </style>
 </head>
 <body>
@@ -1540,11 +1545,18 @@ async def testflight_success(request: Request, session_id: str = Query(...)):
         '<li>Tap <strong>Join TestFlight</strong> below, then <strong>Accept</strong> and <strong>Install</strong> in TestFlight.</li>'
         '</ol>'
     )
+    launch_perk = (
+        '<p class="perk">As a thank-you, beta testers get their first '
+        '<strong>3 months free</strong> if Plannr launches as a paid app. '
+        'Plannr is an early beta, so a public launch isn\'t guaranteed — if the app '
+        'never ships publicly, or ships without a paid plan, there\'s nothing to apply '
+        'the free months to.</p>'
+    )
     return HTMLResponse(
         _TESTFLIGHT_PAGE.format(
             title="You're in", heading="You're in!",
             message="Thanks for your purchase. Follow the steps below to install Plannr through TestFlight.",
-            action=f'<a class="btn" href="{settings.testflight_link}">Join TestFlight</a>{install_steps}',
+            action=f'<a class="btn" href="{settings.testflight_link}">Join TestFlight</a>{install_steps}{launch_perk}',
             analytics=_CLOUDFLARE_BEACON
         )
     )
@@ -1580,6 +1592,21 @@ async def stripe_webhook(request: Request):
             email = (session.get('customer_details') or {}).get('email')
             logger.info("TestFlight payment confirmed (session=%s, email=%s)",
                         session.get('id'), _mask_email(email))
+            # Local backstop to Stripe's own records so the launch-time "3 months
+            # free" offer can be fulfilled even if Stripe data is unavailable.
+            # Best-effort: never fail the webhook over this, or Stripe retries a
+            # broken write for days.
+            try:
+                if record_beta_purchase(
+                    stripe_session_id=session.get('id'),
+                    email=email,
+                    amount_total=session.get('amount_total'),
+                    currency=session.get('currency'),
+                ):
+                    logger.info("Recorded beta purchaser (session=%s)", session.get('id'))
+            except Exception:
+                logger.exception("Failed to record beta purchaser backstop (session=%s)",
+                                 session.get('id'))
             # Extension point: email the TestFlight link here as a durability backstop
             # for customers who never land on /testflight/success.
     elif event_type == 'checkout.session.async_payment_failed':

@@ -1,6 +1,6 @@
 # Terms of Service for Plannr
 
-*Last updated: January 28, 2025*
+*Last updated: September 9, 2026*
 
 ## 1. Acceptance of Terms
 
@@ -52,7 +52,20 @@ Plannr is provided on an "as-is" and "as-available" basis without warranties of 
 
 You acknowledge that Plannr is a student-developed project and may contain bugs or limitations.
 
-## 6. Limitation of Liability
+## 6. Beta Access and Launch Offer
+
+Plannr is currently distributed as a paid TestFlight beta. Your one-time payment buys access to the beta build as it exists at the time of purchase. TestFlight betas are time-limited by Apple, and we may change, pause, or end the beta at any time.
+
+As a thank-you to beta testers, if Plannr is later released to the public as a paid app, everyone who paid for beta access will receive their first 3 months of paid service at no charge. This offer is subject to the following:
+
+- A public launch is not guaranteed. Plannr may never leave beta, may be discontinued, or may launch only as a free product, in which case there is no paid service to which the 3 free months could apply.
+- The offer applies only to the account associated with your beta payment and cannot be transferred, exchanged, or redeemed for cash.
+- If a public launch happens, we will contact beta testers at the email associated with their account with instructions for claiming the free months. You must claim the offer within the window we specify.
+- We may modify the mechanics of the offer (for example, how the credit is applied) as long as the total value of at least 3 months of free paid service is preserved.
+
+Except as required by law, beta payments are non-refundable.
+
+## 7. Limitation of Liability
 
 To the fullest extent permitted by law, Plannr and its developers shall not be held liable for any damages arising from your use of the App, including but not limited to:
 
@@ -63,7 +76,7 @@ To the fullest extent permitted by law, Plannr and its developers shall not be h
 
 You are responsible for verifying that all synced events are accurate before relying on them.
 
-## 7. Termination
+## 8. Termination
 
 We reserve the right to, at our sole discretion:
 
@@ -73,10 +86,10 @@ We reserve the right to, at our sole discretion:
 
 You may stop using the App at any time. You can revoke Plannr's access to your Google account through your [Google Account Permissions](https://myaccount.google.com/permissions) page.
 
-## 8. Changes to These Terms
+## 9. Changes to These Terms
 
 We may update these Terms of Service from time to time. Any changes will be reflected by the "Last updated" date at the top of this page. Your continued use of the App after changes are posted constitutes your acceptance of the revised terms.
 
-## 9. Contact Us
+## 10. Contact Us
 
 If you have questions about these Terms of Service, contact us at **mattheweblanke@gmail.com**.

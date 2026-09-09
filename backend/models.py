@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Text, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import String, Text, Integer, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID, ARRAY
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
@@ -52,3 +52,30 @@ class GoogleCredentials(Base):
     user: Mapped["User"] = relationship("User", back_populates="credentials")
 
     __table_args__ = (UniqueConstraint("user_id", name="uq_google_credentials_user"),)
+
+
+class BetaPurchaser(Base):
+    """Local record of a paid TestFlight beta purchase.
+
+    Stripe is the source of truth for who paid; this table is a backstop so the
+    launch-time "3 months free" offer can still be fulfilled if Stripe data is
+    ever unavailable. Written best-effort from the Stripe webhook — a failure to
+    insert here never fails the webhook.
+
+    Not linked to `users`: the beta is paid for before anyone signs into Plannr,
+    and the checkout email may differ from the eventual account email. `email` is
+    the address the launch redemption code should be sent to.
+    """
+
+    __tablename__ = "beta_purchasers"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # Stripe Checkout Session id. Unique so webhook re-delivery and the
+    # checkout.session.completed / async_payment_succeeded double-fire are idempotent.
+    stripe_session_id: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    email: Mapped[str | None] = mapped_column(Text, nullable=True)
+    amount_total: Mapped[int | None] = mapped_column(Integer, nullable=True)  # smallest currency unit (e.g. cents)
+    currency: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
