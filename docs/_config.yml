@@ -6,12 +6,20 @@
 # docs/ from being published at https://<site>/<file>.
 #
 # Public (served): index.html, privacy.html, terms.html, style.css, site.js,
-#   favicon*.{ico,png}, apple-touch-icon.png, screenshots/, PlannrDemo.mp4
+#   favicon*.{ico,png}, apple-touch-icon.png, screenshots/, PlannrDemo.mp4, CNAME
 #
 # When you add another internal doc under docs/, add it here too.
 #
 # Do NOT add a docs/.nojekyll file — that disables Jekyll and would serve every
 # file in this folder verbatim, defeating the exclusion.
+#
+# Custom domain: docs/CNAME holds `tryplannr.app`. Also set the same value in
+# Settings -> Pages -> Custom domain and turn on "Enforce HTTPS" once the
+# certificate provisions. DNS: apex A/AAAA records to GitHub Pages (or
+# ALIAS/ANAME to m4ttblanke.github.io), plus a `www` CNAME to
+# m4ttblanke.github.io.
+
+url: https://tryplannr.app
 
 exclude:
   - COSTS.md
