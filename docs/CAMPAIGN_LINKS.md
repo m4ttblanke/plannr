@@ -20,10 +20,30 @@ Rules of thumb:
 
 ---
 
+## Clean public links (preferred for sharing)
+
+Two short URLs that look tidy in a post or a bio and expand to the full UTM
+landing URL. They redirect **to the landing page** (not to TestFlight); the
+`Join the Free Beta` CTA then carries the UTMs onward exactly as it does for a
+hand-built link. Attribution values are **fixed** — anything you append to
+`/linkedin` or `/instagram` is ignored.
+
+| Share this | It redirects to |
+| --- | --- |
+| **`https://tryplannr.app/linkedin`** — LinkedIn personal launch post | `https://tryplannr.app/?utm_source=linkedin&utm_medium=post&utm_campaign=beta_launch` |
+| **`https://tryplannr.app/instagram`** — Instagram bio | `https://tryplannr.app/?utm_source=instagram&utm_medium=bio_link&utm_campaign=beta_launch` |
+
+Implemented as static pages: `docs/linkedin/index.html`, `docs/instagram/index.html`
+(`location.replace()` + `<meta http-equiv="refresh">` fallback + a visible link).
+For any other placement, build a full UTM URL from the cookbook below.
+
+---
+
 ## Launch campaign — `utm_campaign=beta_launch`
 
 ### Instagram — bio link
 Profile "link in bio" (or the destination of the beta button in a link-in-bio tool).
+Prefer the clean alias **`https://tryplannr.app/instagram`**, which redirects to:
 
 ```
 https://tryplannr.app/?utm_source=instagram&utm_medium=bio_link&utm_campaign=beta_launch
@@ -41,6 +61,14 @@ Set as the ad's destination / website URL. Give each ad set or creative its own 
 
 ```
 https://tryplannr.app/?utm_source=instagram&utm_medium=ad&utm_campaign=beta_launch&utm_content=ad_set_a
+```
+
+### LinkedIn — post
+A personal or company post / comment. Prefer the clean alias
+**`https://tryplannr.app/linkedin`**, which redirects to:
+
+```
+https://tryplannr.app/?utm_source=linkedin&utm_medium=post&utm_campaign=beta_launch
 ```
 
 ### Discord / community

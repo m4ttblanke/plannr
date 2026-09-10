@@ -11,6 +11,7 @@ no fingerprinting, no extra analytics dependency.
 
 ```
 campaign link                     ← you build these, with utm_* tags
+ [ /linkedin or /instagram ]      ← optional clean alias → 302s to the tagged landing URL
   → https://tryplannr.app/?utm_*  ← landing page  (Cloudflare counts the visit)
   → "Join the Free Beta"          ← 3 CTAs: nav, hero, final
   → /go/beta.html?utm_*           ← redirect page (Cloudflare counts the CTA click)
@@ -19,7 +20,37 @@ campaign link                     ← you build these, with utm_* tags
 ```
 
 The beta is **free**. Nothing on this path touches Stripe or the backend — the
-redirect page is a static file on GitHub Pages.
+redirect pages are static files on GitHub Pages.
+
+### Clean-alias entry redirects
+
+`/linkedin` and `/instagram` are static pages (`docs/linkedin/index.html`,
+`docs/instagram/index.html`) that immediately `location.replace()` to the
+landing page with **fixed** UTM tags (with a `<meta http-equiv="refresh">`
+fallback and a visible link). They land the visitor on `/?utm_*` — **not** on
+`/go/beta.html` or TestFlight — so `site.js` picks the tags up exactly as it
+would for a hand-built link.
+
+| Clean URL | Redirects to |
+| --- | --- |
+| `https://tryplannr.app/linkedin` | `https://tryplannr.app/?utm_source=linkedin&utm_medium=post&utm_campaign=beta_launch` |
+| `https://tryplannr.app/instagram` | `https://tryplannr.app/?utm_source=instagram&utm_medium=bio_link&utm_campaign=beta_launch` |
+
+The measurement chain is therefore:
+
+```
+/linkedin  → /?utm_source=linkedin&utm_medium=post&utm_campaign=beta_launch
+           → /go/beta.html?utm_source=linkedin&utm_medium=post&utm_campaign=beta_launch → TestFlight
+
+/instagram → /?utm_source=instagram&utm_medium=bio_link&utm_campaign=beta_launch
+           → /go/beta.html?utm_source=instagram&utm_medium=bio_link&utm_campaign=beta_launch → TestFlight
+```
+
+Cloudflare *may* log `/linkedin` or `/instagram` as an extra pageview if its
+beacon fires before the redirect, but the hand-off is immediate and no delay is
+added to force it — the **landing-page `/?utm_*` visit is the attribution
+signal**. As with any campaign link, a TestFlight install still cannot be tied
+back to a specific UTM (see *What we CANNOT directly connect*).
 
 ---
 
@@ -97,15 +128,23 @@ one `utm_campaign` for different things.
 
 ## Building campaign links
 
-All of these use the same `utm_campaign=beta_launch`.
+All of these use the same `utm_campaign=beta_launch`. For LinkedIn posts and the
+Instagram bio, prefer the clean aliases (`/linkedin`, `/instagram`) from
+*Clean-alias entry redirects* above — they expand to the exact URLs below.
 
-### Instagram — bio link
+### Instagram — bio link  (alias: `https://tryplannr.app/instagram`)
 The single link in your profile. Medium = `bio_link`.
 ```
 https://tryplannr.app/?utm_source=instagram&utm_medium=bio_link&utm_campaign=beta_launch
 ```
-If you use a link-in-bio tool, put this as the destination URL of the "Join the
-beta" button there.
+If you use a link-in-bio tool, put the alias (or this URL) as the destination of
+the "Join the beta" button there.
+
+### LinkedIn — post  (alias: `https://tryplannr.app/linkedin`)
+A personal or company post / comment. Medium = `post`.
+```
+https://tryplannr.app/?utm_source=linkedin&utm_medium=post&utm_campaign=beta_launch
+```
 
 ### Instagram — story link sticker
 Add a link sticker to the story; paste this as the URL. Medium = `story`. Add
