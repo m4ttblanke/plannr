@@ -92,4 +92,4 @@ We may update these Terms of Service from time to time. Any changes will be refl
 
 ## 10. Contact Us
 
-If you have questions about these Terms of Service, contact us at **mattheweblanke@gmail.com**.
+If you have questions about these Terms of Service, contact us at **plannr.review@gmail.com**.

@@ -1,205 +1,318 @@
+/* Plannr marketing site — progressive enhancement only.
+   The page is fully readable and coherent with this file absent or failed:
+   the Conversion section is a static numbered walk-through, the FAQ answers
+   are all visible, nothing is hidden behind JS. */
 (function () {
-  // ── Floating nav: morphs into a glassy pill after scrolling past the hero ──
-  const nav = document.getElementById('site-nav');
+  "use strict";
+
+  /* Mark the document as enhanced so CSS can arm the scroll-reveal.
+     If this file never loads/runs, .reveal elements stay visible. */
+  document.documentElement.classList.add("js-ready");
+
+  var reduce = window.matchMedia
+    ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    : false;
+
+  /* ---------------------------------------------------- floating nav ---- */
+  var nav = document.getElementById("site-nav");
   if (nav) {
-    const THRESHOLD = 40;
-    let ticking = false;
-
-    function updateNav() {
-      nav.classList.toggle('is-floating', window.scrollY > THRESHOLD);
-      ticking = false;
-    }
-
-    window.addEventListener('scroll', () => {
-      if (!ticking) {
-        requestAnimationFrame(updateNav);
-        ticking = true;
-      }
-    }, { passive: true });
-
-    updateNav();
+    var stick = function () {
+      nav.classList.toggle("is-stuck", window.scrollY > 24);
+    };
+    window.addEventListener("scroll", stick, { passive: true });
+    stick();
   }
 
-  // ── Scroll reveal: fade + rise elements into view once ──────────────────
-  const revealEls = document.querySelectorAll('.reveal');
-  if (revealEls.length && 'IntersectionObserver' in window) {
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('is-visible');
-          observer.unobserve(entry.target);
+  /* -------------------------------------------------- reveal on scroll -- */
+  var revealables = document.querySelectorAll(".reveal");
+  if (reduce || !("IntersectionObserver" in window)) {
+    for (var r = 0; r < revealables.length; r++) revealables[r].classList.add("in");
+  } else {
+    var revObs = new IntersectionObserver(
+      function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) {
+            e.target.classList.add("in");
+            revObs.unobserve(e.target);
+          }
+        });
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -8% 0px" }
+    );
+    revealables.forEach(function (el) { revObs.observe(el); });
+  }
+
+  /* ---------------------------------------------------------- FAQ ------- */
+  /* Default markup shows every answer. JS turns it into an accordion and
+     marks collapsed panels [hidden] so their links aren't focusable. */
+  var faqList = document.querySelector(".faq__list");
+  if (faqList) {
+    faqList.classList.add("faq__list--js");
+    faqList.querySelectorAll(".faq__item").forEach(function (item) {
+      var btn = item.querySelector(".faq__q");
+      var panel = item.querySelector(".faq__panel");
+      if (!btn || !panel) return;
+
+      btn.setAttribute("type", "button");
+      btn.setAttribute("aria-expanded", "false");
+      panel.hidden = true;
+
+      btn.addEventListener("click", function () {
+        var open = !item.classList.contains("is-open");
+        btn.setAttribute("aria-expanded", open ? "true" : "false");
+
+        if (open) {
+          panel.hidden = false;
+          if (reduce) {
+            item.classList.add("is-open");
+          } else {
+            requestAnimationFrame(function () { item.classList.add("is-open"); });
+          }
+        } else {
+          item.classList.remove("is-open");
+          if (reduce) {
+            panel.hidden = true;
+          } else {
+            var hide = function () {
+              if (!item.classList.contains("is-open")) panel.hidden = true;
+              panel.removeEventListener("transitionend", hide);
+            };
+            panel.addEventListener("transitionend", hide);
+          }
         }
       });
-    }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
-
-    revealEls.forEach((el) => observer.observe(el));
-  } else {
-    revealEls.forEach((el) => el.classList.add('is-visible'));
-  }
-
-  // ── Accordion / disclosure groups (features + FAQ) ──────────────────────
-  document.querySelectorAll('.disclosure-trigger').forEach((trigger) => {
-    const panel = trigger.nextElementSibling;
-    if (!panel) return;
-
-    trigger.addEventListener('click', () => {
-      const isOpen = trigger.getAttribute('aria-expanded') === 'true';
-
-      if (isOpen) {
-        panel.style.maxHeight = '0px';
-        trigger.setAttribute('aria-expanded', 'false');
-        return;
-      }
-
-      trigger.setAttribute('aria-expanded', 'true');
-      panel.style.maxHeight = panel.scrollHeight + 'px';
-    });
-  });
-
-  // Keep open panels correctly sized if the layout reflows (e.g. font load, resize).
-  window.addEventListener('resize', () => {
-    document.querySelectorAll('.disclosure-trigger[aria-expanded="true"]').forEach((trigger) => {
-      const panel = trigger.nextElementSibling;
-      if (panel) panel.style.maxHeight = panel.scrollHeight + 'px';
-    });
-  });
-
-  // ── Draggable ticker: idle auto-scroll, mouse-drag with flick momentum,
-  // native touch scrolling on mobile. Cards are duplicated once in the
-  // markup so the loop can wrap seamlessly. ─────────────────────────────
-  function initTicker(wrapSelector, trackSelector) {
-    const wrap = document.querySelector(wrapSelector);
-    const track = document.querySelector(trackSelector);
-    if (!wrap || !track) return;
-
-    const SPEED = 0.4;
-    const RESUME_DELAY = 1200;
-    const FRICTION = 0.95;
-    const MIN_VELOCITY = 0.02;
-    const MAX_VELOCITY = 3;
-
-    // Respect the OS "reduce motion" setting: no idle auto-scroll. The ticker
-    // stays put and remains fully draggable / touch-scrollable.
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    let loopWidth = track.scrollWidth / 2;
-    let rafId = null;
-    let resumeTimer = null;
-
-    let dragging = false;
-    let startX = 0;
-    let startScrollLeft = 0;
-    let lastX = 0;
-    let lastTime = 0;
-    let velocity = 0;
-
-    function normalize() {
-      if (wrap.scrollLeft >= loopWidth) wrap.scrollLeft -= loopWidth;
-      else if (wrap.scrollLeft <= 0) wrap.scrollLeft += loopWidth;
-    }
-
-    function stopRaf() {
-      if (rafId) cancelAnimationFrame(rafId);
-      rafId = null;
-    }
-
-    function idleTick() {
-      wrap.scrollLeft += SPEED;
-      normalize();
-      rafId = requestAnimationFrame(idleTick);
-    }
-
-    function playIdle() {
-      if (reduceMotion || rafId) return;
-      rafId = requestAnimationFrame(idleTick);
-    }
-
-    function scheduleResume(delay) {
-      clearTimeout(resumeTimer);
-      resumeTimer = setTimeout(playIdle, delay);
-    }
-
-    function momentumTick() {
-      wrap.scrollLeft += velocity * 16.67;
-      normalize();
-      velocity *= FRICTION;
-      if (Math.abs(velocity) < MIN_VELOCITY) {
-        stopRaf();
-        scheduleResume(RESUME_DELAY);
-        return;
-      }
-      rafId = requestAnimationFrame(momentumTick);
-    }
-
-    function playMomentum() {
-      stopRaf();
-      rafId = requestAnimationFrame(momentumTick);
-    }
-
-    playIdle();
-
-    wrap.addEventListener('mouseenter', () => {
-      if (!dragging) {
-        clearTimeout(resumeTimer);
-        stopRaf();
-      }
-    });
-    wrap.addEventListener('mouseleave', () => {
-      if (!dragging && !rafId) playIdle();
-    });
-
-    wrap.addEventListener('mousedown', (e) => {
-      dragging = true;
-      wrap.classList.add('dragging');
-      startX = lastX = e.pageX;
-      startScrollLeft = wrap.scrollLeft;
-      lastTime = performance.now();
-      velocity = 0;
-      clearTimeout(resumeTimer);
-      stopRaf();
-    });
-
-    window.addEventListener('mousemove', (e) => {
-      if (!dragging) return;
-      e.preventDefault();
-      const now = performance.now();
-      const dt = now - lastTime || 16.67;
-      const dx = e.pageX - lastX;
-      velocity = Math.max(-MAX_VELOCITY, Math.min(MAX_VELOCITY, -dx / dt));
-      wrap.scrollLeft = startScrollLeft - (e.pageX - startX);
-      normalize();
-      lastX = e.pageX;
-      lastTime = now;
-    });
-
-    window.addEventListener('mouseup', () => {
-      if (!dragging) return;
-      dragging = false;
-      wrap.classList.remove('dragging');
-      if (Math.abs(velocity) > MIN_VELOCITY) {
-        playMomentum();
-      } else {
-        scheduleResume(RESUME_DELAY);
-      }
-    });
-
-    wrap.addEventListener('touchstart', () => {
-      clearTimeout(resumeTimer);
-      stopRaf();
-    }, { passive: true });
-
-    function onTouchDone() {
-      scheduleResume(RESUME_DELAY);
-    }
-    wrap.addEventListener('touchend', onTouchDone);
-    wrap.addEventListener('touchcancel', onTouchDone);
-
-    wrap.addEventListener('scroll', normalize);
-
-    window.addEventListener('resize', () => {
-      loopWidth = track.scrollWidth / 2;
     });
   }
 
-  initTicker('.roadmap-ticker-wrap', '.roadmap-ticker-track');
+  /* ============================================================ */
+  /*  THE CONVERSION                                              */
+  /*  Desktop (>=1000px, motion ok): one sticky stage scrubbed by */
+  /*  scroll into a single physical story — site.js sets --seq    */
+  /*  plus eased "cue" props that time the moments in each beat.   */
+  /*  Tablet / phone: the static walk-through stays; each beat's   */
+  /*  internals animate in once on entry.                          */
+  /*  Reduced motion / no JS: the static walk-through, no props.   */
+  /* ============================================================ */
+  var conv = document.querySelector(".conversion");
+  var scene = conv && conv.querySelector(".conversion__scene");
+  var rail = conv && conv.querySelector(".conversion__rail");
+  var wide = window.matchMedia
+    ? window.matchMedia("(min-width: 1000px)")
+    : { matches: true, addEventListener: function () {} };
+
+  var scrubbing = false;
+  var frame = 0;
+
+  /* smoothstep: 0 below a, 1 above b, eased S-curve between */
+  function ss(x, a, b) {
+    var t = (x - a) / (b - a);
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    return t * t * (3 - 2 * t);
+  }
+
+  var CUES = [
+    ["--scan", 0.02, 0.22],
+    ["--chipsout", 0.51, 0.57],
+    ["--cardin", 0.52, 0.60],
+    ["--acc", 0.58, 0.63],
+    ["--edit", 0.65, 0.70],
+    ["--decl", 0.72, 0.77],
+    ["--curgone", 0.79, 0.84],
+    ["--hand", 0.78, 0.93],
+    ["--devin", 0.76, 0.90],
+    ["--settle", 0.91, 1.0]
+  ];
+
+  function readSeq() {
+    frame = 0;
+    var rect = scene.getBoundingClientRect();
+    var span = scene.offsetHeight - window.innerHeight;
+    var seq = span > 0 ? -rect.top / span : 0;
+    if (seq < 0) seq = 0;
+    else if (seq > 1) seq = 1;
+
+    var st = conv.style;
+    st.setProperty("--seq", seq.toFixed(4));
+    for (var c = 0; c < CUES.length; c++) {
+      st.setProperty(CUES[c][0], ss(seq, CUES[c][1], CUES[c][2]).toFixed(4));
+    }
+
+    if (rail) {
+      var active = seq >= 0.77 ? 3 : seq >= 0.50 ? 2 : seq >= 0.20 ? 1 : 0;
+      for (var i = 0; i < rail.children.length; i++) {
+        var on = i === active;
+        if (on) rail.children[i].setAttribute("data-on", "");
+        else rail.children[i].removeAttribute("data-on");
+        var b = rail.children[i].firstElementChild;
+        if (b) {
+          if (on) b.setAttribute("aria-current", "step");
+          else b.removeAttribute("aria-current");
+        }
+      }
+    }
+  }
+
+  /* A rail pill jumps the scroll to that step; the sticky scene animates
+     through to it (smoothly, unless the user prefers reduced motion). */
+  function jumpToSeq(target) {
+    if (!scene) return;
+    var span = scene.offsetHeight - window.innerHeight;
+    if (span <= 0) return;
+    var top = scene.getBoundingClientRect().top + window.scrollY + target * span;
+    window.scrollTo({ top: Math.round(top), behavior: reduce ? "auto" : "smooth" });
+  }
+  if (rail) {
+    rail.querySelectorAll("button[data-seq]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        jumpToSeq(parseFloat(btn.getAttribute("data-seq")) || 0);
+      });
+    });
+  }
+
+  function onScrollScrub() {
+    if (!frame) frame = requestAnimationFrame(readSeq);
+  }
+
+  function startScrub() {
+    if (scrubbing || !scene) return;
+    scrubbing = true;
+    conv.classList.add("is-enhanced");
+    window.addEventListener("scroll", onScrollScrub, { passive: true });
+    window.addEventListener("resize", onScrollScrub);
+    readSeq();
+  }
+
+  function stopScrub() {
+    if (!scrubbing) return;
+    scrubbing = false;
+    conv.classList.remove("is-enhanced");
+    conv.style.removeProperty("--seq");
+    for (var c = 0; c < CUES.length; c++) conv.style.removeProperty(CUES[c][0]);
+    window.removeEventListener("scroll", onScrollScrub);
+    window.removeEventListener("resize", onScrollScrub);
+    if (rail) {
+      for (var i = 0; i < rail.children.length; i++) {
+        rail.children[i].removeAttribute("data-on");
+        var rb = rail.children[i].firstElementChild;
+        if (rb) rb.removeAttribute("aria-current");
+      }
+    }
+  }
+
+  /* Tablet / phone: reveal each beat's internals once, on entry. Content is
+     never left hidden — a scroll fallback catches any beat the observer
+     missed (e.g. a fast fling past it). */
+  var beatsRevealed = false;
+  function revealBeats() {
+    if (beatsRevealed || !conv) return;
+    beatsRevealed = true;
+    var beats = [].slice.call(conv.querySelectorAll(".beat"));
+    var seeAll = function () {
+      for (var i = 0; i < beats.length; i++) beats[i].classList.add("is-seen");
+    };
+    if (!("IntersectionObserver" in window)) { seeAll(); return; }
+
+    var bo = new IntersectionObserver(function (es) {
+      es.forEach(function (e) {
+        if (e.isIntersecting) {
+          e.target.classList.add("is-seen");
+          bo.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.18, rootMargin: "0px 0px -6% 0px" });
+    beats.forEach(function (b) { bo.observe(b); });
+
+    var sweep = function () {
+      var pending = false;
+      for (var i = 0; i < beats.length; i++) {
+        if (beats[i].classList.contains("is-seen")) continue;
+        if (beats[i].getBoundingClientRect().top < window.innerHeight * 0.9) {
+          beats[i].classList.add("is-seen");
+          bo.unobserve(beats[i]);
+        } else pending = true;
+      }
+      if (!pending) window.removeEventListener("scroll", sweep);
+    };
+    window.addEventListener("scroll", sweep, { passive: true });
+    sweep();
+  }
+
+  if (conv && scene && !reduce) {
+    if (wide.matches) startScrub();
+    else revealBeats();
+    var onBpChange = function (e) {
+      if (e.matches) startScrub();
+      else { stopScrub(); revealBeats(); }
+    };
+    if (wide.addEventListener) wide.addEventListener("change", onBpChange);
+    else if (wide.addListener) wide.addListener(onBpChange); // older Safari
+  }
+
+  /* ------------------------------------------ Coming soon / roadmap -- */
+  /*  One-shot: draw the growth spine + fan the branches in on entry.    */
+  /*  Drawn by default (CSS), so no JS / reduced motion is fine.         */
+  var roadmap = document.querySelector(".roadmap");
+  if (roadmap && !reduce) {
+    if (!("IntersectionObserver" in window)) {
+      roadmap.classList.add("is-armed");
+    } else {
+      var rmObs = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) {
+            roadmap.classList.add("is-armed");
+            rmObs.disconnect();
+          }
+        });
+      }, { threshold: 0.2, rootMargin: "0px 0px -10% 0px" });
+      rmObs.observe(roadmap);
+    }
+  }
+
+  /* ---------------------------------------------- Product proof ------- */
+  /*  Scroll-linked emphasis (>=961px) + a whisper of pointer parallax.  */
+  var proof = document.querySelector(".proof");
+  if (proof && !reduce) {
+    var wideProof = window.matchMedia
+      ? window.matchMedia("(min-width: 961px)")
+      : { matches: true };
+    var finePointer = window.matchMedia
+      ? window.matchMedia("(pointer: fine)").matches
+      : false;
+    var ZONES = [0.14, 0.5, 0.86];
+    var pf = 0;
+    var pTx = 0, pTy = 0;
+
+    function paintProof() {
+      pf = 0;
+      var r = proof.getBoundingClientRect();
+      var vh = window.innerHeight;
+      var p = (vh * 0.68 - r.top) / (r.height + vh * 0.36);
+      if (p < 0) p = 0; else if (p > 1) p = 1;
+      var s = proof.style;
+      for (var i = 0; i < 3; i++) {
+        var em = 1 - Math.abs(p - ZONES[i]) * 2.4;
+        s.setProperty("--em" + i, (em < 0 ? 0 : em).toFixed(3));
+      }
+      s.setProperty("--tx", pTx.toFixed(3));
+      s.setProperty("--ty", pTy.toFixed(3));
+    }
+    function queueProof() { if (!pf) pf = requestAnimationFrame(paintProof); }
+
+    if (wideProof.matches) {
+      window.addEventListener("scroll", queueProof, { passive: true });
+      window.addEventListener("resize", queueProof);
+      if (finePointer) {
+        proof.addEventListener("pointermove", function (e) {
+          var r = proof.getBoundingClientRect();
+          pTx = ((e.clientX - r.left) / r.width - 0.5) * 2;
+          pTy = ((e.clientY - r.top) / r.height - 0.5) * 2;
+          queueProof();
+        });
+        proof.addEventListener("pointerleave", function () {
+          pTx = 0; pTy = 0; queueProof();
+        });
+      }
+      paintProof();
+    }
+  }
 })();

@@ -3,26 +3,508 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PLANNR</title>
-  <meta name="description" content="Upload your course syllabus and sync every deadline, exam, and assignment directly to your Google Calendar." />
+  <title>Plannr — Syllabus to organized calendar</title>
+  <meta name="description" content="Plannr is an iOS app that turns each course syllabus into a reviewed, color-coded Google Calendar. Plannr finds every assignment, quiz, and exam — you approve every date before it syncs." />
+  <link rel="canonical" href="https://tryplannr.app/" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Plannr" />
+  <meta property="og:url" content="https://tryplannr.app/" />
+  <meta property="og:title" content="Plannr — turn a course syllabus into an organized calendar" />
+  <meta property="og:description" content="Upload a course syllabus. Plannr finds every assignment, quiz, and exam, you approve the dates, and they sync to a Google Calendar for each class." />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="Plannr — Syllabus to organized calendar" />
+  <meta name="twitter:description" content="Plannr does the semester setup for you: it reads each syllabus, extracts every deadline, and you approve what syncs to Google Calendar." />
+  <meta name="theme-color" content="#f7f2e7" />
+  <meta name="theme-color" content="#04213f" media="(prefers-color-scheme: dark)" />
+  <meta name="color-scheme" content="light" />
+
   <link rel="stylesheet" href="style.css" />
   <link rel="icon" type="image/x-icon" href="favicon.ico" />
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&display=swap" />
+
+  <script src="site.js" defer></script>
+
   <!-- Cloudflare Web Analytics -->
   <script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "56b37c71bdaf4f969a3b2ad12a8bd943"}'></script>
   <!-- End Cloudflare Web Analytics -->
 </head>
 <body>
 
+  <a class="skip-link" href="#main">Skip to content</a>
+
   <header id="site-nav" class="site-nav">
-    <div class="site-nav-inner">
+    <div class="site-nav__inner">
       <a class="nav-logo" href="index.html">
         <img class="nav-logo-mark" src="favicon-32.png" alt="" width="22" height="22" />
-        <span>Plannr</span>
+        <span translate="no">Plannr</span>
       </a>
-      <div class="nav-social">
+      <nav class="nav-social" aria-label="Plannr on social media">
+        <a class="social-link" href="https://github.com/m4ttblanke/plannr" target="_blank" rel="noopener" aria-label="Plannr on GitHub">
+          <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        </a>
+        <a class="social-link" href="https://instagram.com/tryplannr" target="_blank" rel="noopener" aria-label="Plannr on Instagram">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2.16c3.2 0 3.58.01 4.85.07 1.17.05 1.8.25 2.23.41.56.22.96.48 1.38.9.42.42.68.82.9 1.38.16.42.36 1.06.41 2.23.06 1.27.07 1.65.07 4.85s-.01 3.58-.07 4.85c-.05 1.17-.25 1.8-.41 2.23-.22.56-.48.96-.9 1.38-.42.42-.82.68-1.38.9-.42.16-1.06.36-2.23.41-1.27.06-1.65.07-4.85.07s-3.58-.01-4.85-.07c-1.17-.05-1.8-.25-2.23-.41a3.7 3.7 0 0 1-1.38-.9 3.7 3.7 0 0 1-.9-1.38c-.16-.42-.36-1.06-.41-2.23-.06-1.27-.07-1.65-.07-4.85s.01-3.58.07-4.85c.05-1.17.25-1.8.41-2.23.22-.56.48-.96.9-1.38.42-.42.82-.68 1.38-.9.42-.16 1.06-.36 2.23-.41 1.27-.06 1.65-.07 4.85-.07M12 0C8.74 0 8.33.01 7.05.07 5.78.13 4.9.33 4.14.63c-.79.31-1.46.72-2.13 1.38A5.9 5.9 0 0 0 .63 4.14c-.3.76-.5 1.64-.56 2.91C.01 8.33 0 8.74 0 12s.01 3.67.07 4.95c.06 1.27.26 2.15.56 2.91.31.79.72 1.46 1.38 2.13.67.66 1.34 1.07 2.13 1.38.76.3 1.64.5 2.91.56C8.33 23.99 8.74 24 12 24s3.67-.01 4.95-.07c1.27-.06 2.15-.26 2.91-.56.79-.31 1.46-.72 2.13-1.38.66-.67 1.07-1.34 1.38-2.13.3-.76.5-1.64.56-2.91.06-1.28.07-1.69.07-4.95s-.01-3.67-.07-4.95c-.06-1.27-.26-2.15-.56-2.91a5.9 5.9 0 0 0-1.38-2.13A5.9 5.9 0 0 0 19.86.63c-.76-.3-1.64-.5-2.91-.56C15.67.01 15.26 0 12 0Zm0 5.84A6.16 6.16 0 1 0 12 18.16 6.16 6.16 0 0 0 12 5.84Zm0 10.16A4 4 0 1 1 12 8a4 4 0 0 1 0 8Zm7.85-10.41a1.44 1.44 0 1 1-2.88 0 1.44 1.44 0 0 1 2.88 0Z"/></svg>
+        </a>
+      </nav>
+      <a class="btn btn--gold btn--sm nav-cta" href="https://buy.stripe.com/dRmfZi6P531D5JEbKZ7IY00" target="_blank" rel="noopener">Get TestFlight</a>
+    </div>
+  </header>
+
+  <main id="main">
+
+    <!-- ============================ HERO ============================ -->
+    <section class="hero">
+      <div class="shell hero__grid">
+        <div class="hero__copy">
+          <p class="eyebrow">An iOS app for students</p>
+          <h1>Your syllabus wasn&rsquo;t built for your <em>calendar</em>.</h1>
+          <p class="hero__sub">Upload a course syllabus. Plannr finds every assignment, quiz, and exam, you approve the dates, and they sync to a Google Calendar for each class.</p>
+          <div class="hero__cta">
+            <a class="btn btn--gold" href="https://buy.stripe.com/dRmfZi6P531D5JEbKZ7IY00" target="_blank" rel="noopener">Get TestFlight Access</a>
+            <a class="text-link" href="#conversion">See how it works</a>
+          </div>
+          <p class="hero__perk">Beta testers get <strong>3 months of Plannr free</strong> at launch. <a class="text-link" href="#faq">How it works</a></p>
+        </div>
+
+        <div class="hero__figure" aria-hidden="true">
+          <div class="paper-card">
+            <p class="paper-card__kicker">Course syllabus &middot; page 2</p>
+            <p class="paper-card__title">Schedule of graded work</p>
+            <ul>
+              <li>Response paper 1 &mdash; due <span class="mark">Fri, Week&nbsp;3</span></li>
+              <li>Quiz 2 &mdash; <span class="mark">Thu, Sep&nbsp;25</span>, in class</li>
+              <li>Midterm exam &mdash; <span class="mark">Week&nbsp;6</span>, in lecture</li>
+              <li>Lab report 3 &mdash; due <span class="mark">Oct&nbsp;21</span></li>
+              <li>Participation &mdash; graded throughout</li>
+            </ul>
+          </div>
+          <div class="hero__extract">
+            <span class="hero__extract-label">Plannr pulls out</span>
+            <div class="chip-row">
+              <span class="chip" data-type="hw"><span class="chip__type">Homework</span> Response 1 <span class="chip__date">Sep 19</span></span>
+              <span class="chip" data-type="quiz"><span class="chip__type">Quiz</span> Quiz 2 <span class="chip__date">Sep 25</span></span>
+              <span class="chip" data-type="exam"><span class="chip__type">Exam</span> Midterm <span class="chip__date">Oct 9</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================== PROBLEM ========================== -->
+    <section class="section problem" aria-labelledby="problem-title">
+      <div class="shell problem__grid">
+        <div class="problem__copy reveal">
+          <h2 id="problem-title">The setup you keep redoing</h2>
+          <p>Every term brings four to six syllabi, each in its own format, each with a dozen dates scattered through it &mdash; readings, labs, quizzes, a midterm, a final.</p>
+          <p>Copying all of that into a calendar by hand is slow, easy to get wrong, and you do it again the moment a professor moves a deadline. Miss one line and you miss the assignment.</p>
+        </div>
+        <div class="stack reveal" aria-hidden="true">
+          <span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================== THE CONVERSION ===================== -->
+    <section class="section conversion" id="conversion" aria-labelledby="conversion-title">
+      <div class="shell conversion__head reveal">
+        <p class="eyebrow">The part Plannr does for you</p>
+        <h2 id="conversion-title">From a syllabus you scroll past<br>to a calendar you actually use</h2>
+        <p class="section__lead">Read &rarr; extract &rarr; review &rarr; organized. You stay in control at the step that matters.</p>
+      </div>
+
+      <div class="conversion__scene">
+       <div class="conversion__viewport">
+      <ol class="conversion__steps">
+        <li class="beat beat--read" style="--i:0">
+          <div class="shell beat__inner">
+            <div class="beat__copy">
+              <p class="beat__label">Read</p>
+              <h3>It all starts in the syllabus</h3>
+              <p>The dates you need are already written down &mdash; just trapped in a PDF, in prose, in a format that&rsquo;s different for every class.</p>
+            </div>
+            <div class="beat__vis">
+              <div class="syllabus">
+                <span class="syllabus__scan" aria-hidden="true"></span>
+                <p class="syllabus__meta">Course syllabus &middot; sample</p>
+                <h4>Introduction to Media Studies</h4>
+                <p class="syllabus__sec">Schedule of graded work</p>
+                <ul>
+                  <li>Reading response 1 &mdash; due <span class="mark" style="--ln:1">Friday, Week&nbsp;3</span></li>
+                  <li>Quiz 2 &mdash; <span class="mark" style="--ln:2">Thursday, Sep&nbsp;25</span> (in class)</li>
+                  <li>Midterm exam &mdash; <span class="mark" style="--ln:3">Week&nbsp;6</span>, during lecture</li>
+                  <li>Lab report 3 &mdash; due <span class="mark" style="--ln:4">Oct&nbsp;21</span>, 11:59pm</li>
+                  <li>Final project &mdash; due <span class="mark" style="--ln:5">finals week</span></li>
+                </ul>
+                <p class="syllabus__sec">Also in here</p>
+                <ul>
+                  <li>Weekly readings, office hours, the late policy, grading breakdown&hellip;</li>
+                </ul>
+              </div>
+              <p class="repro-note">Sample syllabus for illustration &mdash; fictitious course.</p>
+            </div>
+          </div>
+        </li>
+
+        <li class="beat beat--extract" style="--i:1">
+          <div class="shell beat__inner">
+            <div class="beat__copy">
+              <p class="beat__label">Extract</p>
+              <h3>Plannr pulls out the graded work</h3>
+              <p>It reads the whole document, keeps the assignments, quizzes, exams and labs, and resolves &ldquo;Week&nbsp;3 Friday&rdquo; into a real date. Everything else stays behind.</p>
+            </div>
+            <div class="beat__vis">
+              <div class="syllabus">
+                <p class="syllabus__meta">Course syllabus &middot; sample</p>
+                <h4>Introduction to Media Studies</h4>
+                <p class="syllabus__sec">Schedule of graded work</p>
+                <ul>
+                  <li>Reading response 1 &mdash; due <span class="mark">Friday, Week&nbsp;3</span></li>
+                  <li>Quiz 2 &mdash; <span class="mark">Thursday, Sep&nbsp;25</span> (in class)</li>
+                  <li>Midterm exam &mdash; <span class="mark">Week&nbsp;6</span>, during lecture</li>
+                  <li>Lab report 3 &mdash; due <span class="mark">Oct&nbsp;21</span>, 11:59pm</li>
+                  <li>Final project &mdash; due <span class="mark">finals week</span></li>
+                </ul>
+              </div>
+              <div class="chip-row">
+                <span class="chip" data-type="hw" style="--ln:1"><span class="chip__type">Homework</span> Response 1 <span class="chip__date">Sep 19</span></span>
+                <span class="chip" data-type="quiz" style="--ln:2"><span class="chip__type">Quiz</span> Quiz 2 <span class="chip__date">Sep 25</span></span>
+                <span class="chip" data-type="exam" style="--ln:3"><span class="chip__type">Exam</span> Midterm <span class="chip__date">Oct 9</span></span>
+                <span class="chip" data-type="lab" style="--ln:4"><span class="chip__type">Lab</span> Lab report 3 <span class="chip__date">Oct 21</span></span>
+                <span class="chip" data-type="hw" style="--ln:5"><span class="chip__type">Homework</span> Final project <span class="chip__date">Dec 8</span></span>
+              </div>
+            </div>
+          </div>
+        </li>
+
+        <li class="beat beat--review" style="--i:2">
+          <div class="shell beat__inner">
+            <div class="beat__copy">
+              <p class="beat__label">Review</p>
+              <h3>Nothing syncs until you say so</h3>
+              <p>You get the full list first. Accept a date, fix one that&rsquo;s off, or drop it. Parsing is close, not perfect &mdash; so the last word is yours.</p>
+            </div>
+            <div class="beat__vis">
+              <div class="review" role="img" aria-label="Plannr's review list: each extracted event shows its type, title and date with Accept, Edit and Decline controls. One row's date has been edited; one row is declined.">
+                <p class="review__bar"><svg class="star" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.9 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14l-5-4.87 7.1-1.01z"/></svg> Review before sync &middot; 5 events</p>
+                <div class="review__row" style="--i:0" data-demo="accept">
+                  <span class="chip__type" style="--chip:var(--t-hw)">HW</span>
+                  <span class="review__rowtitle">Reading response 1</span>
+                  <span class="review__rowdate">Sep 19</span>
+                  <span class="review__actions"><span class="review__act" data-act="accept">Accepted</span></span>
+                </div>
+                <div class="review__row" style="--i:1">
+                  <span class="chip__type" style="--chip:var(--t-quiz)">Quiz</span>
+                  <span class="review__rowtitle">Quiz 2</span>
+                  <span class="review__rowdate">Sep 25</span>
+                  <span class="review__actions"><span class="review__act" data-act="accept">Accepted</span></span>
+                </div>
+                <div class="review__row" style="--i:2">
+                  <span class="chip__type" style="--chip:var(--t-exam)">Exam</span>
+                  <span class="review__rowtitle">Midterm exam</span>
+                  <span class="review__rowdate">Oct 9</span>
+                  <span class="review__actions"><span class="review__act" data-act="edit">Edit</span><span class="review__act">Decline</span></span>
+                </div>
+                <div class="review__row" style="--i:3" data-demo="edit">
+                  <span class="chip__type" style="--chip:var(--t-hw)">HW</span>
+                  <span class="review__rowtitle">Final project</span>
+                  <span class="review__rowdate"><del>Dec 8</del> <ins>Dec 10</ins></span>
+                  <span class="review__actions"><span class="review__act" data-act="accept">Accepted</span></span>
+                </div>
+                <div class="review__row" style="--i:4" data-demo="decline" data-state="declined">
+                  <span class="chip__type" style="--chip:var(--t-lab)">Lab</span>
+                  <span class="review__rowtitle">Optional lab writeup</span>
+                  <span class="review__rowdate">Oct 21</span>
+                  <span class="review__actions"><span class="review__act">Declined</span></span>
+                </div>
+                <p class="review__note">Edit the title, date, type or description on any event &mdash; or decline it &mdash; before it reaches your calendar.</p>
+              </div>
+              <p class="repro-note">Representative layout &mdash; the real review screen replaces this.</p>
+            </div>
+          </div>
+        </li>
+
+        <li class="beat beat--organized" style="--i:3">
+          <div class="shell beat__inner">
+            <div class="beat__copy">
+              <p class="beat__label">Organized</p>
+              <h3>Your semester, on the calendar</h3>
+              <p>Approved dates sync to a dedicated Google Calendar for each class, color-coded to match. Open your calendar and the whole term is just there.</p>
+            </div>
+            <div class="beat__vis">
+              <div class="organized">
+                <span class="fly" aria-hidden="true">
+                  <span class="fly__chip" data-type="hw"></span>
+                  <span class="fly__chip" data-type="quiz"></span>
+                  <span class="fly__chip" data-type="hw"></span>
+                </span>
+                <div class="device">
+                  <img src="screenshots/calendar.png" alt="Plannr's calendar view: a week grid with color-coded events across three classes and a list of upcoming assignments below it." width="1206" height="2622" loading="lazy" decoding="async" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </li>
+      </ol>
+      <ol class="conversion__rail" aria-label="Jump to a step in the sequence">
+        <li><button type="button" data-seq="0.10">Read</button></li>
+        <li><button type="button" data-seq="0.44">Extract</button></li>
+        <li><button type="button" data-seq="0.64">Review</button></li>
+        <li><button type="button" data-seq="0.93">Organized</button></li>
+      </ol>
+       </div>
+      </div>
+    </section>
+
+    <!-- ========================== PROOF =========================== -->
+    <section class="section proof" aria-labelledby="proof-title">
+      <div class="shell">
+        <div class="reveal">
+          <p class="eyebrow">The result</p>
+          <h2 id="proof-title">What you get to keep</h2>
+          <p class="section__lead">Not another calendar app &mdash; the organized version of the one you already use, plus the views that make a course load legible.</p>
+        </div>
+        <div class="proof__grid">
+          <div class="proof__item reveal">
+            <div class="device">
+              <img src="screenshots/my-classes.png" alt="Plannr's My Classes screen: a list of courses, each with a color bar, meeting time, active status, and a count of events synced." width="1206" height="2622" loading="lazy" decoding="async" />
+            </div>
+            <h3>My Classes</h3>
+            <p>Every course in one list, each with its own color and sync status. Group them into terms.</p>
+          </div>
+          <div class="proof__item reveal">
+            <div class="device">
+              <img src="screenshots/calendar.png" alt="Plannr's Calendar screen: a week view with color-coded dots per day and upcoming assignments listed below." width="1206" height="2622" loading="lazy" decoding="async" />
+            </div>
+            <h3>Calendar</h3>
+            <p>A week or month view across every class. Filter to just exams, quizzes, homework or labs.</p>
+          </div>
+          <div class="proof__item reveal">
+            <div class="device">
+              <img src="screenshots/week-glance.png" alt="Plannr's Week at a Glance screen: counts for this week and next, a per-day overview, and a weekend preview." width="1206" height="2622" loading="lazy" decoding="async" />
+            </div>
+            <h3>Week at a Glance</h3>
+            <p>See a heavy week coming before it lands. Counts per day, plus a weekend preview.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================= ORGANIZE ========================= -->
+    <section class="section organize" aria-labelledby="organize-title">
+      <div class="shell">
+        <div class="reveal">
+          <p class="eyebrow">When things change</p>
+          <h2 id="organize-title">You don&rsquo;t start over</h2>
+        </div>
+        <div class="organize__grid">
+          <div class="feature reveal">
+            <h3>Grouped by term</h3>
+            <p>File classes into a quarter, semester, or custom-length term. When the term ends, its classes go inactive on their own and drop out of your week view.</p>
+          </div>
+          <div class="feature reveal">
+            <h3>Re-upload when the syllabus changes</h3>
+            <p>Plannr compares the new version against what&rsquo;s already there and syncs only the difference. Edits you made by hand in Google Calendar stay put, and every sync is saved so you can roll a class back.</p>
+            <p class="diff" aria-hidden="true">
+              <span data-keep>12 unchanged</span>
+              <span data-new>2 moved &middot; 1 added</span>
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================== TRUST ========================== -->
+    <section class="section trust" aria-labelledby="trust-title">
+      <div class="shell trust__grid">
+        <div class="reveal">
+          <p class="eyebrow">You approve it</p>
+          <h2 id="trust-title">Automatic, but never behind your back</h2>
+          <p class="section__lead">Automatic dates are only useful if you can trust them. So Plannr keeps you in the loop.</p>
+          <a class="text-link trust__more" href="privacy.html">Read the full Privacy Policy</a>
+        </div>
+        <ul class="trust__list reveal">
+          <li style="--i:0">
+            <span class="trust__check" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span>
+            <span><strong>Review every date before it syncs.</strong> Accept, edit, or decline each extracted event individually.</span>
+          </li>
+          <li style="--i:1">
+            <span class="trust__check" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span>
+            <span><strong>Re-uploads keep your manual edits.</strong> Reconciling a changed syllabus preserves changes you made directly in Google Calendar.</span>
+          </li>
+          <li style="--i:2">
+            <span class="trust__check" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span>
+            <span><strong>Every sync is restorable.</strong> Plannr snapshots each sync so you can roll a class back to an earlier version.</span>
+          </li>
+          <li style="--i:3">
+            <span class="trust__check" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span>
+            <span><strong>Your syllabus text isn&rsquo;t kept.</strong> It&rsquo;s used to find dates and isn&rsquo;t stored after processing; Google credentials are encrypted and used only server-side.</span>
+          </li>
+          <li style="--i:4">
+            <span class="trust__check" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg></span>
+            <span><strong>Independent.</strong> Plannr isn&rsquo;t affiliated with or endorsed by Google or any university.</span>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ========================= COMING SOON ===================== -->
+    <section class="section roadmap" aria-labelledby="roadmap-title">
+      <div class="shell">
+        <p class="eyebrow">What&rsquo;s next</p>
+        <h2 id="roadmap-title">Your syllabus is just the start</h2>
+        <p class="section__lead">Today Plannr turns a course syllabus into a reviewed calendar. From there it grows into the rest of keeping a term organised. Everything below is <strong>planned &mdash; not in the current beta</strong>.</p>
+
+        <div class="roadmap__map">
+          <div class="roadmap__today">
+            <p class="roadmap__tag roadmap__tag--now">Today<span> &middot; available now</span></p>
+            <ol class="roadmap__flow" aria-label="How Plannr works today">
+              <li>Syllabus</li>
+              <li>Review</li>
+              <li>Calendar</li>
+            </ol>
+          </div>
+
+          <div class="roadmap__next">
+            <svg class="roadmap__star" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2l2.9 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14l-5-4.87 7.1-1.01z"/></svg>
+            <p class="roadmap__tag roadmap__tag--next">On the roadmap<span> &middot; planned, not yet available</span></p>
+            <ul class="roadmap__branches">
+              <li class="branch" style="--bi:0">
+                <h3>Connect more of your coursework</h3>
+                <ul>
+                  <li><b>Canvas integration</b><span>Pull assignments and due dates straight from Canvas.</span></li>
+                  <li><b>Apple Calendar</b><span>Sync to Apple Calendar, not just Google.</span></li>
+                </ul>
+              </li>
+              <li class="branch" style="--bi:1">
+                <h3>Plan the week for you</h3>
+                <ul>
+                  <li><b>Workload estimates</b><span>Estimate how long each assignment will take.</span></li>
+                  <li><b>Conflict detection</b><span>Flag weeks with overlapping deadlines.</span></li>
+                  <li><b>Daily agenda</b><span>Suggest what to work on each day.</span></li>
+                  <li><b>Workload feedback</b><span>Sharpen estimates from how long work actually took.</span></li>
+                </ul>
+              </li>
+              <li class="branch" style="--bi:2">
+                <h3>Focus on what counts</h3>
+                <ul>
+                  <li><b>Grade-weight priority</b><span>Rank work by its impact on your final grade.</span></li>
+                  <li><b>Project breakdown</b><span>Split big projects into subtasks and milestones.</span></li>
+                </ul>
+              </li>
+              <li class="branch" style="--bi:3">
+                <h3>Ask and adjust in plain words</h3>
+                <ul>
+                  <li><b>Syllabus Q&amp;A</b><span>Ask about deadlines and course details.</span></li>
+                  <li><b>Natural-language edits</b><span>Change your schedule by typing what you want.</span></li>
+                  <li><b>Deadline verification</b><span>Flag uncertain dates for you to confirm.</span></li>
+                </ul>
+              </li>
+              <li class="branch" style="--bi:4">
+                <h3>Work with your class</h3>
+                <ul>
+                  <li><b>Shared study groups</b><span>Coordinate schedules and study sessions with classmates.</span></li>
+                </ul>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ FAQ =========================== -->
+    <section class="section faq" id="faq" aria-labelledby="faq-title">
+      <div class="shell">
+        <div class="reveal">
+          <p class="eyebrow">Questions</p>
+          <h2 id="faq-title">Frequently asked</h2>
+        </div>
+        <div class="faq__list">
+          <div class="faq__item">
+            <button class="faq__q" type="button" aria-expanded="false">
+              Which calendar does Plannr sync to?
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+            <div class="faq__panel"><div><p>Google Calendar today, using a dedicated secondary calendar for each class. Apple Calendar support is planned but not available yet.</p></div></div>
+          </div>
+          <div class="faq__item">
+            <button class="faq__q" type="button" aria-expanded="false">
+              How do I get a syllabus into Plannr?
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+            <div class="faq__panel"><div><p>Upload a PDF or paste the text. Most syllabus formats work without any prep. Camera scan and Photos import are in the app but disabled for now &mdash; a &ldquo;coming soon&rdquo; notice &mdash; until server-side text recognition is enabled.</p></div></div>
+          </div>
+          <div class="faq__item">
+            <button class="faq__q" type="button" aria-expanded="false">
+              Will the dates always be accurate?
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+            <div class="faq__panel"><div><p>Extraction is generally accurate but not guaranteed error-free, especially on unusually formatted syllabi. That&rsquo;s why every event goes through the review step &mdash; you can edit or remove any of them before anything syncs.</p></div></div>
+          </div>
+          <div class="faq__item">
+            <button class="faq__q" type="button" aria-expanded="false">
+              Is my data safe?
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+            <div class="faq__panel"><div><p>Your syllabus text is only used to extract dates and isn&rsquo;t stored after processing. Google OAuth credentials are encrypted in transit and at rest, used only server-side, and never exposed to the app or logs. See the <a href="privacy.html">Privacy Policy</a> for the full breakdown.</p></div></div>
+          </div>
+          <div class="faq__item">
+            <button class="faq__q" type="button" aria-expanded="false">
+              What does TestFlight access cost?
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+            <div class="faq__panel"><div><p>Getting into the current TestFlight beta is a one-time payment through the button above. Pricing may change once Plannr ships on the App Store.</p></div></div>
+          </div>
+          <div class="faq__item">
+            <button class="faq__q" type="button" aria-expanded="false">
+              Do beta testers get anything when Plannr launches?
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+            <div class="faq__panel"><div><p>Yes. If Plannr launches as a paid app, everyone who paid for beta access gets their first 3 months free. Plannr is an early beta, though, and a public launch isn&rsquo;t guaranteed &mdash; if it never ships publicly, or ships without a paid plan, there&rsquo;s nothing to apply the free months to. Your payment buys access to the beta as it exists today; the 3 months are a thank-you on top of that.</p></div></div>
+          </div>
+          <div class="faq__item">
+            <button class="faq__q" type="button" aria-expanded="false">
+              How do I install the app through TestFlight?
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+            <div class="faq__panel"><div><p>After payment you&rsquo;ll get a link to join the beta. Open it on the iPhone or iPad you want Plannr on. If you don&rsquo;t already have the free <a href="https://apps.apple.com/app/testflight/id899247664" target="_blank" rel="noopener">TestFlight</a> app, install that first &mdash; then tap the join link, tap Accept, and tap Install.</p></div></div>
+          </div>
+          <div class="faq__item">
+            <button class="faq__q" type="button" aria-expanded="false">
+              Is Plannr affiliated with Google or my university?
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+            <div class="faq__panel"><div><p>No. Plannr uses Google&rsquo;s public APIs to authenticate and sync events, but it isn&rsquo;t affiliated with or endorsed by Google or any university.</p></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================= FINAL CTA ======================== -->
+    <section class="section cta-final" aria-labelledby="cta-title">
+      <div class="shell reveal">
+        <svg class="star" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.9 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14l-5-4.87 7.1-1.01z"/></svg>
+        <h2 id="cta-title">Set up your whole semester in one sitting</h2>
+        <div class="cta-final__row">
+          <a class="btn btn--gold" href="https://buy.stripe.com/dRmfZi6P531D5JEbKZ7IY00" target="_blank" rel="noopener">Get TestFlight Access</a>
+          <span class="soon">Coming to the App Store</span>
+        </div>
+        <p class="cta-final__perk">Beta testers get 3 months of Plannr free at launch. <a href="#faq">How it works</a></p>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    <div class="footer__inner">
+      <div class="footer-brand">
+        <p>&copy; 2026 Plannr</p>
         <a class="social-link" href="https://github.com/m4ttblanke/plannr" target="_blank" rel="noopener" aria-label="Plannr on GitHub">
           <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
         </a>
@@ -30,326 +512,12 @@
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2.16c3.2 0 3.58.01 4.85.07 1.17.05 1.8.25 2.23.41.56.22.96.48 1.38.9.42.42.68.82.9 1.38.16.42.36 1.06.41 2.23.06 1.27.07 1.65.07 4.85s-.01 3.58-.07 4.85c-.05 1.17-.25 1.8-.41 2.23-.22.56-.48.96-.9 1.38-.42.42-.82.68-1.38.9-.42.16-1.06.36-2.23.41-1.27.06-1.65.07-4.85.07s-3.58-.01-4.85-.07c-1.17-.05-1.8-.25-2.23-.41a3.7 3.7 0 0 1-1.38-.9 3.7 3.7 0 0 1-.9-1.38c-.16-.42-.36-1.06-.41-2.23-.06-1.27-.07-1.65-.07-4.85s.01-3.58.07-4.85c.05-1.17.25-1.8.41-2.23.22-.56.48-.96.9-1.38.42-.42.82-.68 1.38-.9.42-.16 1.06-.36 2.23-.41 1.27-.06 1.65-.07 4.85-.07M12 0C8.74 0 8.33.01 7.05.07 5.78.13 4.9.33 4.14.63c-.79.31-1.46.72-2.13 1.38A5.9 5.9 0 0 0 .63 4.14c-.3.76-.5 1.64-.56 2.91C.01 8.33 0 8.74 0 12s.01 3.67.07 4.95c.06 1.27.26 2.15.56 2.91.31.79.72 1.46 1.38 2.13.67.66 1.34 1.07 2.13 1.38.76.3 1.64.5 2.91.56C8.33 23.99 8.74 24 12 24s3.67-.01 4.95-.07c1.27-.06 2.15-.26 2.91-.56.79-.31 1.46-.72 2.13-1.38.66-.67 1.07-1.34 1.38-2.13.3-.76.5-1.64.56-2.91.06-1.28.07-1.69.07-4.95s-.01-3.67-.07-4.95c-.06-1.27-.26-2.15-.56-2.91a5.9 5.9 0 0 0-1.38-2.13A5.9 5.9 0 0 0 19.86.63c-.76-.3-1.64-.5-2.91-.56C15.67.01 15.26 0 12 0Zm0 5.84A6.16 6.16 0 1 0 12 18.16 6.16 6.16 0 0 0 12 5.84Zm0 10.16A4 4 0 1 1 12 8a4 4 0 0 1 0 8Zm7.85-10.41a1.44 1.44 0 1 1-2.88 0 1.44 1.44 0 0 1 2.88 0Z"/></svg>
         </a>
       </div>
-      <a class="btn btn-primary btn-sm nav-cta" href="https://buy.stripe.com/dRmfZi6P531D5JEbKZ7IY00" target="_blank" rel="noopener">TestFlight</a>
+      <ul class="footer-links">
+        <li><a href="privacy.html">Privacy Policy</a></li>
+        <li><a href="terms.html">Terms of Service</a></li>
+      </ul>
     </div>
-  </header>
-
-  <main>
-    <section class="hero">
-      <div class="hero-glow" aria-hidden="true"></div>
-      <p class="hero-eyebrow">iOS Student App</p>
-      <h1>Syllabus to calendar,<br>automatically.</h1>
-      <p>Upload your course syllabus. Plannr extracts every deadline, exam, and assignment and syncs them directly to your Google Calendar.</p>
-      <div class="btn-row">
-        <a class="btn btn-primary" href="https://buy.stripe.com/dRmfZi6P531D5JEbKZ7IY00" target="_blank" rel="noopener">Get TestFlight Access</a>
-        <span class="btn btn-ghost">Coming to the App Store</span>
-      </div>
-      <p class="hero-perk">Buy into the beta and get <strong>3 months of Plannr free</strong> at launch. <a href="#faq">How it works</a></p>
-
-      <div class="hero-device-wrap reveal">
-        <div class="phone-mockup phone-mockup--hero">
-          <div class="phone-screen">
-            <img class="phone-screenshot" src="screenshots/my-classes.png" alt="My Classes screen in the Plannr app, showing a list of courses with their sync status" />
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="showcase">
-      <div class="showcase-row reveal">
-        <div class="phone-mockup phone-mockup--small">
-          <div class="phone-screen">
-            <img class="phone-screenshot" src="screenshots/calendar.png" alt="Unified calendar view in the Plannr app showing color-coded events across classes" />
-          </div>
-        </div>
-        <div class="showcase-copy">
-          <span class="showcase-tag">Google Calendar sync</span>
-          <h2>Every deadline lands in one calendar.</h2>
-          <p>Each class gets its own secondary Google Calendar, colored the way you want it. No more cross-checking five different syllabi before you plan your week.</p>
-        </div>
-      </div>
-
-      <div class="showcase-row showcase-row--reverse reveal">
-        <div class="phone-mockup phone-mockup--small">
-          <div class="phone-screen">
-            <img class="phone-screenshot" src="screenshots/week-glance.png" alt="Week at a Glance screen in the Plannr app summarizing everything due this week" />
-          </div>
-        </div>
-        <div class="showcase-copy">
-          <span class="showcase-tag">Weekly overview</span>
-          <h2>Know your week before it starts.</h2>
-          <p>Week at a Glance rolls up everything due across every class so you can see a heavy week coming before it's already on top of you.</p>
-        </div>
-      </div>
-    </section>
-
-    <section class="disclosure-section">
-      <h2 class="section-title">Everything the app does</h2>
-      <p class="section-sub">Six things Plannr handles so you don't have to.</p>
-      <div class="disclosure-group">
-        <div class="disclosure-item">
-          <button class="disclosure-trigger" aria-expanded="false">
-            <span class="disclosure-num">01</span>
-            <span class="disclosure-title">AI syllabus parsing</span>
-            <svg class="disclosure-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          </button>
-          <div class="disclosure-panel">
-            <div class="disclosure-panel-inner">Upload a PDF or paste your syllabus text. Plannr extracts every assignment, exam, quiz, and lab deadline automatically. (Camera scan and photo import are coming soon.)</div>
-          </div>
-        </div>
-        <div class="disclosure-item">
-          <button class="disclosure-trigger" aria-expanded="false">
-            <span class="disclosure-num">02</span>
-            <span class="disclosure-title">Color-coded by class</span>
-            <svg class="disclosure-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          </button>
-          <div class="disclosure-panel">
-            <div class="disclosure-panel-inner">Each course gets its own secondary Google Calendar in the color you choose. Events are visually distinct across all your classes.</div>
-          </div>
-        </div>
-        <div class="disclosure-item">
-          <button class="disclosure-trigger" aria-expanded="false">
-            <span class="disclosure-num">03</span>
-            <span class="disclosure-title">Re-upload anytime</span>
-            <svg class="disclosure-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          </button>
-          <div class="disclosure-panel">
-            <div class="disclosure-panel-inner">When a professor updates the syllabus, upload the new version. Plannr reconciles the changes and syncs only what's different.</div>
-          </div>
-        </div>
-        <div class="disclosure-item">
-          <button class="disclosure-trigger" aria-expanded="false">
-            <span class="disclosure-num">04</span>
-            <span class="disclosure-title">Sync history</span>
-            <svg class="disclosure-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          </button>
-          <div class="disclosure-panel">
-            <div class="disclosure-panel-inner">Every sync session is saved. See exactly what events were pushed to your calendar and when, for every class.</div>
-          </div>
-        </div>
-        <div class="disclosure-item">
-          <button class="disclosure-trigger" aria-expanded="false">
-            <span class="disclosure-num">05</span>
-            <span class="disclosure-title">Week at a glance</span>
-            <svg class="disclosure-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          </button>
-          <div class="disclosure-panel">
-            <div class="disclosure-panel-inner">A dashboard view shows everything due across all your classes this week so nothing slips through between courses.</div>
-          </div>
-        </div>
-        <div class="disclosure-item">
-          <button class="disclosure-trigger" aria-expanded="false">
-            <span class="disclosure-num">06</span>
-            <span class="disclosure-title">Multiple upload formats</span>
-            <svg class="disclosure-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          </button>
-          <div class="disclosure-panel">
-            <div class="disclosure-panel-inner">PDF files and plain text are supported today. Camera scans and photo-library images are coming soon.</div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="roadmap">
-      <h2 class="section-title">What's next</h2>
-      <p class="section-sub">Ideas we're exploring for future versions of Plannr.</p>
-      <div class="roadmap-ticker-wrap">
-        <div class="roadmap-ticker-track">
-          <div class="roadmap-card">
-            <h3>AI workload estimation</h3>
-            <p>Estimates how much time assignments will require.</p>
-          </div>
-          <div class="roadmap-card">
-            <h3>Conflict detection</h3>
-            <p>Identifies weeks or days with overlapping deadlines.</p>
-          </div>
-          <div class="roadmap-card">
-            <h3>Grade-weight integration</h3>
-            <p>Prioritizes work based on its impact on your grade.</p>
-          </div>
-          <div class="roadmap-card">
-            <h3>Daily agenda</h3>
-            <p>Recommends what to work on each day.</p>
-          </div>
-          <div class="roadmap-card">
-            <h3>Workload feedback</h3>
-            <p>Improves future estimates based on how long your work actually takes.</p>
-          </div>
-          <div class="roadmap-card">
-            <h3>Project breakdown</h3>
-            <p>Divides large projects into smaller tasks and milestones.</p>
-          </div>
-          <div class="roadmap-card">
-            <h3>Syllabus Q&amp;A</h3>
-            <p>Answers questions about deadlines and course information.</p>
-          </div>
-          <div class="roadmap-card">
-            <h3>Natural-language calendar editing</h3>
-            <p>Edit your schedule by typing what you want changed.</p>
-          </div>
-          <div class="roadmap-card">
-            <h3>Deadline verification</h3>
-            <p>Flags uncertain deadlines for confirmation.</p>
-          </div>
-          <div class="roadmap-card">
-            <h3>Shared study groups</h3>
-            <p>Coordinate schedules and study sessions with classmates.</p>
-          </div>
-          <div class="roadmap-card">
-            <h3>Canvas integration</h3>
-            <p>Pull assignments and due dates straight from Canvas, no syllabus upload needed.</p>
-          </div>
-          <!-- duplicated for seamless loop -->
-          <div class="roadmap-card" aria-hidden="true">
-            <h3>AI workload estimation</h3>
-            <p>Estimates how much time assignments will require.</p>
-          </div>
-          <div class="roadmap-card" aria-hidden="true">
-            <h3>Conflict detection</h3>
-            <p>Identifies weeks or days with overlapping deadlines.</p>
-          </div>
-          <div class="roadmap-card" aria-hidden="true">
-            <h3>Grade-weight integration</h3>
-            <p>Prioritizes work based on its impact on your grade.</p>
-          </div>
-          <div class="roadmap-card" aria-hidden="true">
-            <h3>Daily agenda</h3>
-            <p>Recommends what to work on each day.</p>
-          </div>
-          <div class="roadmap-card" aria-hidden="true">
-            <h3>Workload feedback</h3>
-            <p>Improves future estimates based on how long your work actually takes.</p>
-          </div>
-          <div class="roadmap-card" aria-hidden="true">
-            <h3>Project breakdown</h3>
-            <p>Divides large projects into smaller tasks and milestones.</p>
-          </div>
-          <div class="roadmap-card" aria-hidden="true">
-            <h3>Syllabus Q&amp;A</h3>
-            <p>Answers questions about deadlines and course information.</p>
-          </div>
-          <div class="roadmap-card" aria-hidden="true">
-            <h3>Natural-language calendar editing</h3>
-            <p>Edit your schedule by typing what you want changed.</p>
-          </div>
-          <div class="roadmap-card" aria-hidden="true">
-            <h3>Deadline verification</h3>
-            <p>Flags uncertain deadlines for confirmation.</p>
-          </div>
-          <div class="roadmap-card" aria-hidden="true">
-            <h3>Shared study groups</h3>
-            <p>Coordinate schedules and study sessions with classmates.</p>
-          </div>
-          <div class="roadmap-card" aria-hidden="true">
-            <h3>Canvas integration</h3>
-            <p>Pull assignments and due dates straight from Canvas, no syllabus upload needed.</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="demo">
-      <video controls playsinline preload="metadata">
-        <source src="PlannrDemo.mp4" type="video/mp4" />
-        Your browser does not support video playback.
-      </video>
-    </section>
-
-    <section class="disclosure-section" id="faq">
-      <h2 class="section-title">Frequently asked questions</h2>
-      <div class="disclosure-group">
-        <div class="disclosure-item">
-          <button class="disclosure-trigger" aria-expanded="false">
-            <span class="disclosure-title">Which calendar does Plannr sync to?</span>
-            <svg class="disclosure-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          </button>
-          <div class="disclosure-panel">
-            <div class="disclosure-panel-inner">Google Calendar today, using a dedicated secondary calendar per class. Apple Calendar support is planned — see "What's next" above.</div>
-          </div>
-        </div>
-        <div class="disclosure-item">
-          <button class="disclosure-trigger" aria-expanded="false">
-            <span class="disclosure-title">Is my data safe?</span>
-            <svg class="disclosure-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          </button>
-          <div class="disclosure-panel">
-            <div class="disclosure-panel-inner">Your syllabus text is only used to extract dates and isn't stored after processing. Google OAuth credentials are encrypted in transit and at rest, and never exposed to the app or logs. See our <a href="privacy.html">Privacy Policy</a> for the full breakdown.</div>
-          </div>
-        </div>
-        <div class="disclosure-item">
-          <button class="disclosure-trigger" aria-expanded="false">
-            <span class="disclosure-title">What does TestFlight access cost?</span>
-            <svg class="disclosure-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          </button>
-          <div class="disclosure-panel">
-            <div class="disclosure-panel-inner">Getting into the current TestFlight beta is a one-time payment through the button above. Pricing may change once Plannr ships on the App Store.</div>
-          </div>
-        </div>
-        <div class="disclosure-item">
-          <button class="disclosure-trigger" aria-expanded="false">
-            <span class="disclosure-title">Do beta testers get anything when Plannr launches?</span>
-            <svg class="disclosure-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          </button>
-          <div class="disclosure-panel">
-            <div class="disclosure-panel-inner">Yes. If Plannr launches as a paid app, everyone who paid for beta access gets their first 3 months free. That said, Plannr is an early beta and a public launch isn't guaranteed — if the app never ships publicly, or ships without a paid plan, there's nothing to apply the free months to. Your beta payment buys access to the beta as it exists today; the 3 free months are a thank-you on top of that, not a guarantee.</div>
-          </div>
-        </div>
-        <div class="disclosure-item">
-          <button class="disclosure-trigger" aria-expanded="false">
-            <span class="disclosure-title">How do I install the app through TestFlight?</span>
-            <svg class="disclosure-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          </button>
-          <div class="disclosure-panel">
-            <div class="disclosure-panel-inner">After payment you'll get a link to join the beta. Open it on the iPhone or iPad you want Plannr on. If you don't already have the free <a href="https://apps.apple.com/app/testflight/id899247664" target="_blank" rel="noopener">TestFlight</a> app, install that first — then tap the join link, tap Accept, and tap Install.</div>
-          </div>
-        </div>
-        <div class="disclosure-item">
-          <button class="disclosure-trigger" aria-expanded="false">
-            <span class="disclosure-title">What if my syllabus doesn't fit the usual format?</span>
-            <svg class="disclosure-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          </button>
-          <div class="disclosure-panel">
-            <div class="disclosure-panel-inner">Plannr accepts PDF uploads and pasted text, so most syllabus formats work without any prep on your end. Camera scan and Photos import are coming soon.</div>
-          </div>
-        </div>
-        <div class="disclosure-item">
-          <button class="disclosure-trigger" aria-expanded="false">
-            <span class="disclosure-title">Will the dates always be accurate?</span>
-            <svg class="disclosure-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          </button>
-          <div class="disclosure-panel">
-            <div class="disclosure-panel-inner">Plannr's AI parsing is generally accurate but not guaranteed to be error-free, especially on unusually formatted syllabi. Review extracted events before relying on them — you can edit or remove any event before it syncs.</div>
-          </div>
-        </div>
-        <div class="disclosure-item">
-          <button class="disclosure-trigger" aria-expanded="false">
-            <span class="disclosure-title">Is Plannr affiliated with Google or my university?</span>
-            <svg class="disclosure-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          </button>
-          <div class="disclosure-panel">
-            <div class="disclosure-panel-inner">No. Plannr uses Google's public APIs to authenticate and sync events, but it isn't affiliated with or endorsed by Google or any university.</div>
-          </div>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <footer>
-    <div class="footer-brand">
-      <p>&copy; 2026 Plannr</p>
-      <a class="social-link" href="https://github.com/m4ttblanke/plannr" target="_blank" rel="noopener" aria-label="Plannr on GitHub">
-        <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
-      </a>
-      <a class="social-link" href="https://instagram.com/tryplannr" target="_blank" rel="noopener" aria-label="Plannr on Instagram">
-        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2.16c3.2 0 3.58.01 4.85.07 1.17.05 1.8.25 2.23.41.56.22.96.48 1.38.9.42.42.68.82.9 1.38.16.42.36 1.06.41 2.23.06 1.27.07 1.65.07 4.85s-.01 3.58-.07 4.85c-.05 1.17-.25 1.8-.41 2.23-.22.56-.48.96-.9 1.38-.42.42-.82.68-1.38.9-.42.16-1.06.36-2.23.41-1.27.06-1.65.07-4.85.07s-3.58-.01-4.85-.07c-1.17-.05-1.8-.25-2.23-.41a3.7 3.7 0 0 1-1.38-.9 3.7 3.7 0 0 1-.9-1.38c-.16-.42-.36-1.06-.41-2.23-.06-1.27-.07-1.65-.07-4.85s.01-3.58.07-4.85c.05-1.17.25-1.8.41-2.23.22-.56.48-.96.9-1.38.42-.42.82-.68 1.38-.9.42-.16 1.06-.36 2.23-.41 1.27-.06 1.65-.07 4.85-.07M12 0C8.74 0 8.33.01 7.05.07 5.78.13 4.9.33 4.14.63c-.79.31-1.46.72-2.13 1.38A5.9 5.9 0 0 0 .63 4.14c-.3.76-.5 1.64-.56 2.91C.01 8.33 0 8.74 0 12s.01 3.67.07 4.95c.06 1.27.26 2.15.56 2.91.31.79.72 1.46 1.38 2.13.67.66 1.34 1.07 2.13 1.38.76.3 1.64.5 2.91.56C8.33 23.99 8.74 24 12 24s3.67-.01 4.95-.07c1.27-.06 2.15-.26 2.91-.56.79-.31 1.46-.72 2.13-1.38.66-.67 1.07-1.34 1.38-2.13.3-.76.5-1.64.56-2.91.06-1.28.07-1.69.07-4.95s-.01-3.67-.07-4.95c-.06-1.27-.26-2.15-.56-2.91a5.9 5.9 0 0 0-1.38-2.13A5.9 5.9 0 0 0 19.86.63c-.76-.3-1.64-.5-2.91-.56C15.67.01 15.26 0 12 0Zm0 5.84A6.16 6.16 0 1 0 12 18.16 6.16 6.16 0 0 0 12 5.84Zm0 10.16A4 4 0 1 1 12 8a4 4 0 0 1 0 8Zm7.85-10.41a1.44 1.44 0 1 1-2.88 0 1.44 1.44 0 0 1 2.88 0Z"/></svg>
-      </a>
-    </div>
-    <ul class="footer-links">
-      <li><a href="privacy.html">Privacy Policy</a></li>
-      <li><a href="terms.html">Terms of Service</a></li>
-    </ul>
   </footer>
 
-  <script src="site.js"></script>
 </body>
 </html>
