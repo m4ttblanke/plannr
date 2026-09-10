@@ -52,18 +52,11 @@ Plannr is provided on an "as-is" and "as-available" basis without warranties of 
 
 You acknowledge that Plannr is a student-developed project and may contain bugs or limitations.
 
-## 6. Beta Access and Launch Offer
+## 6. Beta Access
 
-Plannr is currently distributed as a paid TestFlight beta. Your one-time payment buys access to the beta build as it exists at the time of purchase. TestFlight betas are time-limited by Apple, and we may change, pause, or end the beta at any time.
+Plannr is currently distributed as a free TestFlight beta. Access is provided at no charge and on an "as is" basis. TestFlight betas are time-limited by Apple, and we may change, pause, or end the beta, or remove any tester, at any time and without notice.
 
-As a thank-you to beta testers, if Plannr is later released to the public as a paid app, everyone who paid for beta access will receive their first 3 months of paid service at no charge. This offer is subject to the following:
-
-- A public launch is not guaranteed. Plannr may never leave beta, may be discontinued, or may launch only as a free product, in which case there is no paid service to which the 3 free months could apply.
-- The offer applies only to the account associated with your beta payment and cannot be transferred, exchanged, or redeemed for cash.
-- If a public launch happens, we will contact beta testers at the email associated with their account with instructions for claiming the free months. You must claim the offer within the window we specify.
-- We may modify the mechanics of the offer (for example, how the credit is applied) as long as the total value of at least 3 months of free paid service is preserved.
-
-Except as required by law, beta payments are non-refundable.
+Plannr may never be released publicly, and if it is, the public version may be free or paid — that has not been decided. Nothing in the beta constitutes a commitment to a future release, feature set, price, or discount.
 
 ## 7. Limitation of Liability
 

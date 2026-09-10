@@ -41,7 +41,7 @@ https://github.com/ucsb-cs148-w26/pj07-syllabus-to-cal-2pm
 - **Google OAuth 2.0** — authentication and Calendar API access
 - **Google Calendar API** — creating and syncing calendar events
 - **Google Gemini** — AI-powered syllabus parsing
-- **Stripe** — one-time payment gating access to the TestFlight demo
+- **Stripe** — payment infrastructure (Checkout + webhook + fulfillment), retained for future monetization; **not** on the current public beta path (the TestFlight beta is free)
 - **slowapi** — per-IP rate limiting on all backend endpoints
 - **Sentry** (`sentry-cocoa`, SPM) — iOS crash reporting; inert unless a DSN is set
 - **GitHub Actions** — CI (backend `pytest` + iOS `xcodebuild test`) on every push/PR, plus a `/health` keep-warm ping so Render's free dyno doesn't cold-start
@@ -123,9 +123,9 @@ Edit `backend/.env` and fill in your values:
 | `GOOGLE_REDIRECT_URI` | Must match a URI registered in Google Cloud Console. Use `http://localhost:8000/auth/callback` for local dev. |
 | `GEMINI_API_KEY` | Gemini API key from AI Studio |
 | `DATABASE_URL` | PostgreSQL connection string — e.g. `postgresql://your_macos_username@localhost:5432/plannr` |
-| `STRIPE_SECRET_KEY` | Optional. Restricted key (`rk_...`) with "Checkout Sessions: Read" permission, from [dashboard.stripe.com/apikeys](https://dashboard.stripe.com/apikeys). Only needed to test the TestFlight payment flow. |
-| `STRIPE_WEBHOOK_SECRET` | Optional. Signing secret (`whsec_...`) for the `/stripe/webhook` endpoint. |
-| `TESTFLIGHT_LINK` | Optional. Public TestFlight join link from App Store Connect, revealed to customers after payment. |
+| `STRIPE_SECRET_KEY` | Optional. Restricted key (`rk_...`) with "Checkout Sessions: Read" permission, from [dashboard.stripe.com/apikeys](https://dashboard.stripe.com/apikeys). Only needed to exercise the preserved Stripe payment flow (not used by the current free beta). |
+| `STRIPE_WEBHOOK_SECRET` | Optional. Signing secret (`whsec_...`) for the `/stripe/webhook` endpoint (preserved Stripe flow). |
+| `TESTFLIGHT_LINK` | Optional. Public TestFlight join link from App Store Connect. Used by the preserved `/testflight/success` flow; the public beta funnel now links to the TestFlight invitation directly from the marketing site. |
 
 ### 5. Run database migrations
 
@@ -171,14 +171,18 @@ Press `Cmd+R` to build and run on a simulator or device.
 5. **Sync** — Tapping Sync creates a dedicated secondary Google Calendar for the class (named after it, colored to match) and pushes all accepted events as all-day events. Transient failures retry with backoff; anything still pending re-syncs automatically when the connection returns.
 6. **Re-sync** — If you edit or delete events later, or upload a new syllabus, the app reconciles changes and pushes only the diff to Google Calendar. Every sync is snapshotted, and you can **restore** the class's events to any past one.
 
-## TestFlight Access (Stripe)
+## TestFlight access
 
-The landing page (`docs/index.html`) has a "Get TestFlight Access" button that links to a Stripe Payment Link for a one-time payment. Two backend routes handle it:
+**Current (public beta):** the beta is **free**. The landing page's "Join the Free Beta" button links to `docs/go/beta.html`, a small redirect page that registers a Cloudflare Web Analytics pageview and then forwards to Plannr's public TestFlight invitation. No payment, no backend call.
 
-- `GET /testflight/success` — the Payment Link's redirect target. Verifies the Checkout Session server-side and reveals the public TestFlight join link (`TESTFLIGHT_LINK`) only once payment is confirmed. This is UX only — customers aren't guaranteed to land here (they may close the tab after paying).
+### Preserved: Stripe payment flow (future monetization)
+
+The Stripe integration below is **retained and functional but dormant** for the public beta — it is not wired into any current public CTA. It's kept so a paid tier can be turned back on later without rebuilding it. Whether this is the final App Store monetization architecture is a separate, later decision.
+
+- `GET /testflight/success` — a Payment Link's redirect target. Verifies the Checkout Session server-side and reveals the public TestFlight join link (`TESTFLIGHT_LINK`) only once payment is confirmed. UX only — customers aren't guaranteed to land here.
 - `POST /stripe/webhook` — the source of truth for fulfillment. Verifies the event signature and handles `checkout.session.completed` / `checkout.session.async_payment_succeeded` (gated on `payment_status != 'unpaid'`).
 
-Both the Payment Link and the webhook endpoint (Dashboard → Webhooks → pointed at `https://plannr-api.onrender.com/stripe/webhook`) are configured directly in the Stripe Dashboard — there's no code path that creates them.
+When used, both the Payment Link and the webhook endpoint (Dashboard → Webhooks → pointed at `https://plannr-api.onrender.com/stripe/webhook`) are configured directly in the Stripe Dashboard — there's no code path that creates them.
 
 ### Testing without real money
 

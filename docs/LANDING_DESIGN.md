@@ -22,7 +22,10 @@ To be audited before redesign.
 
 ## Primary CTA
 
-Get TestFlight Access
+Join the Free Beta
+
+Links to `go/beta.html`, which records a Cloudflare pageview and redirects to
+Plannr's public TestFlight invitation. The beta is free — no payment step.
 
 ## Product proof
 
