@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Redirecting to Plannr…</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="canonical" href="https://tryplannr.app/" />
+
+  <!-- Campaign entry redirect. /linkedin is a clean public URL that lands the
+       visitor on the Plannr landing page with fixed UTM tags; site.js there
+       carries those onto the "Join the Free Beta" CTA. This does NOT go to
+       /go/beta.html or TestFlight. Attribution values are fixed — any query
+       params sent to /linkedin are ignored. -->
+  <meta http-equiv="refresh" content="0; url=https://tryplannr.app/?utm_source=linkedin&amp;utm_medium=post&amp;utm_campaign=beta_launch" />
+  <script>
+    // Immediate hand-off; replace() so this stub isn't left in history.
+    window.location.replace("https://tryplannr.app/?utm_source=linkedin&utm_medium=post&utm_campaign=beta_launch");
+  </script>
+
+  <link rel="icon" type="image/x-icon" href="../favicon.ico" />
+  <style>
+    html, body { margin: 0; }
+    body {
+      min-height: 100svh; display: grid; place-items: center; padding: 2rem;
+      background: #f7f2e7; color: #23201a; text-align: center;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    }
+    a { color: #002e61; }
+  </style>
+
+  <!-- Cloudflare Web Analytics -->
+  <script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "56b37c71bdaf4f969a3b2ad12a8bd943"}'></script>
+  <!-- End Cloudflare Web Analytics -->
+</head>
+<body>
+  <p>Redirecting to
+    <a href="https://tryplannr.app/?utm_source=linkedin&amp;utm_medium=post&amp;utm_campaign=beta_launch">tryplannr.app</a>…</p>
+</body>
+</html>

@@ -7,7 +7,11 @@
 #
 # Public (served): index.html, privacy.html, terms.html, style.css, site.js,
 #   favicon*.{ico,png}, apple-touch-icon.png, screenshots/, assets/, go/,
-#   PlannrDemo.mp4, CNAME
+#   linkedin/, instagram/, PlannrDemo.mp4, CNAME
+#
+# linkedin/ and instagram/ are clean-URL campaign-entry redirects
+# (/linkedin, /instagram -> the landing page with fixed utm_* tags). They must
+# stay OUT of the exclude list below or the routes 404.
 #
 # When you add another internal doc under docs/, add it here too.
 #
