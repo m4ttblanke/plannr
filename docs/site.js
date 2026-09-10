@@ -315,4 +315,65 @@
       paintProof();
     }
   }
+
+  /* ------------------------------------------ campaign attribution --- */
+  /*  Carry utm_* from the landing URL onto the Stripe CTAs so a purchase
+      can be traced back to the campaign that drove it.
+
+      Stripe Payment Links natively accept utm_source / utm_medium /
+      utm_campaign / utm_term / utm_content, and a client_reference_id
+      that surfaces in the checkout.session.completed webhook and on the
+      payment row in the Dashboard.
+      (https://docs.stripe.com/payment-links/url-parameters)
+
+      No cookie, no storage, no third party: the params are read straight
+      off the current URL. This is a one-page site, so ?utm_… set on the
+      landing request is still on location.search when a CTA is clicked.
+      See docs/ANALYTICS.md for the campaign-URL convention. */
+  var UTM_KEYS = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"];
+  var stripeCtas = document.querySelectorAll('a[href*="buy.stripe.com"]');
+  if (stripeCtas.length && window.URL && window.URLSearchParams) {
+    var landing = null;
+    try { landing = new URLSearchParams(window.location.search); } catch (e) { landing = null; }
+    if (landing) {
+      /* Stripe keeps only [A-Za-z0-9_-] in these values and silently drops
+         anything else, so normalise: lower-case, runs of other chars -> "_",
+         trim, and bound the length. */
+      var tidy = function (v) {
+        return String(v).toLowerCase()
+          .replace(/[^a-z0-9_]+/g, "_")
+          .replace(/^_+|_+$/g, "")
+          .slice(0, 60);
+      };
+      var utm = {};
+      for (var ui = 0; ui < UTM_KEYS.length; ui++) {
+        var rawv = landing.get(UTM_KEYS[ui]);
+        if (rawv) {
+          var cleanv = tidy(rawv);
+          if (cleanv) utm[UTM_KEYS[ui]] = cleanv;
+        }
+      }
+      if (utm.utm_source || utm.utm_campaign) {
+        var refParts = [];
+        if (utm.utm_campaign) refParts.push("cmp-" + utm.utm_campaign);
+        if (utm.utm_source) refParts.push("src-" + utm.utm_source);
+        if (utm.utm_medium) refParts.push("mdm-" + utm.utm_medium);
+        var ref = refParts.join("__").slice(0, 200);
+
+        for (var ci = 0; ci < stripeCtas.length; ci++) {
+          var link;
+          try { link = new URL(stripeCtas[ci].href); } catch (e) { continue; }
+          for (var ki = 0; ki < UTM_KEYS.length; ki++) {
+            if (utm[UTM_KEYS[ki]] && !link.searchParams.has(UTM_KEYS[ki])) {
+              link.searchParams.set(UTM_KEYS[ki], utm[UTM_KEYS[ki]]);
+            }
+          }
+          if (ref && !link.searchParams.has("client_reference_id")) {
+            link.searchParams.set("client_reference_id", ref);
+          }
+          stripeCtas[ci].href = link.toString();
+        }
+      }
+    }
+  }
 })();
