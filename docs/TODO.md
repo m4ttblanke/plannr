@@ -105,8 +105,13 @@ suite passes via `xcodebuild test`. Findings below are ordered by severity.
   window on the DB's Recovery page in the Render dashboard, and consider an
   external `pg_dump` cron for off-Render redundancy; (b) if a blueprint sync ever
   rejects `plan: basic-256mb`, check the exact plan slug on the DB's Settings
-  page (Render has renamed Postgres plans over time). The **web service** is
-  still `plan: free` (cold-starts) — separate, lower-priority cost decision.
+  page (Render has renamed Postgres plans over time).
+
+  **Update (2026-09-09):** the **web service** is now on a paid Render plan as
+  well — compute `0.5c-512mb` (0.5 CPU / 512 MB RAM, ~$7/mo), no cold-starts, no
+  idle spin-down. `render.yaml` and `docs/COSTS.md` updated to match. Same
+  caveat as the DB plan: if a blueprint sync rejects the slug, re-check the
+  service's Instance Type page for the exact accepted value.
 
 - ~~**Internal ops docs are published by the public site.**~~ **FIXED
   (2026-09-03).** Added [`docs/_config.yml`](_config.yml) with a Jekyll

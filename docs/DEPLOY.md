@@ -58,8 +58,9 @@ RESTful API built with **FastAPI**, deployed on **[Render](https://render.com)**
 | Rate limiting | `slowapi`, per-IP (100/min default; tighter per-route) |
 | Health check | `GET /health` — always 200 while serving; body reports DB
 readiness. `render.yaml` sets it as `healthCheckPath`. |
-| Plan | Free tier (spins down after ~15 min idle; first request after a
-cold start can take ~30 s — the keep-warm workflow below mitigates this) |
+| Plan | Paid compute `0.5c-512mb` (0.5 CPU / 512 MB RAM, ~$7/mo) — no idle
+spin-down, no ~30 s cold start. Set as `plan` in `render.yaml`. The keep-warm
+workflow below is now a safety net, not load-bearing. |
 
 **Data stored server-side:** only a user record (`email`, timestamps) and their
 Google OAuth credentials (access token, refresh token, scopes, plus a hash of the
@@ -139,10 +140,10 @@ needs no secrets. Render deploys are **not** gated on it today; add it as a
 required status check in branch protection to gate merges.
 
 The other workflow, [`keep-warm.yml`](../.github/workflows/keep-warm.yml), is
-**not** part of deployment — it just `curl`s `/health` every ~10 minutes so the
-free dyno doesn't cold-start (which also steadies the OAuth round-trip). It fails
-on a non-200 and warns when the DB is unavailable, so it doubles as a crude
-uptime check. Override the target with a repo variable `HEALTH_URL`. For real
+**not** part of deployment — it just `curl`s `/health` every ~10 minutes. The
+paid `0.5c-512mb` instance doesn't idle-spin-down, so this is now a crude uptime
+check rather than a cold-start mitigation: it fails on a non-200 and warns when
+the DB is unavailable. Override the target with a repo variable `HEALTH_URL`. For real
 alerting, point an uptime service (UptimeRobot / Better Stack) at the same URL —
 see [`OPS.md`](OPS.md).
 

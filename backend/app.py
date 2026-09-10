@@ -530,8 +530,10 @@ async def parse_syllabus(request: Request, file: UploadFile = File(...)):
             )
         logger.info("Syllabus size: %d bytes", len(contents))
 
-        # Extract text from PDF
-        pdf_text = extract_text_from_pdf(contents)
+        # Extract text from PDF. PyPDF2 (and the OCR fallback) are blocking and
+        # CPU-bound, so run them off the event loop to keep the worker responsive
+        # to other requests while a syllabus is being processed.
+        pdf_text = await asyncio.to_thread(extract_text_from_pdf, contents)
         logger.info("Extracted %d characters of syllabus text", len(pdf_text))
 
         if not pdf_text:
@@ -788,7 +790,11 @@ Return a **single JSON object** in this exact format:
     response = None
     for attempt in range(1, GEMINI_MAX_ATTEMPTS + 1):
         try:
-            response = _gemini_client.models.generate_content(
+            # generate_content is a synchronous, network-bound SDK call; run it
+            # in a worker thread so it doesn't block the event loop for the
+            # duration of the Gemini round-trip. Same call, args and exceptions.
+            response = await asyncio.to_thread(
+                _gemini_client.models.generate_content,
                 model='gemini-3.7-flash',
                 contents=prompt,
                 config=genai_types.GenerateContentConfig(
@@ -1500,7 +1506,7 @@ async def testflight_success(request: Request, session_id: str = Query(...)):
         return HTMLResponse(
             _TESTFLIGHT_PAGE.format(
                 title="Not configured", heading="Not configured yet",
-                message="Stripe isn't set up on this server. Email mattheweblanke@gmail.com for help.", action="", analytics=""
+                message="Stripe isn't set up on this server. Email plannr.review@gmail.com for help.", action="", analytics=""
             ),
             status_code=500
         )
@@ -1511,7 +1517,7 @@ async def testflight_success(request: Request, session_id: str = Query(...)):
         return HTMLResponse(
             _TESTFLIGHT_PAGE.format(
                 title="Invalid session", heading="We couldn't verify that",
-                message="This link looks invalid or expired. If you were just charged, email mattheweblanke@gmail.com.", action="",
+                message="This link looks invalid or expired. If you were just charged, email plannr.review@gmail.com.", action="",
                 analytics=""
             ),
             status_code=400
@@ -1521,7 +1527,7 @@ async def testflight_success(request: Request, session_id: str = Query(...)):
         return HTMLResponse(
             _TESTFLIGHT_PAGE.format(
                 title="Payment incomplete", heading="Payment not completed",
-                message="We couldn't confirm your payment. If you believe this is an error, email mattheweblanke@gmail.com.", action="",
+                message="We couldn't confirm your payment. If you believe this is an error, email plannr.review@gmail.com.", action="",
                 analytics=""
             ),
             status_code=402
@@ -1531,7 +1537,7 @@ async def testflight_success(request: Request, session_id: str = Query(...)):
         return HTMLResponse(
             _TESTFLIGHT_PAGE.format(
                 title="Almost there", heading="Payment confirmed!",
-                message="We're still finishing TestFlight setup — check back shortly, or email mattheweblanke@gmail.com for your access link.",
+                message="We're still finishing TestFlight setup — check back shortly, or email plannr.review@gmail.com for your access link.",
                 action="", analytics=""
             ),
             status_code=200

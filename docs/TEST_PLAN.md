@@ -487,7 +487,7 @@ visit `localhost:8000`).
   setting on, it does **not** auto-scroll but is still draggable / scrollable.
 - [ ] The **demo phone mockups** render crisply (no fuzzy text).
 - [ ] **Privacy** and **Terms** links open; both show **"Last updated:
-  August 30, 2026"** and contact **mattheweblanke@gmail.com**.
+  September 9, 2026"** and contact **plannr.review@gmail.com**.
 - [ ] "Get TestFlight Access" links to the Stripe payment link.
 
 ### 2f. TestFlight / Stripe flow (optional — needs Stripe test mode)
