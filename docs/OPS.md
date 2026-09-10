@@ -1,4 +1,4 @@
-# Ops — health check & keeping the dyno warm
+# Ops — health check & uptime monitoring
 
 ## `GET /health`
 
@@ -17,17 +17,19 @@ Always returns **200** while the process is serving. Body:
 
 - `ready` / `database` — `false` / `"unavailable"` when the DB doesn't answer a
   `SELECT 1`. The HTTP status stays 200: the app tolerates a briefly-unreachable
-  database (Render's free Postgres sleeps/restarts), so a nap must **not** make
-  Render cycle the instance. Alert on the body if you want DB-down paging.
+  database (a restart, failover, or transient network blip), so a nap must
+  **not** make Render cycle the instance. Alert on the body if you want DB-down
+  paging.
 - `version` — `RENDER_GIT_COMMIT` (short) in production, `"dev"` locally.
 
 `render.yaml` sets `healthCheckPath: /health` so Render's own checks use it.
 
-## Keeping the free dyno warm
+## Keeping the service warm (safety net)
 
-Render's free web service spins down after ~15 min idle; the next request eats a
-~30–60 s cold start (which also makes the OAuth round-trip flaky). Pinging
-`/health` on a schedule keeps it up.
+The web service is on a paid Render tier now, so it **no longer spins down on
+idle** and there's no ~30–60 s cold start. The scheduled `/health` ping below is
+kept as a low-cost early-warning signal (service or DB not answering), not
+because the instance sleeps.
 
 ### Built in: GitHub Actions (`.github/workflows/keep-warm.yml`)
 

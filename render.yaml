@@ -3,7 +3,12 @@ services:
     name: plannr-api
     env: python
     region: oregon
-    plan: free
+    # Paid compute plan: 0.5 CPU / 512 MB RAM, ~$7/mo — no idle spin-down or
+    # cold starts. Slug taken from the service's Instance Type page in the Render
+    # dashboard. If a blueprint sync ever rejects `0.5c-512mb`, re-check that page
+    # for the exact accepted value (Render has renamed plans over time — same
+    # caveat as the database plan below).
+    plan: 0.5c-512mb
     rootDir: backend
     healthCheckPath: /health
     buildCommand: pip install -r requirements.txt

@@ -1,6 +1,6 @@
 # Cost & Break-Even Model
 
-*Last updated: September 1, 2026. All third-party prices are estimates — verify
+*Last updated: September 9, 2026. All third-party prices are estimates — verify
 against current published pricing before relying on these numbers.*
 
 This document estimates what it costs to run Plannr, what each paying customer
@@ -17,19 +17,19 @@ the one you set.
 | Item | Cost | Notes |
 | --- | --- | --- |
 | Apple Developer Program | **$99 / year** | Required to ship to TestFlight or the App Store. Flat fee. |
-| Render — web service | **$0 (free) → ~$7 / mo** ($84/yr) | Currently `plan: free` in `render.yaml`. Free tier spins down after ~15 min idle (cold-start delay on the next request). Starter is ~$7/mo. |
+| Render — web service | **$7 / mo** ($84/yr) | Paid compute plan `0.5c-512mb` (0.5 CPU / 512 MB RAM) in `render.yaml` — no idle spin-down, no cold starts. |
 | Render — PostgreSQL | **$6 / mo** ($72/yr) | **Now on the paid `basic-256mb` plan** (0.1 CPU / 256 MB / 1 GB storage) in `render.yaml` — durable, not time-limited, with automatic daily backups. The free tier (deleted after ~30 days, no backups) is no longer in use. |
 | Landing page hosting | **$0** | Served from `docs/` via GitHub Pages (supports HTTPS + a custom domain). |
-| Domain — `tryplannr.app` (planned) | **$16 year 1, then $30 / yr** | Via Squarespace. Not yet purchased. `.app` requires HTTPS, which GitHub Pages provides. Squarespace pricing is on the high side — plan to transfer to a cheaper registrar (~$12–15/yr for `.app`) later. |
+| Domain — `tryplannr.app` | **Live / in use** (confirm registrar & renewal price) | Registered and serving the marketing site over HTTPS via GitHub Pages (`docs/CNAME`, `_config.yml`). `.app` is HTTPS-only, which Pages satisfies. If it's on a premium registrar (~$30/yr for `.app`), a later transfer to a budget `.app` registrar (~$12–15/yr) still saves money. |
 | Cloudflare Web Analytics | **$0** | Free tier. |
 
 **Fixed-cost scenarios:**
 
 | Scenario | Annual fixed cost | When it applies |
 | --- | --- | --- |
-| **Minimum** (free web tier, no domain) | **~$99 + $72 / yr** (~$14.25/mo) | Current setup: free web service (cold starts), paid `$6/mo` database (durable). |
-| **DB-only paid** (free web + $6/mo DB + domain) | **~$201 / yr** (~$16.75/mo) | Durable data, but the API still cold-starts. Year 1 ~$187 with the $16 intro domain price. |
-| **Fully paid** (Starter web + $6/mo DB + domain) | **~$285 / yr** (~$23.75/mo) | No cold starts. Year 1 ~$271. This is the target for paying customers. |
+| **Minimum** (free web tier, no domain) | **~$99 + $72 / yr** (~$14.25/mo) | Historical low-water mark — no longer current. |
+| **DB-only paid** (free web + $6/mo DB + domain) | **~$201 / yr** (~$16.75/mo) | Superseded — the web service is no longer free. Kept for reference. |
+| **Fully paid** ($7/mo web + $6/mo DB + domain) | **~$285 / yr** (~$23.75/mo) | **This is the current setup** — `$7/mo` web compute (`0.5c-512mb`, no cold starts), `$6/mo` `basic-256mb` DB, live domain. |
 
 ---
 
@@ -100,13 +100,14 @@ Year 1 is ~$14 cheaper thanks to the intro domain price.
 
 1. **Price (set in Stripe).** Doubling the price nearly halves the break-even
    count. This is the single biggest lever.
-2. **Render web tier.** The database is already on the **$6/mo paid Postgres**
-   (durable, backed up). The remaining lever is the web service: still free, so
-   the API cold-starts after ~15 min idle (the keep-warm workflow only softens
-   this). Moving it to a paid instance (~$7/mo) removes cold starts entirely.
-3. **Domain registrar.** `tryplannr.app` through Squarespace is $16 the first
-   year then **$30/yr** — roughly double a budget registrar. Transferring to
-   Cloudflare/Porkbun/Namecheap after the first year saves ~$15/yr.
+2. **Render web tier.** Both the database (**$6/mo `basic-256mb` Postgres**) and
+   the web service (**$7/mo `0.5c-512mb` compute**) are on paid Render plans, so
+   the API no longer cold-starts and the keep-warm workflow is just a safety net.
+   This lever is now spent — the next cost decision is only whether to scale *up*
+   under load.
+3. **Domain registrar.** `tryplannr.app` is registered and live. If it's on a
+   premium registrar (~$30/yr for `.app`), transferring to
+   Cloudflare/Porkbun/Namecheap later saves ~$15/yr versus a budget `.app` price.
 4. **Disputes / refunds.** One Stripe dispute is $15 — it erases ~3 sales at $5
    or ~6 at $3. A 2–3% dispute rate on a cheap impulse purchase is realistic;
    budget for it.
@@ -121,7 +122,7 @@ Replace the placeholders and recompute:
 
 ```
 P                 = <your Stripe price>
-fixed_annual      = 99 (Apple) + 72 (Render DB $6/mo) + [84 if paid web] + 30 (domain, yr 2+)
+fixed_annual      = 99 (Apple) + 72 (Render DB $6/mo) + 84 (Render web $7/mo) + 30 (domain, yr 2+)
 net_per_customer  = P − 0.30 − 0.029·P − 0.15
 break_even_users  = fixed_annual ÷ net_per_customer
 
