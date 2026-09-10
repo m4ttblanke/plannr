@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Opening Plannr in TestFlight…</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="canonical" href="https://tryplannr.app/go/beta.html" />
+  <!-- No-JS / slow-JS fallback: hand off after 1s. With JS the redirect below
+       fires sooner (after a brief pause so the Cloudflare pageview registers). -->
+  <meta http-equiv="refresh" content="1; url=https://testflight.apple.com/join/8q3eFC8d" />
+  <link rel="icon" type="image/x-icon" href="../favicon.ico" />
+  <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png" />
+  <style>
+    :root {
+      --paper: #f7f2e7;
+      --navy: #002e61;
+      --gold: #fdb814;
+      --ink: #23201a;
+      --ink-soft: #5b5647;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      min-height: 100svh;
+      display: grid;
+      place-items: center;
+      padding: 2rem;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: "Fraunces", Georgia, "Times New Roman", serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .card { max-width: 26rem; text-align: center; }
+    .mark {
+      width: 40px; height: 40px; border-radius: 10px;
+      background: var(--navy); margin: 0 auto 1.25rem;
+      display: grid; place-items: center;
+    }
+    .mark svg { width: 22px; height: 22px; fill: var(--gold); }
+    h1 {
+      font-size: 1.4rem; font-weight: 600; line-height: 1.25;
+      margin: 0 0 0.5rem;
+    }
+    p {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      color: var(--ink-soft); font-size: 0.98rem; line-height: 1.55;
+      margin: 0 0 1.5rem;
+    }
+    a.btn {
+      display: inline-block;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      font-weight: 600; font-size: 0.95rem;
+      text-decoration: none;
+      color: var(--navy); background: var(--gold);
+      padding: 0.8em 1.5em; border-radius: 999px;
+    }
+    a.btn:hover { background: #ffc63d; }
+  </style>
+
+  <!-- Cloudflare Web Analytics -->
+  <script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "56b37c71bdaf4f969a3b2ad12a8bd943"}'></script>
+  <!-- End Cloudflare Web Analytics -->
+</head>
+<body>
+  <main class="card">
+    <div class="mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M12 2l2.9 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14l-5-4.87 7.1-1.01z"/></svg>
+    </div>
+    <h1>Opening Plannr in TestFlight…</h1>
+    <p>Taking you to the free Plannr beta invitation. If nothing happens, use the button below.</p>
+    <a class="btn" href="https://testflight.apple.com/join/8q3eFC8d">Open TestFlight</a>
+  </main>
+
+  <script>
+    (function () {
+      "use strict";
+      var TESTFLIGHT = "https://testflight.apple.com/join/8q3eFC8d";
+      // Short, deliberate pause: long enough to give the Cloudflare Web
+      // Analytics beacon a chance to register this pageview, short enough that
+      // it reads as an instant hand-off. UX first — a missed beacon just means
+      // one uncounted click, not a broken funnel.
+      window.setTimeout(function () {
+        window.location.replace(TESTFLIGHT);
+      }, 220);
+    })();
+  </script>
+</body>
+</html>

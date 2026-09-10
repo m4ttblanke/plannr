@@ -488,11 +488,22 @@ visit `localhost:8000`).
 - [ ] The **demo phone mockups** render crisply (no fuzzy text).
 - [ ] **Privacy** and **Terms** links open; both show **"Last updated:
   September 9, 2026"** and contact **plannr.review@gmail.com**.
-- [ ] "Get TestFlight Access" links to the Stripe payment link.
+- [ ] **"Join the Free Beta"** (nav, hero, and final CTA) all point to
+  `go/beta.html`. No CTA goes to `buy.stripe.com` or implies payment.
+- [ ] Opening a "Join the Free Beta" CTA lands briefly on an **"Opening Plannr
+  in TestFlight…"** page (with an **Open TestFlight** fallback link), then
+  redirects to `https://testflight.apple.com/join/8q3eFC8d`.
+- [ ] Load the landing page with `?utm_source=instagram&utm_medium=bio_link&utm_campaign=beta_launch`.
+  **Expect:** the page renders normally and the "Join the Free Beta" CTAs now
+  point to `go/beta.html?utm_source=instagram&utm_medium=bio_link&utm_campaign=beta_launch`.
+- [ ] FAQ: "What does TestFlight access cost?" answers **free** (no payment
+  language for the beta).
 
-### 2f. TestFlight / Stripe flow (optional — needs Stripe test mode)
+### 2f. Preserved Stripe payment flow (optional — needs Stripe test mode)
 
-Follow the "Testing without real money" steps in `README.md`. Then:
+**Not on the current public path** — the public beta is free. This exercises the
+retained payment infrastructure only. Follow the "Testing without real money"
+steps in `README.md`. Then:
 
 - [ ] Pay with test card `4242 4242 4242 4242`. The redirect hits
   `/testflight/success?session_id=…`.

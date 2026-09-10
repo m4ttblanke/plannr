@@ -4,11 +4,16 @@
 against current published pricing before relying on these numbers.*
 
 This document estimates what it costs to run Plannr, what each paying customer
-nets, and how many customers are needed to break even. The revenue model today is
-a **one-time payment for TestFlight access** (a Stripe Payment Link on the
-landing page). The price is configured in the Stripe Dashboard, not in this
-repo — the tables below are worked at several price points so you can read off
-the one you set.
+nets, and how many customers are needed to break even.
+
+> **Current status (2026-09):** the public TestFlight beta is **free** — there is
+> **no active revenue**. The landing page links straight to the TestFlight
+> invitation; nobody is charged. The Stripe Payment Link / Checkout / webhook
+> infrastructure is **retained but dormant** for possible future monetization
+> (a decision to be made later). Everything below models a **hypothetical
+> one-time-payment scenario** for if/when that is turned on — the price would be
+> set in the Stripe Dashboard, not in this repo, so the tables are worked at
+> several price points.
 
 ---
 

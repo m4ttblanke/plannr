@@ -154,8 +154,12 @@ The public site is served by **GitHub Pages** from `main` → **`/docs`** (Setti
 
 ```
 docs/index.html  privacy.html  terms.html  style.css  site.js
-docs/favicon*.{ico,png}  apple-touch-icon.png  screenshots/  PlannrDemo.mp4
+docs/favicon*.{ico,png}  apple-touch-icon.png  screenshots/  assets/  go/  PlannrDemo.mp4
 ```
+
+`docs/go/beta.html` is the public free-beta redirect: the landing page's
+"Join the Free Beta" CTAs point at it, it records a Cloudflare Web Analytics
+pageview, then forwards to Plannr's TestFlight invitation.
 
 The operational docs that also live in `docs/` (`DEPLOY.md`, `COSTS.md`,
 `OPS.md`, `TEST_PLAN.md`, `MANUAL.md`, `TODO.md`, `CRASH_REPORTING.md`, and the
@@ -181,7 +185,7 @@ adding a new internal doc under `docs/`, add it to that `exclude:` list.
   - An OAuth 2.0 client of type **Web application**
   - Gemini API enabled
 - A **Gemini API key** from [aistudio.google.com](https://aistudio.google.com)
-- *(Optional, for the paid TestFlight flow)* a **Stripe** account
+- *(Optional, for the preserved Stripe payment flow — not used by the current free beta)* a **Stripe** account
 - *(Optional)* a **[Sentry](https://sentry.io)** project for iOS crash reports —
   paste its DSN into `Plannr/Plannr/Info.plist` (`SENTRY_DSN`). Empty = crash
   reporting off. See [`CRASH_REPORTING.md`](CRASH_REPORTING.md).
@@ -230,9 +234,9 @@ All backend configuration is read from environment variables (locally via
 | `GEMINI_API_KEY` | Yes* | Gemini API key. If unset, `/syllabus` returns a "not configured" error. |
 | `DATABASE_URL` | Yes | PostgreSQL connection string. On Render this is wired automatically from the `plannr-db` database. |
 | `TOKEN_ENC_KEY` | Prod | Fernet key(s) encrypting stored Google OAuth tokens at rest. Unset = tokens stored **in plaintext** (dev only). Generate: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. Rotate by prepending a new key, comma-separated (`NEW,OLD`), until every row has re-written on next sign-in, then drop `OLD`. |
-| `STRIPE_SECRET_KEY` | No | Restricted key (`rk_...`) with "Checkout Sessions: Read". Needed only for the TestFlight payment flow. |
-| `STRIPE_WEBHOOK_SECRET` | No | Signing secret (`whsec_...`) for `POST /stripe/webhook`. |
-| `TESTFLIGHT_LINK` | No | Public TestFlight join link, revealed to customers after a confirmed payment. |
+| `STRIPE_SECRET_KEY` | No | Restricted key (`rk_...`) with "Checkout Sessions: Read". Only for the preserved Stripe payment flow — the current free beta doesn't use it. |
+| `STRIPE_WEBHOOK_SECRET` | No | Signing secret (`whsec_...`) for `POST /stripe/webhook` (preserved Stripe flow). |
+| `TESTFLIGHT_LINK` | No | Public TestFlight invitation link. Used by the preserved `/testflight/success` flow; the public beta funnel links to the same invitation directly from the marketing site (`docs/go/beta.html`). |
 
 \* Not required for the app to boot, but syllabus parsing (the core feature)
 does not work without it.
@@ -244,7 +248,9 @@ does not work without it.
 Render will **not** read a value from the blueprint — you must set each one in
 the Render dashboard (**Service → Environment**) or during Blueprint creation.
 A missing `STRIPE_*` / `TESTFLIGHT_LINK` degrades gracefully: `/testflight/success`
-and the webhook report "not configured" instead of crashing.
+and the webhook report "not configured" instead of crashing. The public free-beta
+funnel is entirely static (`docs/go/beta.html` → TestFlight invitation) and does
+not depend on any of these being set.
 
 ### Upload guardrails (not configurable)
 
@@ -330,10 +336,12 @@ network call in the app reads it. Then open `Plannr/Plannr.xcodeproj` and press
 > cannot — use your Mac's LAN IP (`http://192.168.x.x:8000/`) and make sure both
 > devices are on the same network.
 
-#### Part 3 — (Optional) Stripe test mode
+#### Part 3 — (Optional) Stripe test mode — preserved flow, not the current beta path
 
-See the **TestFlight Access (Stripe)** section of the repo-root `README.md` for
-the `stripe listen` / test-card walkthrough.
+See the **TestFlight access → Preserved: Stripe payment flow** section of the
+repo-root `README.md` for the `stripe listen` / test-card walkthrough. The public
+free beta doesn't touch Stripe; this is only for exercising the retained payment
+infrastructure.
 
 ---
 
